@@ -59,31 +59,31 @@ DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
 ```
 You have:
 
-| Command           | Action                                                                                                                       | Input Type |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------|------------|
-| Setup             |                                                                                                                              |            |
-| cores             | Changes the number of cores you are using, default is maximum! **Let's up the tempo.**                                       |            |
-| burn_out          | To configure the steps for the burn out phase. Default is half the steps for the chainlength.                                |            |
-| CONSTRAIN         | This constrain the search according to the results of the previous analyzed model. Default is True. (should be always True)  |            |
-| thin              | Thins the chain. Default is 1.                                                                                               |            |
-| Statistical Tools |                                                                                                                              |            |
-| bayes_factor      | changes the in-chain factor, default is sp.log(150)                                                                          |            |
-| model_comparison  | Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running, default is 5 |            |
-| BIC               | This is the BIC used to compare models. Default is 5.                                                                        |            |
-| AIC               | This is the AIC used to compare models. Default is 5.                                                                        |            |
-| Model             |                                                                                                                              |            |
-| MOAV              | Sets the Moving Average Order for the rednoise model. Default is 1. (can be 0)                                               |            |
-| eccprior          | Sets the sigma for the Prior Normal Distribution for eccentricity. Default is 0.3                                            |            |
-| jittprior         | Sets the sigma for the Prior Normal Distribution for jitter. Default is 5.0                                                  |            |
-| jittmean          | Sets the mu for the Prior Normal Distribution for jitter. Default is 5.0 as well                                             |            |
-| STARMASS          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                 |            |
-| HILL              | Enables the fact that the Hill Stability Criteria has to comply as a prior.                                                  |            |
-| Plotting          |                                                                                                                              |            |
-| PLOT              | Enables Plotting. Default is True                                                                                            |            |
-| CORNER            | Enables Corner plot. Default is True                                                                                         |            |
-| HISTOGRAMS        | Enables Beautiful Histograms. Default is True                                                                                |            |
-| PNG               | Enables PNG plots. Default is True                                                                                           |            |
-| PDF               | Enables PDF plots. Default is False                                                                                          |            |
-| draw_every_n      | draws 1 every n points in the plots, without thining the chain for the statistics. Default is 1.                             |            |
-| Easter            | True/False. Short sounds that tell you what is emperor doing! So you can work on other things while it's ready.              |            |
-| MUSIC             |                                                                                                                              |            |
+| Command           | Action                                                                                                                       | Input Type | Default |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------|------------|---------|
+| Setup             |                                                                                                                              |            |         |
+| cores             | Changes the number of cores you are using, default is maximum! **Let's up the tempo.**                                       |            |         |
+| burn_out          | To configure the steps for the burn out phase. Default is half the steps for the chainlength.                                |            |         |
+| CONSTRAIN         | This constrain the search according to the results of the previous analyzed model. Default is True. (should be always True)  |            |         |
+| thin              | Thins the chain. Default is 1.                                                                                               |            |         |
+| Statistical Tools |                                                                                                                              |            |         |
+| bayes_factor      | changes the in-chain factor, default is sp.log(150)                                                                          |            |         |
+| model_comparison  | Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running, default is 5 |            |         |
+| BIC               | This is the BIC used to compare models. Default is 5.                                                                        |            |         |
+| AIC               | This is the AIC used to compare models. Default is 5.                                                                        |            |         |
+| Model             |                                                                                                                              |            |         |
+| MOAV              | Sets the Moving Average Order for the rednoise model. Default is 1. (can be 0)                                               |            |         |
+| eccprior          | Sets the sigma for the Prior Normal Distribution for eccentricity. Default is 0.3                                            |            |         |
+| jittprior         | Sets the sigma for the Prior Normal Distribution for jitter. Default is 5.0                                                  |            |         |
+| jittmean          | Sets the mu for the Prior Normal Distribution for jitter. Default is 5.0 as well                                             |            |         |
+| STARMASS          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                 |            |         |
+| HILL              | Enables the fact that the Hill Stability Criteria has to comply as a prior.                                                  |            |         |
+| Plotting          |                                                                                                                              |            |         |
+| PLOT              | Enables Plotting. Default is True                                                                                            |            |         |
+| CORNER            | Enables Corner plot. Default is True                                                                                         |            |         |
+| HISTOGRAMS        | Enables Beautiful Histograms. Default is True                                                                                |            |         |
+| PNG               | Enables PNG plots. Default is True                                                                                           |            |         |
+| PDF               | Enables PDF plots. Default is False                                                                                          |            |         |
+| draw_every_n      | draws 1 every n points in the plots, without thining the chain for the statistics. Default is 1.                             |            |         |
+| Easter            |                                                                                                                              |            |         |
+| Music              | True/False                                                                                                                  |            |         |
