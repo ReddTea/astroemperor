@@ -56,6 +56,9 @@ You will see chain plots, posterior plots, histograms, phasefolded curves, the c
 Assuming  you have already set up the chain:
 ```sh
 DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
+DT.eccprior = 0.1
+DT.PNG = False
+DT.PDF = True
 ```
 You have:
 
@@ -87,3 +90,4 @@ You have:
 | draw_every_n      | draws 1 every n points in the plots, without thining the chain for the statistics. Default is 1.                             |            |         |
 | Easter            |                                                                                                                              |            |         |
 | Music              | True/False                                                                                                                  |            |         |
+
