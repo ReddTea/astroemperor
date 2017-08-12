@@ -37,11 +37,11 @@ stardat = sp.array(['starname_1_telescopename1.vels', 'starname_2_telescopename2
 setup = sp.array([5, 300, 12000])  # temperatures, walkers, steps
 
 DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
-DT.conquer(0, 5)
+DT.conquer(0, 5)  # run from 0 to 5 signals !
 ```
 
 # Outputs
 They go under /datalogs folder. Following the name convention for the datasets, you should have them properly clasiffied as /datalogs/starname/<date_i>, where i is the ith run in that date.
 
-You will see chain plots, posterior plots, histograms, phasefolded curve, the chain sample and more!!! 
+You will see chain plots, posterior plots, histograms, phasefolded curves, the chain sample and more!!! 
 
