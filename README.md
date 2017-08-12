@@ -58,6 +58,7 @@ Assuming  you have already set up the chain:
 DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
 ```
 You have:
+
 | Command           | Action                                                                                                                       | Input Type |
 |-------------------|------------------------------------------------------------------------------------------------------------------------------|------------|
 | Setup             |                                                                                                                              |            |
