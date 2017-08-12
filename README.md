@@ -62,32 +62,41 @@ DT.PDF = True
 ```
 You have:
 
-| Command           | Action                                                                                                                       | Input Type | Default |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------|------------|---------|
-| Setup             |                                                                                                                              |            |         |
-| cores             | Changes the number of cores you are using, default is maximum! **Let's up the tempo.**                                       |            |         |
-| burn_out          | To configure the steps for the burn out phase. Default is half the steps for the chainlength.                                |            |         |
-| CONSTRAIN         | This constrain the search according to the results of the previous analyzed model. Default is True. (should be always True)  |            |         |
-| thin              | Thins the chain. Default is 1.                                                                                               |            |         |
-| Statistical Tools |                                                                                                                              |            |         |
-| bayes_factor      | changes the in-chain factor, default is sp.log(150)                                                                          |            |         |
-| model_comparison  | Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running, default is 5 |            |         |
-| BIC               | This is the BIC used to compare models. Default is 5.                                                                        |            |         |
-| AIC               | This is the AIC used to compare models. Default is 5.                                                                        |            |         |
-| Model             |                                                                                                                              |            |         |
-| MOAV              | Sets the Moving Average Order for the rednoise model. Default is 1. (can be 0)                                               |            |         |
-| eccprior          | Sets the sigma for the Prior Normal Distribution for eccentricity. Default is 0.3                                            |            |         |
-| jittprior         | Sets the sigma for the Prior Normal Distribution for jitter. Default is 5.0                                                  |            |         |
-| jittmean          | Sets the mu for the Prior Normal Distribution for jitter. Default is 5.0 as well                                             |            |         |
-| STARMASS          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                 |            |         |
-| HILL              | Enables the fact that the Hill Stability Criteria has to comply as a prior.                                                  |            |         |
-| Plotting          |                                                                                                                              |            |         |
-| PLOT              | Enables Plotting. Default is True                                                                                            |            |         |
-| CORNER            | Enables Corner plot. Default is True                                                                                         |            |         |
-| HISTOGRAMS        | Enables Beautiful Histograms. Default is True                                                                                |            |         |
-| PNG               | Enables PNG plots. Default is True                                                                                           |            |         |
-| PDF               | Enables PDF plots. Default is False                                                                                          |            |         |
-| draw_every_n      | draws 1 every n points in the plots, without thining the chain for the statistics. Default is 1.                             |            |         |
-| Easter            |                                                                                                                              |            |         |
-| Music              | True/False                                                                                                                  |            |         |
-
+% Please add the following required packages to your document preamble:
+% \usepackage[normalem]{ulem}
+% \useunder{\uline}{\ul}{}
+\begin{table}[]
+\centering
+\caption{My caption}
+\label{my-label}
+\begin{tabular}{l|l|l|l|}
+\cline{2-2} \cline{4-4}
+Command                                 & Action                                                                                                                                                 & Input Type  & Default                                        \\ \hline
+\multicolumn{1}{|l|}{Setup}             &                                                                                                                                                        &             &                                                \\ \hline
+\multicolumn{1}{|l|}{cores}             & Sets the number of threads you are using.                                                                                                              & Int         & Default is maximum! **Let's up the tempo.**    \\ \hline
+\multicolumn{1}{|l|}{burn\_out}         & The steps for the burn-in phase.                                                                                                                       & Int         & Default is half the steps for the chainlength. \\ \hline
+\multicolumn{1}{|l|}{CONSTRAIN}         & Constrains the search according to the results of the previous analyzed model.                                                                         & Boolean     & Default is True. (should be always True)       \\ \hline
+\multicolumn{1}{|l|}{thin}              & Thins the chain.                                                                                                                                       & Int         & 1                                              \\ \hline
+\multicolumn{1}{|l|}{Statistical Tools} &                                                                                                                                                        &             &                                                \\ \hline
+\multicolumn{1}{|l|}{bayes\_factor}     & Changes the in-chain comparison factor.                                                                                                                & float       & sp.log(150)                                    \\ \hline
+\multicolumn{1}{|l|}{model\_comparison} & Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running.                                        & float       & 5.0                                            \\ \hline
+\multicolumn{1}{|l|}{BIC}               & This is the BIC used to compare models. Default is 5.                                                                                                  & float       & 5.0                                            \\ \hline
+\multicolumn{1}{|l|}{AIC}               & This is the AIC used to compare models. Default is 5.                                                                                                  & float       & 5.0                                            \\ \hline
+\multicolumn{1}{|l|}{Model}             &                                                                                                                                                        &             &                                                \\ \hline
+\multicolumn{1}{|l|}{MOAV}              & Sets the Moving Average Order for the rednoise model (can be 0).                                                                                       & Int         & 1                                              \\ \hline
+\multicolumn{1}{|l|}{eccprior}          & Sets the sigma for the Prior Normal Distribution for eccentricity.                                                                                     & float       & 0.3                                            \\ \hline
+\multicolumn{1}{|l|}{jittprior}         & Sets the sigma for the Prior Normal Distribution for jitter.                                                                                           & float       & 5.0                                            \\ \hline
+\multicolumn{1}{|l|}{jittmean}          & Sets the mu for the Prior Normal Distribution for jitter.                                                                                              & float       & 5.0 as well                                    \\ \hline
+\multicolumn{1}{|l|}{STARMASS}          & Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           & float/False & False                                          \\ \hline
+\multicolumn{1}{|l|}{HILL}              & Enables the fact that the Hill Stability Criteria has to comply as a prior (requires STARMASS)                                                         & boolean     & False                                          \\ \hline
+\multicolumn{1}{|l|}{Plotting}          &                                                                                                                                                        &             &                                                \\ \hline
+\multicolumn{1}{|l|}{PLOT}              & Enables Plotting.                                                                                                                                      & boolean     & True                                           \\ \hline
+\multicolumn{1}{|l|}{CORNER}            & Enables Corner plot.                                                                                                                                   & boolean     & True                                           \\ \hline
+\multicolumn{1}{|l|}{HISTOGRAMS}        & Enables Beautiful Histograms for the keplerian parameters.                                                                                             & boolean     & True                                           \\ \hline
+\multicolumn{1}{|l|}{PNG}               & Enables PNG plots. (light weight and fast)                                                                                                             & boolean     & True                                           \\ \hline
+\multicolumn{1}{|l|}{PDF}               & Enables PDF plots. (heavy and slow, maximum quality!)                                                                                                  & boolean     & False                                          \\ \hline
+\multicolumn{1}{|l|}{draw\_every\_n}    & Draws 1 every n points in the plots, without thining the chain for the statistics. So it takes shorter on printing the plots (never necessary in .PNG) & int         & 1                                              \\ \hline
+\multicolumn{1}{|l|}{Easter}            &                                                                                                                                                        &             &                                                \\ \hline
+\multicolumn{1}{|l|}{MUSIC}             & Sounds so you don't have to explicitly check EMPEROR to know what is it doing.                                                                         & boolean     & False                                          \\ \hline
+\end{tabular}
+\end{table}
