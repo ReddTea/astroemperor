@@ -19,7 +19,7 @@ This code makes use of:
 All of them can be easily installed with pip.
 
 # Installation
-Soon to be pip installable! Pardon us for the 'manual installation' and read below!
+Soon to be pip installable! Sorry for the 'manual installation' and read below!!
 
 # Easy Setup
 Download folder and run test_emperor.py to make sure everything works!
@@ -41,7 +41,7 @@ DT.conquer(0, 5)  # run from 0 to 5 signals !
 ```
 
 # Outputs
-They go under /datalogs folder. Following the name convention for the datasets, you should have them properly clasiffied as /datalogs/starname/<date_i>, where i is the ith run in that date.
+They go under /datalogs folder. Following the name convention for the datasets, you should have them properly classified as /datalogs/starname/<date_i>, where i is the ith run in that date.
 
 You will see chain plots, posterior plots, histograms, phasefolded curves, the chain sample and more!!! 
 
