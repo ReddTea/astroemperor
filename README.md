@@ -47,12 +47,12 @@ And then, as shown in test_emperor.py, append the names of the datasets you want
 # Example
 ```sh
 import scipy as sp
-import emperor
+import astroemperor
 
 stardat = sp.array(['starname_1_telescopename1.vels', 'starname_2_telescopename2.vels'])
 setup = sp.array([5, 300, 12000])  # temperatures, walkers, steps
 
-DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
+DT = astroemperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
 DT.conquer(0, 5)  # run from 0 to 5 signals !
 ```
 
@@ -63,15 +63,15 @@ You will see chain plots, posterior plots, histograms, phasefolded curves, the c
 
 # Why EMPEROR?
 
-  -It's really simple to use
-  -It has a series of configuration commands that will amaze you
-  -Advanced Noise Model
-  -Quite Flexible!
+  - It's really simple to use
+  - It has a series of configuration commands that will amaze you
+  - Advanced Noise Model
+  - Quite Flexible!
   
 # List of Commands
 Assuming  you have already set up the chain:
 ```sh
-DT = emperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
+DT = astroemperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
 DT.eccprior = 0.1
 DT.PNG = False
 DT.PDF = True
