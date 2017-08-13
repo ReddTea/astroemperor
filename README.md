@@ -20,9 +20,25 @@ All of them can be easily installed with pip.
 
 # Installation
 Soon to be pip installable! Sorry for the 'manual installation' and read below!!
+In the console type in your work folder
+```sh
+git clone https://github.com/ReddTea/astroEMPEROR.git
+```
+
 
 # Easy Setup
-Download folder and run test_emperor.py to make sure everything works!
+Download folder and run test_astroemperor.py to make sure everything works!
+
+```sh
+cd astroEMPEROR
+ipython  # open python environment
+run test_astroemperor
+```
+or just
+```sh
+python test_astroemperor.py
+```
+
 
 # Usage
 The code is really simple to use! You just need to have your data under /datafiles folder.
