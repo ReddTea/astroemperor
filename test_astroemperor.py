@@ -26,7 +26,7 @@ em = astroemperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameter
 
 # We configure the settings
 em.CORNER = False  # corner plot disabled as it takes some time to plot
-
+em.betas = sp.array([1.0, 0.5])  # beta factor for each temperature, None for automatic
 # we actually run the chain from 0 to 2 signals
 em.conquer(0, 2, BOUND=BOUNDARY)
 
