@@ -89,7 +89,6 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
     SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
     for k in range(kplanets):
         Ask, Pk, Ack, Sk, Ck = theta[k*5:(k+1)*5]
-        Astd, Pstd, phastd, wstd, Estd = sigmas[5*k:5*(k+1)]
 
         if (boundaries[k*10] <= Ask <= boundaries[k*10+1] and
             boundaries[k*10+4] <= Ack <= boundaries[k*10+5] and
@@ -296,6 +295,7 @@ class EMPIRE:
         #  Reading data
         tryout = read_data(stardat)
         self.time, self.rv, self.err, self.ins = tryout[0]  # time, radial velocities, error and instrument flag
+        self.betas = None
         self.staract, self.starflag = tryout[1], tryout[2]  # star activity index and flag
         self.totcornum = tryout[3]  # quantity if star activity indices
         self.stardat = stardat
@@ -367,7 +367,7 @@ class EMPIRE:
     ########################################
     # los IC sirven para los mod_lims? NO!
     # mod_lims sólo acotan el espacio donde buscar, excepto para periodo
-    def mklogfile(self, theta_max, betas, best_post, sample_sizes, sigmas, kplanets, modlims, BIC, AIC, alt_res, START):
+    def mklogfile(self, theta_max, best_post, sample_sizes, sigmas, kplanets, modlims, BIC, AIC, alt_res, START):
         dayis = dt.date.today()  # This is for the folder name
         def ensure_dir(date='datalogs/'+self.starname+'/'+str(dayis.month)+'.'+str(dayis.day)+'.'+str(dayis.year)[2:]):
             if not os.path.exists(date):
@@ -402,7 +402,7 @@ class EMPIRE:
             else:
                 return '%i weeks, %i days, %i hours, %i minutes and %i seconds' % (weeks, days, hours, minutes, seconds)
 
-        def mklogdat(theta, betas, best_post):
+        def mklogdat(theta, best_post):
             G = 39.5
             sigmas_hen = sigmas
             logdat = '\nStar Name                         : '+self.starname
@@ -453,7 +453,7 @@ class EMPIRE:
             logdat += '\nN Instruments, K planets, N data  : '+str((self.nins, kplanets, self.ndat))
             logdat += '\nNumber of Dimensions              : '+str(1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum)
             logdat += '\nN Moving Average                  : '+str(self.MOAV)
-            logdat += '\nBeta Detail                       : '+str(betas)
+            logdat += '\nBeta Detail                       : '+str(self.betas)
             logdat += '\n--------------------------------------------------------------------'
             logdat += '\nRunning Time                      : '+timer()
             print(logdat)
@@ -468,7 +468,7 @@ class EMPIRE:
 
 
         name = str(ensure_dir())
-        logdat = mklogdat(theta_max, betas, best_post)
+        logdat = mklogdat(theta_max, best_post)
         sp.savetxt(name+'/log.dat', sp.array([logdat]), fmt='%100s')
         return name
 
@@ -987,7 +987,7 @@ class EMPIRE:
         print(logdat)
         return RESU
 
-    def MCMC(self, kplanets, boundaries, inslims, acc_lims, sigmas_raw, pos0, BETAS,
+    def MCMC(self, kplanets, boundaries, inslims, acc_lims, sigmas_raw, pos0,
              logl, logp):
 
         ndim = 1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum
@@ -1008,7 +1008,7 @@ class EMPIRE:
             logdat += '\nN Instruments, K planets, N data  : '+str((self.nins, kplanets, self.ndat))
             logdat += '\nN Number of Dimensions            : '+str(ndim)
             logdat += '\nN Moving Average                  : '+str(self.MOAV)
-            logdat += '\nBeta Detail                       : '+str(BETAS)
+            logdat += '\nBeta Detail                       : '+str(self.betas)
             logdat += '\n-----------------------------------------------------'
             print(logdat)
             pass
@@ -1016,7 +1016,7 @@ class EMPIRE:
         starinfo()
         sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp, loglargs=[self.time, self.rv, self.err, self.ins, self.staract, self.starflag, kplanets, self.nins, self.MOAV, self.totcornum],
                             logpargs=[self.time, kplanets, self.nins, self.MOAV, self.totcornum, boundaries, inslims, acc_lims, sigmas_raw, self.eccprior, self.jittprior, self.jittmean, self.STARMASS, self.HILL, self.CHECK],
-                            threads=self.cores, betas=BETAS)
+                            threads=self.cores, betas=self.betas)
 
         print('\n --------------------- BURN IN --------------------- \n')
 
@@ -1068,14 +1068,13 @@ class EMPIRE:
         #print('mod_lims', boundaries)
         return thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, sampler.betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw
 
-    def conquer(self, from_k, to_k, BETAS=None, logl=logl, logp=logp,
-                BOUND=sp.array([])):
+    def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
 
         burn_out = self.burn_out
         assert self.cores >= 1, 'Cores is set to 0 ! !'
         assert self.thin * self.draw_every_n < self.nsteps, 'You are thining way too hard ! !'
-        if BETAS is not None:
-            assert len(BETAS) == self.ntemps, 'BETAS array and ntemps dont match ! !'
+        if self.betas is not None:
+            assert len(self.betas) == self.ntemps, 'Betas array and ntemps dont match ! !'
 
         if self.MUSIC:
             mixer.init()
@@ -1145,7 +1144,7 @@ class EMPIRE:
             if self.breakFLAG==True:
                 break
             pos0 = self.pt_pos(kplan, mod_lims, ins_lims, acc_lims)
-            thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw = self.MCMC(kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, BETAS, logl, logp)
+            thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw = self.MCMC(kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, logl, logp)
             chain = thetas_hen
             fit = ajuste_hen
             sample_sizes = sp.array([len(interesting_thetas[i]) for i in range((len(interesting_thetas)))])
@@ -1158,7 +1157,7 @@ class EMPIRE:
             OLD_AIC = 2 * ndim - 2 * oldlogpost
 
             alt_res = self.alt_results(interesting_thetas[0], kplan)
-            saveplace = self.mklogfile(fit, betas, bestlogpost, sample_sizes, sigmas, kplan, mod_lims, NEW_BIC, NEW_AIC, alt_res, START)
+            saveplace = self.mklogfile(fit, bestlogpost, sample_sizes, sigmas, kplan, mod_lims, NEW_BIC, NEW_AIC, alt_res, START)
             self.instigator(interesting_thetas, interesting_posts, saveplace, kplan)
 
             if self.MUSIC:
@@ -1167,10 +1166,11 @@ class EMPIRE:
                 self.plot2(fit, kplan, saveplace)
                 self.plot1(interesting_thetas, interesting_posts, '0', kplan, saveplace)
 
-            if OLD_BIC - NEW_BIC < self.BIC:
+            if OLD_BIC - NEW_BIC > self.BIC:
                 print('\nBayes Information Criteria of %.2f requirement not met ! !' % self.BIC)
-            if OLD_AIC - NEW_AIC < self.AIC:
-                print('\nAkaike Information Criteria of %.2f requirement not met ! !' % self.AIC, OLD_AIC, NEW_AIC, OLD_AIC - NEW_AIC)
+            if OLD_AIC - NEW_AIC > self.AIC:
+                print('\nAkaike Information Criteria of %.2f requirement not met ! !' % self.AIC)
+                print(OLD_AIC, NEW_AIC, OLD_AIC - NEW_AIC)
 
             print('New logpost vs. Old logpost', bestlogpost, oldlogpost, bestlogpost - oldlogpost)
             print('Old BIC vs New BIC', OLD_BIC, NEW_BIC, OLD_BIC - NEW_BIC)
