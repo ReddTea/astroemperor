@@ -638,7 +638,7 @@ class EMPIRE:
                 lab=['Amplitude [m/s]','Period [d]',r'$\phi$ [rads]',r'$\omega$ [rads]','Eccentricity','a [AU]',r'Msin(i) [$M_{\oplus}$]']
                 params=len(lab)
                 pbar_hist = tqdm(total=params*kplanets)
-                num_bins = 25
+                num_bins = 20
                 for k in range(kplanets):
                     per_s = thetas.T[5*k+1] * 24. * 3600.
                     if self.STARMASS:
@@ -855,8 +855,8 @@ class EMPIRE:
             return RV0, ERR, residuals
 
         ndim = 1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum
-        colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
-        letter = ['a', 'b', 'c', 'd', 'e', 'f']  # 'a' is just a placeholder
+        colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k', 'xkcd:indigo', 'xkcd:scarlet', 'xkcd:burnt orange', 'xkcd:apple green', 'xkcd:coral']
+        #letter = ['a', 'b', 'c', 'd', 'e', 'f']  # 'a' is just a placeholder
 
         theta_k = fit[:kplanets * 5]
         accel = fit[kplanets * 5]
@@ -1087,10 +1087,8 @@ class EMPIRE:
         # for k = 0
         mod_lims = sp.array([])
         acc_lims = sp.array([-1., 1.])
-        jitt_limiter = sp.amax(self.rv)
-        if sp.amax(self.rv) ** 2 < sp.amin(self.rv) ** 2:
-            jitt_limiter = sp.amin(self.rv)
-        jitt_lim = 2 * abs(jitt_limiter)  # review this
+        jitt_limiter = sp.amax(abs(self.rv))
+        jitt_lim = 3 * jitt_limiter  # review this
         offs_lim = jitt_limiter  # review this
         ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
         sqrta, sqrte = jitt_lim, 1.
