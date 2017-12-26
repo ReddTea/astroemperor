@@ -933,7 +933,7 @@ class EMPIRE:
             h = []
             kepler = ['Amplitude               ', 'Period                  ', 'Phase                   ', 'Longitude               ', 'Eccentricity            ', 'Minimum Mass            ', 'SemiMajor Axis          ']
             telesc = ['Jitter                  ', 'Offset                  ']
-            mov_ave = ['MA Coef                 ', 'Timescale               ']
+            mov_ave = ['MA Coef ', 'Timescale ']
             for i in range(kplanets):
                 for item in kepler:
                     h.append(item)
@@ -942,10 +942,10 @@ class EMPIRE:
                 for item in telesc:
                     h.append(item)
                     for c in range(self.MOAV):
-                        h.append(mov_ave[0])
-                        h.append(mov_ave[1])
-            for h in range(self.totcornum):
-                h.append('Stellar Activity'+str(h))
+                        h.append(mov_ave[0]+str(c)+'               ')
+                        h.append(mov_ave[1]+str(c)+'             ')
+            for jj in range(self.totcornum):
+                h.append('Stellar Activity'+str(jj))
             h = ' '.join(h)
             return h
 
