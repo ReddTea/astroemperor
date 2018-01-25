@@ -864,7 +864,13 @@ class EMPIRE:
             else:
                 FMC = 0
 
-            MODEL = OFFSET + theta_acc[0] * (self.time - self.time[0]) + theta_acc[1] * (self.time - self.time[0]) ** 2 + FMC
+
+            if self.PACC:
+                ACC = theta_acc[0] * (self.time - self.time[0]) + theta_acc[1] * (self.time - self.time[0]) ** 2
+            else:
+                ACC = theta_acc[0] * (self.time - self.time[0])
+
+            MODEL = OFFSET + ACC + FMC
 
             for k in sp.arange(kplanets):
                 MODEL += self.semimodel(theta_k[5*k:5*(k+1)], self.time)
@@ -877,7 +883,7 @@ class EMPIRE:
                         MODEL[i] += MA[i]
                         residuals[i] -= MA[i]
 
-            RV0 = RV - OFFSET - theta_acc[0] * (self.time - self.time[0]) - theta_acc[1] * (self.time - self.time[0]) ** 2 - FMC - MA
+            RV0 = RV - OFFSET - ACC - FMC - MA
 
             return RV0, ERR, residuals
 
