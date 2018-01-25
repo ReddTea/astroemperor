@@ -15,6 +15,7 @@ This code makes use of:
   - pygame (https://www.pygame.org/)
   - tqdm (https://pypi.python.org/pypi/tqdm)
   - termcolor (https://pypi.python.org/pypi/termcolor)
+  - corner(https://pypi.python.org/pypi/corner)
 
 All of them can be easily installed with pip.
 
