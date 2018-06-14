@@ -85,7 +85,7 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
 
     model_params = kplanets * 5
     acc_params = 1 + PACC
-    ins_params = nins * 4
+    ins_params = nins * 2 * (MOAV + 1)
     MP = sp.zeros(kplanets)
     SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
     for k in range(kplanets):
@@ -261,7 +261,7 @@ def logl(theta, time, rv, err, ins, staract, starflag, kplanets, nins, MOAV, tot
         residuals[i] = rv[i] - MODEL[i]
         for c in range(MOAV):
             if i > c:
-                MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1] - time[i]) / timescale[c][i]) * residuals[i-1]
+                MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1-c] - time[i]) / timescale[c][i]) * residuals[i-1-c]
                 residuals[i] -= MA
 
     inv_sigma2 = 1.0 / (err**2 + jitter**2)
@@ -337,6 +337,8 @@ class EMPIRE:
         self.STARMASS = False
         self.HILL = False
         self.CHECK = False
+
+        # About the search parameters
         self.PACC = False  # parabolic Acceleration
 
         self.CONSTRAIN = True
@@ -449,14 +451,13 @@ class EMPIRE:
                     logdat += '\nMinimum Mass   '+str(i+1)+' :   ' + str(MP)
                     logdat += '\nSemiMajor Axis '+str(i+1)+' :   ' + str(SMA)
             logdat += '\n--------------------------------------------------------------------'
-            logdat += '\nAcceleration [m/(year)]:'+str(theta[5*kplanets]*days_in_year) + ' +- ' + str(sigmas_hen[5*kplanets]*days_in_year)
             if self.PACC:
                 logdat += '\nQuadratic Acceleration [m/(year)]:'+str(theta[5*kplanets + self.PACC]*days_in_year) + ' +- ' + str(sigmas_hen[5*kplanets + self.PACC]*days_in_year)
 
             for i in range(self.nins):
                 logdat += '\n--------------------------------------------------------------------'
-                logdat += '\nJitter '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + 1 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + 1 + self.PACC])
-                logdat += '\nOffset '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + 2 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + 2 + self.PACC])
+                logdat += '\nJitter '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 1]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 1])
+                logdat += '\nOffset '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 1]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 2])
                 for j in range(self.MOAV):
                     logdat += '\nMA coef '+str(i+1)+'_'+str(j+1)+'        : ' + str(theta[5*kplanets + i*2*(j+1) + 3 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(j+1) + 3 + self.PACC])
                     logdat += '\nTimescale '+str(i+1)+'_'+str(j+1)+'[days]: ' + str(theta[5*kplanets + i*2*(j+1) + 4 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(j+1) + 4 + self.PACC])
@@ -468,7 +469,7 @@ class EMPIRE:
             logdat += '\n--------------------------------------------------------------------'
             logdat += '\nTemperatures, Walkers, Steps      : '+str((self.ntemps, self.nwalkers, self.nsteps))
             logdat += '\nN Instruments, K planets, N data  : '+str((self.nins, kplanets, self.ndat))
-            logdat += '\nNumber of Dimensions              : '+str(1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC)
+            logdat += '\nNumber of Dimensions              : '+str(5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC + 1)
             logdat += '\nN Moving Average                  : '+str(self.MOAV)
             logdat += '\nBeta Detail                       : '+str(self.betas)
             logdat += '\n--------------------------------------------------------------------'
@@ -522,7 +523,7 @@ class EMPIRE:
                     for i in range(self.nwalkers):
                         pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
 
-
+            # instruments
             if 5 * kplanets + self.PACC < j < 5*kplanets + self.nins*2*(self.MOAV+1) + 1 + self.PACC:
                 l += 2
                 fact = sp.absolute(inslims[l] - inslims[l+1]) / self.nwalkers
@@ -1053,10 +1054,10 @@ class EMPIRE:
             pass
 
         starinfo()
+        #'''
         sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp, loglargs=[self.time, self.rv, self.err, self.ins, self.staract, self.starflag, kplanets, self.nins, self.MOAV, self.totcornum, self.PACC],
                             logpargs=[self.time, kplanets, self.nins, self.MOAV, self.totcornum, boundaries, inslims, acc_lims, sigmas_raw, self.eccprior, self.jittprior, self.jittmean, self.STARMASS, self.HILL, self.PACC, self.CHECK],
                             threads=self.cores, betas=self.betas)
-
         print('\n --------------------- BURN IN --------------------- \n')
 
         pbar = tqdm(total=self.burn_out)
@@ -1069,8 +1070,31 @@ class EMPIRE:
         print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(sampler.acceptance_fraction)))
         assert sp.mean(sampler.acceptance_fraction) != 0, 'Mean acceptance fraction = 0 ! ! !'
         sampler.reset()
+        '''
 
-        print('\n ---------------------- CHAIN ---------------------- \n')
+
+        sampler1 = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp, loglargs=[self.time, self.rv, self.err, self.ins, self.staract, self.starflag, kplanets, self.nins, self.MOAV, self.totcornum, self.PACC],
+                            logpargs=[self.time, kplanets, self.nins, self.MOAV, self.totcornum, boundaries, inslims, acc_lims, sigmas_raw, self.eccprior, self.jittprior, self.jittmean, self.STARMASS, self.HILL, self.PACC, self.CHECK],
+                            threads=self.cores, betas=self.betas*0.3)
+
+        print('\n --------------- EXPERIMENTAL BURN IN --------------- \n')
+
+        pbar = tqdm(total=self.burn_out)
+        for p, lnprob, lnlike in sampler1.sample(pos0, iterations=self.burn_out // 3):
+            pbar.update(1)
+            pass
+        pbar.close()
+
+        p0, lnprob0, lnlike0 = p, lnprob, lnlike
+        print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(sampler1.acceptance_fraction)))
+        assert sp.mean(sampler1.acceptance_fraction) != 0, 'Mean acceptance fraction = 0 ! ! !'
+        sampler1.reset()
+
+        print('\n ---------------- EXPERIMENTAL CHAIN ---------------- \n')
+        sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp, loglargs=[self.time, self.rv, self.err, self.ins, self.staract, self.starflag, kplanets, self.nins, self.MOAV, self.totcornum, self.PACC],
+                            logpargs=[self.time, kplanets, self.nins, self.MOAV, self.totcornum, boundaries, inslims, acc_lims, sigmas_raw, self.eccprior, self.jittprior, self.jittmean, self.STARMASS, self.HILL, self.PACC, self.CHECK],
+                            threads=self.cores, betas=self.betas)
+
         pbar = tqdm(total=self.nsteps)
         for p, lnprob, lnlike in sampler.sample(p0, lnprob0=lnprob0,
                                                    lnlike0=lnlike0,
@@ -1080,6 +1104,19 @@ class EMPIRE:
             pass
         pbar.close()
 
+
+
+        '''
+        print('\n ---------------------- CHAIN ---------------------- \n')
+        pbar = tqdm(total=self.nsteps)
+        for p, lnprob, lnlike in sampler.sample(p0, lnprob0=lnprob0,
+                                                   lnlike0=lnlike0,
+                                                   iterations=self.nsteps,
+                                                   thin=self.thin):
+            pbar.update(1)
+            pass
+        pbar.close()
+        #'''
 
         assert sampler.chain.shape == (self.ntemps, self.nwalkers, self.nsteps/self.thin, ndim), 'something really weird happened'
         print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(sampler.acceptance_fraction)))
@@ -1108,7 +1145,6 @@ class EMPIRE:
         return thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, sampler.betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw
 
     def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
-
         burn_out = self.burn_out
         assert self.cores >= 1, 'Cores is set to 0 ! !'
         assert self.thin * self.draw_every_n < self.nsteps, 'You are thining way too hard ! !'
@@ -1144,6 +1180,7 @@ class EMPIRE:
         #####################################################
         START = chrono.time()
         while kplan <= to_k:
+            ndim = kplan * 5 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
             mod_lims = sp.array([free_lims for i in range(kplan)]).reshape(-1)
             ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
             #if LIL_JITT:
