@@ -45,29 +45,25 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
     lp_correl = 0.
     lp_jeffreys = 0.
 
-    model_params = kplanets * 5
+    model_params = kplanets * 4
     acc_params = 1 + PACC
     ins_params = nins * 2 * (MOAV + 1)
     MP = sp.zeros(kplanets)
     SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
     for k in range(kplanets):
-        Ask, Pk, Ack, Sk, Ck = theta[k*5:(k+1)*5]
+        Pk, Ask, Ack, ecck = theta[k*4:(k+1)*4]
 
-        if (boundaries[k*10] <= Ask <= boundaries[k*10+1] and
-            boundaries[k*10+4] <= Ack <= boundaries[k*10+5] and
-            boundaries[k*10+6] <= Sk <= boundaries[k*10+7] and
-            boundaries[k*10 + 8] <= Ck <= boundaries[k*10 + 9]):
+        if (boundaries[k*8+2] <= Ask <= boundaries[k*8+3] and
+            boundaries[k*8+4] <= Ack <= boundaries[k*8+5]):
             lp_flat_fix += 0.0
             #print('GOOD_ONE_1')
         else:
             if CHECK:
-                print('mark 1', boundaries[k*10],Ask, boundaries[k*10+1],
-                      boundaries[k*10+4], Ack, boundaries[k*10+5],
-                      boundaries[k*10+6], Sk, boundaries[k*10+7],
-                      boundaries[k*10 + 8], Ck, boundaries[k*10 + 9])
+                print('mark 1', boundaries[k*8+2], Ask, boundaries[k*8+3],
+                      boundaries[k*8+4], Ack, boundaries[k*8+5])
             return -sp.inf
 
-        Pmin, Pmax = boundaries[k*10+2], boundaries[k*10+3]
+        Pmin, Pmax = boundaries[k*8], boundaries[k*8+1]
         if Pmin <= Pk <= Pmax:
             #lp_jeffreys += sp.log(Pk**-1 / (sp.log(Pmax/Pmin)))
             lp_jeffreys += 0.  # Because it is logp ??
@@ -78,7 +74,6 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
             return -sp.inf
 
         Ak = Ask ** 2 + Ack ** 2
-        ecck = Sk ** 2 + Ck ** 2
 
         if 0.0 <= ecck <= 1.0:
             lp_ecc += emplib.normal_pdf(ecck, 0, eccprior**2)
@@ -86,8 +81,6 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
             if CHECK:
                 print('ecc')
             return -sp.inf
-
-
 
         if kplanets > 1:
             if HILL:
@@ -97,6 +90,7 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
                 #SMA[k] = (((sp.exp(Pk)/365.242199) ** 2) * G * STARMASS / (4 * sp.pi ** 2)) ** (1/3.)
                 #MP[k] = sp.sqrt(1 - ecck ** 2) * Ak * sp.exp(Pk) ** (1/3.) * STARMASS ** (2/3.) / 203.
                 GAMMA[k] = sp.sqrt(1 - ecck)
+
     if kplanets > 1:
         if HILL:
             orden = sp.argsort(SMA)
@@ -117,7 +111,7 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
                 else:
                     pass
 
-    acc_k = theta[kplanets * 5]
+    acc_k = theta[kplanets * 4]
     if acc_lims[0] <= acc_k <= acc_lims[1]:
         lp_flat_fix += 0
     else:
@@ -126,7 +120,7 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
         return -sp.inf
 
     if PACC:
-        if acc_lims[0] <= theta[kplanets * 5 + 1] <= acc_lims[1]:
+        if acc_lims[0] <= theta[kplanets * 4 + 1] <= acc_lims[1]:
             lp_flat_fix += 0
         else:
             if CHECK:
@@ -175,7 +169,7 @@ def logp(theta, time, kplanets, nins, MOAV, totcornum, boundaries, inslims, acc_
 def logl(theta, time, rv, err, ins, staract, starflag, kplanets, nins, MOAV, totcornum, PACC):
     i, lnl = 0, 0
     ndat = len(time)
-    model_params = kplanets * 5
+    model_params = kplanets * 4
     acc_params = 1 + PACC
     ins_params = nins * 2 * (MOAV + 1)
     jitter, offset, macoef, timescale = sp.zeros(ndat), sp.zeros(ndat), sp.array([sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
@@ -216,7 +210,7 @@ def logl(theta, time, rv, err, ins, staract, starflag, kplanets, nins, MOAV, tot
     else:
         FMC = 0
 
-    MODEL = empmir.RV_model(a1, time, kplanets) + offset + ACC + FMC
+    MODEL = empmir.PM_model(a1, time, kplanets) + offset + ACC + FMC
 
 
     for i in range(ndat):
@@ -326,6 +320,7 @@ class EMPIRE:
                 return '%i weeks, %i days, %i hours, %i minutes and %i seconds' % (weeks, days, hours, minutes, seconds)
 
         def mklogdat(theta, best_post):
+            model_params = 4
             G = 39.5
             days_in_year = 365.242199
             sigmas_hen = sigmas
@@ -343,40 +338,40 @@ class EMPIRE:
             logdat += '\nThe most probable chain values are as follows...'
             for i in range(kplanets):
                 #MP = sp.sqrt(1 - theta[i*5+4] ** 2) * theta[i*5] * theta[i*5+1] ** (1/3.) * STARMASS ** (2/3.) / 203.
-                #SMA = (((theta[i*5+1]/365.242199) ** 2) * G * STARMASS0 / (4 * sp.pi ** 2)) ** (1/3.)
+                #SMA = (((theta[i*model_params+1]/365.242199) ** 2) * G * STARMASS0 / (4 * sp.pi ** 2)) ** (1/3.)
                 if self.STARMASS:
-                    SMA = (((theta[i*5+1]*24.*3600.)**2.0) / ( (4.0*sp.pi**2.0) / (6.67e-11 * self.STARMASS * 1.99e30) ))**(1./3) / 1.49598e11
-                    MP = theta[i*5] / ( (28.4/sp.sqrt(1. - theta[i*5+4]**2.)) * (self.STARMASS**(-0.5)) * (SMA**(-0.5)) ) * 317.8
+                    SMA = (((theta[i*model_params]*24.*3600.)**2.0) / ( (4.0*sp.pi**2.0) / (6.67e-11 * self.STARMASS * 1.99e30) ))**(1./3) / 1.49598e11
+                    MP = theta[i*model_params] / ( (28.4/sp.sqrt(1. - theta[i*model_params+3]**2.)) * (self.STARMASS**(-0.5)) * (SMA**(-0.5)) ) * 317.8
 
                 logdat += '\n--------------------------------------------------------------------'
-                logdat += '\nAmplitude   '+str(i+1)+'[JD]:   ' + str(theta[i*5]) + ' +- ' + str(sigmas_hen[i*5])
-                logdat += '\nPeriod   '+str(i+1)+'[days] :   ' + str(theta[i*5+1]) + ' +- ' + str(sigmas_hen[i*5+1])
-                logdat += '\nPhase   '+str(i+1)+'        :   ' + str(theta[i*5+2]) + ' +- ' + str(sigmas_hen[i*5+2])
-                logdat += '\nLongitude   '+str(i+1)+'    :   ' + str(theta[i*5+3]) + ' +- ' + str(sigmas_hen[i*5+3])
-                logdat += '\nEccentricity   '+str(i+1)+' :   ' + str(theta[i*5+4]) + ' +- ' + str(sigmas_hen[i*5+4])
+                logdat += '\nPeriod   '+str(i+1)+'[days] :   ' + str(theta[i*4]) + ' +- ' + str(sigmas_hen[i*4])
+                logdat += '\nAmplitude   '+str(i+1)+'[m/s]:   ' + str(theta[i*4+1]) + ' +- ' + str(sigmas_hen[i*4+1])
+                logdat += '\nPhase   '+str(i+1)+'        :   ' + str(theta[i*4+2]) + ' +- ' + str(sigmas_hen[i*4+2])
+                logdat += '\nEccentricity   '+str(i+1)+' :   ' + str(theta[i*4+3]) + ' +- ' + str(sigmas_hen[i*4+4])
                 if self.STARMASS:
                     logdat += '\nMinimum Mass   '+str(i+1)+' :   ' + str(MP)
                     logdat += '\nSemiMajor Axis '+str(i+1)+' :   ' + str(SMA)
             logdat += '\n--------------------------------------------------------------------'
-            logdat += '\nAcceleration [m/(year)]:'+str(theta[5*kplanets]*days_in_year) + ' +- ' + str(sigmas_hen[5*kplanets]*days_in_year)
+            logdat += '\nAcceleration [m/(year)]:'+str(theta[4*kplanets]*days_in_year) + ' +- ' + str(sigmas_hen[4*kplanets]*days_in_year)
             if self.PACC:
-                logdat += '\nQuadratic Acceleration [m/(year)]:'+str(theta[5*kplanets + self.PACC]*days_in_year) + ' +- ' + str(sigmas_hen[5*kplanets + self.PACC]*days_in_year)
+                logdat += '\nQuadratic Acceleration [m/(year)]:'+str(theta[4*kplanets + self.PACC]*days_in_year) + ' +- ' + str(sigmas_hen[4*kplanets + self.PACC]*days_in_year)
 
             for i in range(self.nins):
                 logdat += '\n--------------------------------------------------------------------'
-                logdat += '\nJitter '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 1]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 1])
-                logdat += '\nOffset '+str(i+1)+'    [m/s]:   ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 2]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + self.PACC + 2])
+                logdat += '\nJitter '+str(i+1)+'    [m/s]:   ' + str(theta[4*kplanets + i*2*(self.MOAV+1) + self.PACC + 1]) + ' +- ' + str(sigmas_hen[4*kplanets + i*2*(self.MOAV+1) + self.PACC + 1])
+                logdat += '\nOffset '+str(i+1)+'    [m/s]:   ' + str(theta[4*kplanets + i*2*(self.MOAV+1) + self.PACC + 2]) + ' +- ' + str(sigmas_hen[4*kplanets + i*2*(self.MOAV+1) + self.PACC + 2])
                 for j in range(self.MOAV):
-                    logdat += '\nMA coef '+str(i+1)+'_'+str(j+1)+'        : ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 1 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 1 + self.PACC])
-                    logdat += '\nTimescale '+str(i+1)+'_'+str(j+1)+'[days]: ' + str(theta[5*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 2 + self.PACC]) + ' +- ' + str(sigmas_hen[5*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 2 + self.PACC])
+                    logdat += '\nMA coef '+str(i+1)+'_'+str(j+1)+'        : ' + str(theta[4*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 1 + self.PACC]) + ' +- ' + str(sigmas_hen[4*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 1 + self.PACC])
+                    logdat += '\nTimescale '+str(i+1)+'_'+str(j+1)+'[days]: ' + str(theta[4*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 2 + self.PACC]) + ' +- ' + str(sigmas_hen[4*kplanets + i*2*(self.MOAV+1) + 2*(j+1) + 2 + self.PACC])
+
             for h in range(self.totcornum):
                 logdat += '\n--------------------------------------------------------------------'
-                logdat += '\nStellar Activity'+str(h+1)+':   ' + str(theta[5*kplanets + self.nins*2*(self.MOAV+1) + self.PACC + 1 + h]) + ' +- ' + str(sigmas_hen[5*kplanets + self.nins*2*(self.MOAV+1) + self.PACC + 1 + h])
+                logdat += '\nStellar Activity'+str(h+1)+':   ' + str(theta[4*kplanets + self.nins*2*(self.MOAV+1) + self.PACC + 1 + h]) + ' +- ' + str(sigmas_hen[4*kplanets + self.nins*2*(self.MOAV+1) + self.PACC + 1 + h])
 
             logdat += '\n--------------------------------------------------------------------'
             logdat += '\nTemperatures, Walkers, Steps      : '+str((self.ntemps, self.nwalkers, self.nsteps))
             logdat += '\nN Instruments, K planets, N data  : '+str((self.nins, kplanets, self.ndat))
-            logdat += '\nNumber of Dimensions              : '+str(5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC + 1)
+            logdat += '\nNumber of Dimensions              : '+str(4 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC + 1)
             logdat += '\nN Moving Average                  : '+str(self.MOAV)
             logdat += '\nBeta Detail                       : '+str(self.betas)
             logdat += '\n--------------------------------------------------------------------'
@@ -397,11 +392,10 @@ class EMPIRE:
         sp.savetxt(name+'/log.dat', sp.array([logdat]), fmt='%100s')
         return name
 
-
     def instigator(self, chain, post, saveplace, kplanets):
         def mk_header(kplanets):
             h = []
-            kepler = ['Amplitude               ', 'Period                  ', 'Phase                   ', 'Longitude               ', 'Eccentricity            ', 'Minimum Mass            ', 'SemiMajor Axis          ']
+            kepler = ['Period                  ', 'Amplitude               ', 'Phase                   ', 'Eccentricity            ', 'Minimum Mass            ', 'SemiMajor Axis          ']
             telesc = ['Jitter                  ', 'Offset                  ']
             mov_ave = ['MA Coef ', 'Timescale ']
             for i in range(kplanets):
@@ -436,20 +430,20 @@ class EMPIRE:
         pass
 
     def alt_results(self, samples, kplanets):
-        titles = sp.array(["Amplitude","Period","Longitude", "Phase","Eccentricity", 'Acceleration', 'Jitter', 'Offset', 'MACoefficient', 'MATimescale', 'Stellar Activity'])
+        titles = sp.array(["Period","Amplitude", "Phase","Eccentricity", 'Acceleration', 'Jitter', 'Offset', 'MACoefficient', 'MATimescale', 'Stellar Activity'])
         namen = sp.array([])
-        ndim = kplanets * 5 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
+        ndim = kplanets * 4 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
 
         RESU = sp.zeros((ndim, 5))
         for k in range(kplanets):
-            namen = sp.append(namen, [titles[i] + '_'+str(k) for i in range(5)])
-        namen = sp.append(namen, titles[5])  # for acc
+            namen = sp.append(namen, [titles[i] + '_'+str(k) for i in range(4)])
+        namen = sp.append(namen, titles[4])  # for acc
         if self.PACC:
             namen = sp.append(namen, 'Parabolic Acceleration')
         for i in range(self.nins):
-            namen = sp.append(namen, [titles[ii] + '_'+str(i+1) for ii in sp.arange(2)+6])
+            namen = sp.append(namen, [titles[ii] + '_'+str(i+1) for ii in sp.arange(2)+5])
             for c in range(self.MOAV):
-                namen = sp.append(namen, [titles[ii] + '_'+str(i+1) + '_'+str(c+1) for ii in sp.arange(2)+8])
+                namen = sp.append(namen, [titles[ii] + '_'+str(i+1) + '_'+str(c+1) for ii in sp.arange(2)+7])
         for h in range(self.totcornum):
             namen = sp.append(namen, titles[-1]+'_'+str(h+1))
 
@@ -466,7 +460,7 @@ class EMPIRE:
     def MCMC(self, kplanets, boundaries, inslims, acc_lims, sigmas_raw, pos0,
              logl, logp):
 
-        ndim = 1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC
+        ndim = 1 + 4 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC
         ndat = len(self.time)
         def starinfo():
             colors = ['red', 'green', 'blue', 'yellow', 'grey', 'magenta', 'cyan', 'white']
@@ -571,7 +565,7 @@ class EMPIRE:
         best_post = posteriors[0] == np.max(posteriors[0])
 
         thetas_raw = sp.array([chains[i] for i in range(self.ntemps)])
-        thetas_hen = sp.array([empmir.henshin(chains[i], kplanets) for i in range(self.ntemps)])
+        thetas_hen = sp.array([empmir.henshin_PM(chains[i], kplanets) for i in range(self.ntemps)])
 
         ajuste_hen = thetas_hen[0][best_post][0]
         ajuste_raw = thetas_raw[0][best_post][0]
@@ -585,6 +579,7 @@ class EMPIRE:
         #print('sigmas', sigmas)  # for testing
         #print('sigmas_raw', sigmas_raw)
         #print('mod_lims', boundaries)
+        print ajuste_raw, ajuste_hen
         return thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, sampler.betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw
 
     def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
@@ -609,10 +604,10 @@ class EMPIRE:
         jitt_lim = 3 * jitt_limiter  # review this
         offs_lim = jitt_limiter  # review this
         ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
-        sqrta, sqrte = jitt_lim, 1.
-        sqrta, sqrte = sqrta ** 0.5, sqrte ** 0.5
-        ndim = kplan * 5 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
-        free_lims = sp.array([-sqrta, sqrta, sp.log(0.1), sp.log(3 * max(self.time)), -sqrta, sqrta, -sqrte, sqrte, -sqrte, sqrte])
+        sqrta = jitt_lim
+        sqrta = sqrta ** 0.5
+        ndim = kplan * 4 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
+        free_lims = sp.array([sp.log(0.1), sp.log(3 * max(self.time)), -sqrta, sqrta, -sqrta, sqrta, 0.0, 1.0])
         sigmas, sigmas_raw = sp.zeros(ndim), sp.zeros(ndim)
         pos0 = 0.
         thetas_hen, ajuste_hen = 0., 0.
@@ -623,7 +618,7 @@ class EMPIRE:
         #####################################################
         START = chrono.time()
         while kplan <= to_k:
-            ndim = kplan * 5 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
+            ndim = kplan * 4 + self.nins*2*(self.MOAV+1) + self.totcornum + 1 + self.PACC
             mod_lims = sp.array([free_lims for i in range(kplan)]).reshape(-1)
             ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
             #if LIL_JITT:
@@ -633,19 +628,17 @@ class EMPIRE:
                     constrained = sp.array([])
                     for k in range(kplan - 1):
                         amp = 2.0
-                        Ask, Pk, Ack, Sk, Ck = ajuste_raw[k*5:(k+1)*5]
-                        Ask_std, Pk_std, Ack_std, Sk_std, Ck_std = sigmas_raw[5*k:5*(k+1)]
-                        Ask_std, Ack_std, Sk_std, Ck_std = amp * sp.array([Ask_std, Ack_std, Sk_std, Ck_std])
-                        aux = sp.array([Ask - Ask_std, Ask + Ask_std, Pk-Pk_std, Pk+Pk_std, Ack - Ack_std, Ack + Ack_std, Sk - Sk_std, Sk + Sk_std, Ck - Ck_std, Ck + Ck_std])
+                        Pk, Ask, Ack, ecck = ajuste_raw[k*4:(k+1)*4]
+                        Pk_std, Ask_std, Ack_std, ecck_std = sigmas_raw[4*k:4*(k+1)]
+                        Ask_std, Ack_std = amp * sp.array([Ask_std, Ack_std])
+                        aux = sp.array([Pk-Pk_std, Pk+Pk_std, Ask - Ask_std, Ask + Ask_std, Ack - Ack_std, Ack + Ack_std, ecck - ecck_std, ecck + ecck_std])
 
                         constrained = sp.append(constrained, aux)
 
-                    for nin in range(self.nins):  # only constrains
+                    for nin in range(self.nins):
                         ins_lims[0 + nin*4*(self.MOAV+1)] = 0.0001
-                        ins_lims[1 + nin*4*(self.MOAV+1)] = ajuste_raw[(kplan - 1) * 5 + nin*2*(self.MOAV+1) + 1 + self.PACC]
-
-
-                    mod_lims = sp.append(constrained, free_lims)  # only planets limits
+                        ins_lims[1 + nin*4*(self.MOAV+1)] = ajuste_raw[(kplan - 1) * 4 + nin*2*(self.MOAV+1) + 1 + self.PACC]
+                    mod_lims = sp.append(constrained, free_lims)
 
             if len(BOUND) != 0:
                 nn = len(BOUND)
@@ -656,12 +649,12 @@ class EMPIRE:
                     BOUND = sp.array([])
 
             #print('ins_lims', ins_lims)  # testing purposes
-            #print('mod_lims', mod_lims)
+            print('mod_lims', mod_lims)
             #print('ajuste_raw', ajuste_raw)
 
             if self.breakFLAG==True:
                 break
-            pos0 = emplib.pt_pos(self.setup, kplan, self.nins, mod_lims, ins_lims,
+            pos0 = emplib.pt_pos_PM(self.setup, kplan, self.nins, mod_lims, ins_lims,
                                  acc_lims, self.MOAV, self.totcornum, self.PACC)
             thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw = self.MCMC(kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, logl, logp)
             chain = thetas_hen
@@ -681,23 +674,23 @@ class EMPIRE:
             if self.MUSIC:
                 thybiding.play()
             if self.PLOT:
-                from emperors_canvas import plot1, plot2
-                plot2(self.setup, self.all_data, fit, kplan, self.nins,
-                      self.totcornum, self.starflag, self.staract, saveplace,
-                      self.ndat, self.MOAV, self.PACC)
-                plot1(interesting_thetas, interesting_posts, '0', kplan, self.nins,
-                      self.totcornum, saveplace, self.setup, self.MOAV, self.PACC,
-                      self.HISTOGRAMS, self.CORNER, self.STARMASS, self.PNG,
-                      self.PDF, self.thin, self.draw_every_n)
+                from emperors_canvas import plot1_PM, plot2_PM
+                plot2_PM(self.setup, self.all_data, fit, kplan, self.nins,
+                         self.totcornum, self.starflag, self.staract, saveplace,
+                         self.ndat, self.MOAV, self.PACC)
+                plot1_PM(interesting_thetas, interesting_posts, '0', kplan, self.nins,
+                         self.totcornum, saveplace, self.setup, self.MOAV, self.PACC,
+                         self.HISTOGRAMS, self.CORNER, self.STARMASS, self.PNG,
+                         self.PDF, self.thin, self.draw_every_n)
 
                 if self.RAW:
                     rawplace = str(saveplace)+'/RAW'
                     os.makedirs(rawplace)
                     self.instigator(thetas_hen, posteriors, rawplace, kplan)
-                    plot1(thetas_hen, posteriors, '0', kplan, self.nins,
-                          self.totcornum, rawplace, self.setup, self.MOAV, self.PACC,
-                          self.HISTOGRAMS, self.CORNER, self.STARMASS, self.PNG,
-                          self.PDF, self.thin, self.draw_every_n)
+                    plot1_PM(thetas_hen, posteriors, '0', kplan, self.nins,
+                             self.totcornum, rawplace, self.setup, self.MOAV, self.PACC,
+                             self.HISTOGRAMS, self.CORNER, self.STARMASS, self.PNG,
+                             self.PDF, self.thin, self.draw_every_n)
 
             if OLD_BIC - NEW_BIC < self.BIC:
                 print('\nBayes Information Criteria of %.2f requirement not met ! !' % self.BIC)
