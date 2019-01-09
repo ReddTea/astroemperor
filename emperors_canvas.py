@@ -6,10 +6,16 @@ import matplotlib.pyplot as plt
 from PyAstronomy.pyasl import foldAt
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
+from tqdm import tqdm
+from scipy.stats import norm
+from decimal import Decimal  # histograms
+
+
 
 def plot1(thetas, flattened, temp, kplanets, nins, totcornum, saveplace, setup,
           MOAV, PACC, HISTOGRAMS, CORNER, STARMASS, PNG, PDF, thin, draw_every_n,
           ticknum=10):
+          #CORNER_MASK, CORNER_K, CORNER_I
     def gaussian(x, mu, sig):
         return sp.exp(-sp.power((x - mu)/sig, 2.)/2.)
 
@@ -22,8 +28,12 @@ def plot1(thetas, flattened, temp, kplanets, nins, totcornum, saveplace, setup,
 
         p_titles = sp.array(['p_Amplitude', 'p_phase', 'p_ecc'])
 
-        thetas = thetas[:-( len(thetas)%nwalkers )]
-        flattened = flattened[:-( len(flattened)%nwalkers )]
+        leftovers = len(thetas)%nwalkers
+        if leftovers == 0:
+            pass
+        else:
+            thetas = thetas[:-leftovers]
+            flattened = flattened[:-( len(flattened)%nwalkers )]
         quasisteps = len(thetas)//nwalkers
 
         color = sp.arange(quasisteps)
@@ -251,6 +261,7 @@ def plot1(thetas, flattened, temp, kplanets, nins, totcornum, saveplace, setup,
 
 
         if CORNER:
+            # ndim = 1 + 5 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
             try:
                 print('Plotting Corner Plot... May take a few seconds')
                 fig = corner.corner(thetas, labels=subtitles)
@@ -298,7 +309,7 @@ def plot2(setup, all_data, fit, kplanets, nins, totcornum, starflag, staract,
         err_phased = ERR[sortIndi]
         return time_phased, rv_phased, err_phased
 
-    def clear_noise(RV, theta_acc, theta_k, theta_i, theta_sa, staract):
+    def clear_noise(RV, theta_acc, theta_k, theta_i, theta_sa, staract, ndat):
         '''
         This should clean offset, add jitter to err
         clear acc, red noise and stellar activity
@@ -373,7 +384,7 @@ def plot2(setup, all_data, fit, kplanets, nins, totcornum, starflag, staract,
     theta_sa = fit[kplanets * 5 + nins*2*(MOAV+1) + PACC + 1:]
 
     for k in range(kplanets):
-        rv0, err0, residuals = clear_noise(rv, theta_acc, theta_k, theta_i, theta_sa, staract)
+        rv0, err0, residuals = clear_noise(rv, theta_acc, theta_k, theta_i, theta_sa, staract, ndat)
         rvk, errk = rv0, err0
         for kk in sp.arange(kplanets-1)+1:
             rvk -= empmir.mini_RV_model(theta_k[5*kk:5*(kk+1)], time)

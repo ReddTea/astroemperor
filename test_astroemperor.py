@@ -3,14 +3,14 @@
 import astroemperor
 import scipy as sp
 
-
+#'''
 # SETUP
 # files to read, format is NAME_instrument#_instrumentname.format
 # They must be in the datafiles folder
 stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 
 # we set the chain parameters
-setup = sp.array([2, 100, 500])  # temperatures, walkers, steps
+setup = sp.array([2, 100, 3000])  # temperatures, walkers, steps
 
 # Constrains for the signals (k>0), they use the change of variable so don't try to make much of them!
 # The format is sp.array([As_0, As_1, log(Period0), log(Period1), Ac_0, Ac_1, S_0, S_1, C_0, S_1]),
@@ -27,11 +27,12 @@ em = astroemperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameter
 
 # We configure the settings
 em.CORNER = False  # corner plot disabled as it takes some time to plot
-em.betas = sp.array([1.0, 0.5])  # beta factor for each temperature, None for automatic
+em.betas = None #array([1.0])  # beta factor for each temperature, None for automatic
+em.MOAV = 0
 # em.MUSIC= True
 # we actually run the chain from 0 to 2 signals
-#em.RAW = True
-em.conquer(0, 2, BOUND=BOUNDARY)
+em.RAW = True
+em.conquer(1, 2, BOUND=BOUNDARY)
 
 print('Everything is working fine !! Why dont you try running a longer chain without boundaries? See bottom comments!!')
 
@@ -48,20 +49,23 @@ print('Everything is working fine !! Why dont you try running a longer chain wit
 # up to how many files you want!
 
 
-stardat = sp.array(['RV_dataset4.vels'])  # same data
-setup = sp.array([5, 150, 15000])  # ntemps, nwalkers, nsteps, now real
+stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])  # same data
+setup = sp.array([5, 200, 12000])  # ntemps, nwalkers, nsteps, now real
 
 em = astroemperor.EMPIRE(stardat, setup)  # EMPIRE(data_to_read, chain_parameters)
-em.betas = sp.array([1.00, 0.70, 0.50, 0.25,0.05])
+#em.betas = sp.array([1.00, 0.05])
 #em.PACC = True
-em.STARMASS = 1.00  # known mass for this particular star GJ876
-em.HILL = True
+em.betas = sp.array([1.00, 0.7, 0.5, 0.25, 0.05])
+#em.STARMASS = 1.00  # known mass for this particular star GJ876
+#em.HILL = True
 em.CORNER = False  # corner plot disabled
 em.eccprior = 0.3  # sigma for the eccentricity prior!
 em.jittprior = 5.0  # sigma for the jitter prior
 em.jittmean = 5.0
-em.MOAV = 0  # Moving Average Order, works from 0 to the number of datapoints
-em.MUSIC= True  # Music ON, False for OFF
+em.MOAV = 1  # Moving Average Order, works from 0 to the number of datapoints
+#em.MUSIC= True  # Music ON, False for OFF
+#em.RAW = True
 em.conquer(0, 5)
 '''
+
 #
