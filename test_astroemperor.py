@@ -10,7 +10,7 @@ import scipy as sp
 stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 
 # we set the chain parameters
-setup = sp.array([2, 100, 3000])  # temperatures, walkers, steps
+setup = sp.array([2, 100, 200])  # temperatures, walkers, steps
 
 # Constrains for the signals (k>0), they use the change of variable so don't try to make much of them!
 # The format is sp.array([As_0, As_1, log(Period0), log(Period1), Ac_0, Ac_1, S_0, S_1, C_0, S_1]),
