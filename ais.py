@@ -64,6 +64,19 @@ def logl(theta, func_logl, args):
     return func_logl(theta, args)
 
 
+class spec:
+    def __init__(self, name, units, prior, lims, val, *args):
+        self.name = name
+        self.units = units
+        self.prior = d[str(prior)]
+        self.lims = lims
+        self.val = -sp.inf
+    def __prior(self, x, *args):
+        return self.__prior(x, args)
+    def identify(self):
+        return self.name+'    '+self.units
+    pass
+
 class EMPIRE:
     def __init__(self, stardat, setup, file_type='rv_file'):
         assert len(stardat) >= 1, 'stardat has to contain at least 1 file ! !'
@@ -89,7 +102,7 @@ class EMPIRE:
                     'exponential':2,
                     'power2':2,
                     'nonlinear':2}
-
+        self.ndim = len(self.theta)
         #  Reading data
 
 
@@ -128,11 +141,11 @@ class EMPIRE:
             self.lenppm = len(self.params_pm)
             #  Correlate with rv's
             self.fsig = 5
-            self.f2k = None
+            self.f2k = None  # EXTERMINATE
             #  acceleration quadratic
             self.PACC_pm = False
         else:
-            print('You sure you wrote the filetype correctly mate?'')
+            raise Exception('You sure you wrote the filetype correctly mate?')
         #  Statistical Tools
         self.bayes_factor = sp.log(150)  # inside chain comparison (smaller = stricter)
         self.model_comparison = 5  # between differet k configurations
@@ -173,6 +186,18 @@ class EMPIRE:
 
         pass
 
+
+    def change_val(self, object_id, action, whato):
+        for theta in t:
+            if theta.name == object_id:
+                setattr(theta, action, whato)
+
+        pass
+
+    def _ndim(self):
+        return len(self.theta)
+
+
     def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
         # 1 handle data
         # 2 set adecuate model
@@ -181,6 +206,9 @@ class EMPIRE:
         # 5 get stats (and model posterior)
         # 6 compare, exit or next
         # 7 remodel prior, go back to step 2
+
+
+        # 1 is currently being done upstairs (in __init__ i mean)
 
         assert self.cores >= 1, 'Cores is set to 0 ! !'
         assert self.thin * self.draw_every_n < self.nsteps, 'You are thining way too hard ! !'
@@ -192,17 +220,62 @@ class EMPIRE:
 
         pass
 
+        #Here should be how to run! Where does it start? Full auto?
+
+        from also import Accumulator
+        also = Accumulator().also
+
+        if also(self.RV):
+            # for instruments in rv
+            acc_lims = sp.array([-1., 1.])
+            jitt_limiter = sp.amax(abs(self.rv))
+            jitt_lim = 3 * jitt_limiter
+            offs_lim = jitt_limiter
+            ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
+
+            # for the keplerian signals
+            kplan = from_k
+            sqrta, sqrte = jitt_lim, 1.
+            sqrta, sqrte = sqrta ** 0.5, sqrte ** 0.5
+            free_lims = sp.array([sp.log(0.1), sp.log(3 * max(self.time)), -sqrta, sqrta, -sqrta, sqrta, -sqrte, sqrte, -sqrte, sqrte])
+
+
+
+
+        if also(self.PM):
+
+            pass
+
+        if also(self.RV and self.PM):  # Here goes the rvpm
+            pass
+
+        if acc.none:
+            raise Exception('Mark RV or PM')
+            pass
+
+        sigmas, sigmas_raw = sp.zeros(ndim), sp.zeros(ndim)  # should go in param object?
+        pos0 = 0.
+        thetas_hen, ajuste_hen = 0., 0.
+        ajuste_raw = sp.array([0])
+        oldlogpost = -999999999.
+        interesting_thetas, interesting_posts = sp.array([]), sp.array([])
+        thetas_raw = sp.array([])
+
+        START = chrono.time()
+
+
+        while kplan <= to_k:
+            mod_lims = sp.array([free_lims for i in range(kplan)]).reshape(-1)
+            t = sp.append()
+
+
+
+
+            pass
 
 
 
 
 
-
-
-
-
-
-
-
-
+        pass
 #
