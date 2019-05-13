@@ -4,8 +4,8 @@
 # version 0.-432,12.78
 
 # DEPENDENCIES
+from __future__ import division
 if True:
-    from __future__ import division
     import os
     import sys
     import numpy as np
@@ -63,12 +63,21 @@ def logp(theta, func_logp, args):
 def logl(theta, func_logl, args):
     return func_logl(theta, args)
 
+def uniform(x, lims, *args):
+    if lims[0] <= x <= lims[1]:
+        return 1.0
+
+def flat(x, lims, *args):
+    return 0.0
+
+d = {'uniform':uniform,
+     'flat':flat}
 
 class spec:
     def __init__(self, name, units, prior, lims, val, *args):
         self.name = name
         self.units = units
-        self.prior = d[str(prior)]
+        self.prior = prior  #d[str(prior)]
         self.lims = lims
         self.val = -sp.inf
     def __prior(self, x, *args):
@@ -197,6 +206,30 @@ class EMPIRE:
     def _ndim(self):
         return len(self.theta)
 
+    def _theta_rv(self, limits, conditions, kplanets):
+        names = sp.array(["Period", "Amplitude", "Phase", "Eccentricity", "Longitude"])
+        if kplanets >= 2:
+            names = sp.array([str(name)+'_'+str(kplanets) for name in names])
+        units = sp.array([" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", "", " $[rads]$"])
+        priors = sp.array(['uniform', 'uniform', 'uniform', 'uniform', 'uniform'])
+        new = sp.array([])
+        for i in range(5):
+            t = spec(names[i], units[i], priors[i], [limits[2*i], limits[2*i+1]], -sp.inf)
+            new = sp.append(new, t)
+        self.theta = sp.append(new, self.theta)
+        pass
+
+    def _theta_ins(self, limits, conditions, instruments):
+        names = sp.array(['Jitter', 'Offset', 'MACoefficient', 'MATimescale'])
+        if instruments >= 2:
+            names = sp.array([str(name)+'_'+str(kplanets) for name in names])
+        pass
+
+
+    def _theta_star(self, limits, conditions, instruments):
+        name = 'Stellar Activity'
+    def _theta_gen(self, limits, conditions):
+        name = 'Acceleration'
 
     def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
         # 1 handle data
@@ -223,7 +256,8 @@ class EMPIRE:
         #Here should be how to run! Where does it start? Full auto?
 
         from also import Accumulator
-        also = Accumulator().also
+        prepo1 = Accumulator()
+        also = prepo1.also
 
         if also(self.RV):
             # for instruments in rv
@@ -243,17 +277,16 @@ class EMPIRE:
 
 
         if also(self.PM):
-
             pass
 
         if also(self.RV and self.PM):  # Here goes the rvpm
             pass
 
-        if acc.none:
+        if prepo1.none:
             raise Exception('Mark RV or PM')
             pass
 
-        sigmas, sigmas_raw = sp.zeros(ndim), sp.zeros(ndim)  # should go in param object?
+        #sigmas, sigmas_raw = sp.zeros(self._ndim), sp.zeros(self._ndim)  # should go in param object?
         pos0 = 0.
         thetas_hen, ajuste_hen = 0., 0.
         ajuste_raw = sp.array([0])
@@ -265,17 +298,34 @@ class EMPIRE:
 
 
         while kplan <= to_k:
-            mod_lims = sp.array([free_lims for i in range(kplan)]).reshape(-1)
-            t = sp.append()
-
-
-
-
+            self._theta_rv(free_lims, None, kplan)
+            kplan += 1
             pass
 
 
 
 
 
-        pass
+        pass  # end CONQUER
 #
+
+
+
+
+
+
+
+
+import ais
+stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
+setup = sp.array([2, 50, 100])
+
+
+em = ais.EMPIRE(stardat, setup)
+em.CORNER = False  # corner plot disabled as it takes some time to plot
+#em.betas = None #array([1.0])  # beta factor for each temperature, None for automatic
+#em.MOAV = 0
+# em.MUSIC= True
+# we actually run the chain from 0 to 2 signals
+#em.RAW = True
+em.conquer(0, 2)
