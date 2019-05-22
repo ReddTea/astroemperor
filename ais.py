@@ -63,27 +63,22 @@ def logp(theta, func_logp, args):
 def logl(theta, func_logl, args):
     return func_logl(theta, args)
 
-def uniform(x, lims, *args):
-    if lims[0] <= x <= lims[1]:
-        return 1.0
-
-def flat(x, lims, *args):
-    return 0.0
-
-d = {'uniform':uniform,
-     'flat':flat}
 
 class spec:
-    def __init__(self, name, units, prior, lims, val, *args):
+    def __init__(self, name, units, prior, lims, val, args=[]):
         self.name = name
         self.units = units
         self.prior = prior  #d[str(prior)]
         self.lims = lims
         self.val = -sp.inf
+        self.args = args
+
     def __prior(self, x, *args):
         return self.__prior(x, args)
     def identify(self):
         return self.name+'    '+self.units
+    def tag(self):
+        return self.name.split('_')[0]
     pass
 
 class EMPIRE:
@@ -95,6 +90,8 @@ class EMPIRE:
         self.setup = setup
         self.ntemps, self.nwalkers, self.nsteps = setup
         self.betas = None
+        self.changes_list = sp.array([])
+
 
         self.burn_out = self.nsteps // 2
         self.RV = False
@@ -182,7 +179,7 @@ class EMPIRE:
         # About the search parameters
         self.ACC = 1  # Acceleration order
         self.WN = True  # jitter fitting (dont touch)
-        self.MOAV = 1  # MOAV order
+        self.MOAV = sp.array([1, 1])  # MOAV order for each instrument
 
         # EXTERMINATE
         self.eccprior = 0.3
@@ -196,22 +193,28 @@ class EMPIRE:
         pass
 
 
-    def change_val(self, object_id, action, whato):
+    def change_val(self, commands):
+        object_id, action, whato = commands
         for theta in t:
             if theta.name == object_id:
                 setattr(theta, action, whato)
 
         pass
 
+
     def _ndim(self):
-        return len(self.theta)
+        dim = 0
+        for t in self.theta:
+            if t.prior=='fixed' or t.prior=='joined':
+                dim -= 1
+        return len(self.theta) + dim
 
     def _theta_rv(self, limits, conditions, kplanets):
-        names = sp.array(["Period", "Amplitude", "Phase", "Eccentricity", "Longitude"])
+        names = ["Period", "Amplitude", "Phase", "Eccentricity", "Longitude"]
         if kplanets >= 2:
-            names = sp.array([str(name)+'_'+str(kplanets) for name in names])
-        units = sp.array([" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", "", " $[rads]$"])
-        priors = sp.array(['uniform', 'uniform', 'uniform', 'uniform', 'uniform'])
+            names = [str(name)+'_'+str(kplanets) for name in names]
+        units = [" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", "", " $[rads]$"]
+        priors = ['uniform', 'uniform', 'uniform', 'uniform', 'uniform']
         new = sp.array([])
         for i in range(5):
             t = spec(names[i], units[i], priors[i], [limits[2*i], limits[2*i+1]], -sp.inf)
@@ -219,17 +222,193 @@ class EMPIRE:
         self.theta = sp.append(new, self.theta)
         pass
 
-    def _theta_ins(self, limits, conditions, instruments):
-        names = sp.array(['Jitter', 'Offset', 'MACoefficient', 'MATimescale'])
-        if instruments >= 2:
-            names = sp.array([str(name)+'_'+str(kplanets) for name in names])
+    def _theta_ins(self, limits, conditions, nin, MOAV):
+        names = ['Jitter', 'Offset', 'MACoefficient', 'MATimescale']
+        if nin > 0:
+            names = [str(name)+'_'+str(nin+1) for name in names]
+        #print(names)
+        units = [' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' [Days]', '']
+        priors = ['uniform', 'uniform', 'uniform', 'uniform']
+        new = sp.array([])
+        for i in range(2):
+            t = spec(names[i], units[i], priors[i], [limits[2*i], limits[2*i+1]], -sp.inf)
+            new = sp.append(new, t)
+        for j in range(2*MOAV):
+            if MOAV > 1:
+                names1 = [str(name)+'_'+str(j//2+1) for name in names]
+            else:
+                names1 = names
+            t = spec(names1[j%2+2], units[j%2+2], priors[j%2+2], [limits[j%2+2], limits[j%2+2]], -sp.inf)
+            new = sp.append(new, t)
+        self.theta = sp.append(new, self.theta)
         pass
-
 
     def _theta_star(self, limits, conditions, instruments):
         name = 'Stellar Activity'
+
     def _theta_gen(self, limits, conditions):
-        name = 'Acceleration'
+        priors = 'uniform'
+        new = []
+        for i in range(self.ACC):
+            name = 'Acceleration'
+            if self.ACC == 1:
+                aux = ''
+            else:
+                aux = '_%i' % i
+            units = [' $[\\frac{m}{s%i}]$' % (i+1)]
+            t = spec(name+aux, units, priors, [limits[0], limits[1]], -sp.inf)
+            new = sp.append(new, t)
+        self.theta = sp.append(new, self.theta)
+        pass
+
+    def MCMC(self, *args):
+        if args:
+            #kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, logl, logp
+            kplanets, boundaries, inslims = args[0], args[1], args[2]
+            acc_lims, sigmas_raw, pos0 = args[3], args[4], args[5]
+            logl, logp = args[6], args[7]
+        #ndim = 1 + 5 * kplanets + self.nins*2*(self.MOAV+1) + self.totcornum + self.PACC
+        #print(str(self.PM)), 'self.pm!!'  # PMPMPM
+        if kplanets > 0:
+            if self.PM:
+                pm_lims = args[8]
+                ndim += self.lenppm*self.fsig
+                print('checkpoint 1')  # PMPMPM
+        ndat = len(self.time)
+        def starinfo():
+            colors = ['red', 'green', 'blue', 'yellow', 'grey', 'magenta', 'cyan', 'white']
+            c = sp.random.randint(0,7)
+            print(colored('\n    ###############################################', colors[c]))
+            print(colored('    #                                             #', colors[c]))
+            print(colored('    #                                             #', colors[c]))
+            print(colored('    #                 E M P E R 0 R               #', colors[c]))
+            print(colored('    #                                             #', colors[c]))
+            print(colored('    #                                             #', colors[c]))
+            print(colored('    ###############################################', colors[c]))
+            print(colored('Exoplanet Mcmc Parallel tEmpering Radial vel0city fitteR', colors[sp.random.randint(0,7)]))
+            logdat = '\n\nStar Name                         : '+self.starname
+            logdat += '\nTemperatures, Walkers, Steps      : '+str((self.ntemps, self.nwalkers, self.nsteps))
+            logdat += '\nN Instruments, K planets, N data  : '+str((self.nins, kplanets, self.ndat))
+            if self.PM:
+                logdat += '\nN of data for Photometry          : '+str(self.ndat_pm)
+            logdat += '\nN Number of Dimensions            : '+str(ndim)
+            logdat += '\nN Moving Average                  : '+str(self.MOAV)
+            logdat += '\nBeta Detail                       : '+str(self.betas)
+            logdat += '\n-----------------------------------------------------'
+            print(logdat)
+            pass
+
+        starinfo()
+        #'''
+        #from emperors_library import logp_rv
+        print(str(self.PM), ndim, 'self.pm y ndim')  # PMPMPM
+        if self.PM:
+            if kplanets > 0:
+                logp_params = sp.array([sp.array([self.time, kplanets, self.nins, self.MOAV,
+                                        self.totcornum, boundaries, inslims, acc_lims,
+                                        sigmas_raw, self.eccprior, self.jittprior,
+                                        self.jittmean, self.STARMASS, self.HILL,
+                                        self.PACC, self.CHECK]),
+                               sp.array([self.time_pm, self.fsig, self.lenppm,
+                                         self.nins_pm, self.MOAV_pm,
+                                         self.totcornum_pm, boundaries, sigmas_raw,
+                                         self.PACC_pm])])
+
+                logl_params = sp.array([sp.array([self.time, self.rv, self.err, self.ins,
+                                        self.staract, self.starflag, kplanets, self.nins,
+                                        self.MOAV, self.totcornum, self.PACC]),
+                               sp.array([self.time_pm, self.rv_pm, self.err_pm, self.ins_pm,
+                                        self.staract_pm, self.starflag_pm, self.fsig,
+                                        self.f2k, self.nins_pm, self.MOAV_pm,
+                                        self.totcornum_pm, self.PACC_pm, kplanets])])
+                self.sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp,
+                                         loglargs=[empmir.logl_rvpm, logl_params],
+                                         logpargs=[empmir.logp_rvpm, logp_params],
+                                         threads=self.cores, betas=self.betas)
+                #raise ImportError('xd dale al debug mejor')
+            else:
+                logp_params = sp.array([self.time, kplanets, self.nins, self.MOAV,
+                                        self.totcornum, boundaries, inslims, acc_lims,
+                                        sigmas_raw, self.eccprior, self.jittprior,
+                                        self.jittmean, self.STARMASS, self.HILL,
+                                        self.PACC, self.CHECK])
+                logl_params = sp.array([self.time, self.rv, self.err, self.ins,
+                                        self.staract, self.starflag, kplanets, self.nins,
+                                        self.MOAV, self.totcornum, self.PACC])
+                self.sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp,
+                                         loglargs=[empmir.logl_rv, logl_params],
+                                         logpargs=[empmir.logp_rv, logp_params],
+                                         threads=self.cores, betas=self.betas)
+            # raise ImportError
+        else:
+            logp_params = sp.array([self.time, kplanets, self.nins, self.MOAV,
+                                    self.totcornum, boundaries, inslims, acc_lims,
+                                    sigmas_raw, self.eccprior, self.jittprior,
+                                    self.jittmean, self.STARMASS, self.HILL,
+                                    self.PACC, self.CHECK])
+            logl_params = sp.array([self.time, self.rv, self.err, self.ins,
+                                    self.staract, self.starflag, kplanets, self.nins,
+                                    self.MOAV, self.totcornum, self.PACC])
+            self.sampler = PTSampler(self.ntemps, self.nwalkers, ndim, logl, logp,
+                                     loglargs=[empmir.logl_rv, logl_params],
+                                     logpargs=[empmir.logp_rv, logp_params],
+                                     threads=self.cores, betas=self.betas)
+        # RVPM THINGY
+
+        print('\n --------------------- BURN IN --------------------- \n')
+
+        pbar = tqdm(total=self.burn_out)
+
+        for p, lnprob, lnlike in self.sampler.sample(pos0, iterations=self.burn_out):
+            pbar.update(1)
+            pass
+        pbar.close()
+
+        p0, lnprob0, lnlike0 = p, lnprob, lnlike
+        print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(self.sampler.acceptance_fraction)))
+        assert sp.mean(self.sampler.acceptance_fraction) != 0, 'Mean acceptance fraction = 0 ! ! !'
+        self.sampler.reset()
+
+        print('\n ---------------------- CHAIN ---------------------- \n')
+        pbar = tqdm(total=self.nsteps)
+        for p, lnprob, lnlike in self.sampler.sample(p0, lnprob0=lnprob0,
+                                                     lnlike0=lnlike0,
+                                                     iterations=self.nsteps,
+                                                     thin=self.thin):
+            pbar.update(1)
+            pass
+        pbar.close()
+        #'''
+
+        assert self.sampler.chain.shape == (self.ntemps, self.nwalkers, self.nsteps/self.thin, ndim), 'something really weird happened'
+        print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(self.sampler.acceptance_fraction)))
+
+        ln_post = self.sampler.lnprobability
+
+        posteriors = sp.array([ln_post[i].reshape(-1) for i in range(self.ntemps)])
+        chains = self.sampler.flatchain
+        best_post = posteriors[0] == np.max(posteriors[0])
+        #raise ImportError
+
+        thetas_raw = sp.array([chains[i] for i in range(self.ntemps)])
+        thetas_hen = sp.array([empmir.henshin(chains[i], kplanets) for i in sp.arange(self.ntemps)])
+
+        ajuste_hen = thetas_hen[0][best_post][0]
+        ajuste_raw = thetas_raw[0][best_post][0]
+
+        interesting_loc = sp.array([max(posteriors[temp]) - posteriors[temp] < self.bayes_factor for temp in sp.arange(self.ntemps)])
+        interesting_thetas = sp.array([thetas_hen[temp][interesting_loc[temp]] for temp in sp.arange(self.ntemps)])
+        thetas_hen = sp.array([thetas_hen[temp] for temp in sp.arange(self.ntemps)])
+        interesting_thetas_raw = sp.array([thetas_raw[temp][interesting_loc[temp]] for temp in sp.arange(self.ntemps)])
+        interesting_posts = sp.array([posteriors[temp][interesting_loc[temp]] for temp in range(self.ntemps)])
+        sigmas = sp.array([ sp.std(interesting_thetas[0][:, i]) for i in range(ndim) ])
+        sigmas_raw = sp.array([ sp.std(interesting_thetas_raw[0][:, i]) for i in range(ndim) ])
+        #print('sigmas', sigmas)  # for testing
+        #print('sigmas_raw', sigmas_raw)
+        #print('mod_lims', boundaries)
+        print('ALL RIGHT ALL RIGHT ALL RIGHT ALL RIGHT ALL RIGHT ALL RIGHT ALL RIGHT ALL RIGHT ')
+        return thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, self.sampler.betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw
+
 
     def conquer(self, from_k, to_k, logl=logl, logp=logp, BOUND=sp.array([])):
         # 1 handle data
@@ -265,7 +444,7 @@ class EMPIRE:
             jitt_limiter = sp.amax(abs(self.rv))
             jitt_lim = 3 * jitt_limiter
             offs_lim = jitt_limiter
-            ins_lims = sp.array([sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([sp.array([-1.0, 1.0, 0.1, 10]) for j in range(self.MOAV)])) for i in range(self.nins)]).reshape(-1)
+
 
             # for the keplerian signals
             kplan = from_k
@@ -293,14 +472,48 @@ class EMPIRE:
         oldlogpost = -999999999.
         interesting_thetas, interesting_posts = sp.array([]), sp.array([])
         thetas_raw = sp.array([])
-
         START = chrono.time()
 
+        # INITIALIZE GENERAL PARAMS
+        self._theta_gen(acc_lims, None)
+
+        # INITIALIZE INSTRUMENT PARAMS
+        for nin in range(self.nins):
+            ins_lims = sp.append(sp.array([0.0001, jitt_lim, -offs_lim, offs_lim]), sp.array([(-1.0, 1.0, 0.1, 10) for _ in range(self.MOAV[nin])])).reshape(-1)
+            self._theta_ins(ins_lims, None, nin, self.MOAV[nin])
 
         while kplan <= to_k:
-            self._theta_rv(free_lims, None, kplan)
+            if kplan > 0:
+                # INITIALIZE KEPLERIAN PARAMS
+                self._theta_rv(free_lims, None, kplan)
+                pass
+
+
+        # FINAL MODEL STEP, apply commands
+            for j in range(len(self.changes_list))[::-1]:
+                try:
+                    self.change_val(self.changes_list[j])
+
+                except:
+                    pass
+
+        # 3 generate values for said model, different step as this should allow configuration
+            self.pos0 = emplib.neo_p0(self.setup, self.theta, self._ndim())
+        # 4 run chain
+            #thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw = self.MCMC(kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, logl, logp)
+
+            from emperors_mirror import neo_logp_rv
+            p=em.pos0[0][1]
+
+            neo_logp_rv(p, [em.theta, em._ndim()])
+
+            s0 = chrono.time()
+            for _ in range(10000):
+                neo_logp_rv(p, [em.theta, em._ndim()])
+            print('________', chrono.time()-s0)
+
             kplan += 1
-            pass
+
 
 
 
@@ -312,20 +525,19 @@ class EMPIRE:
 
 
 
-
-
-
-
-import ais
+# import ais
 stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 setup = sp.array([2, 50, 100])
 
 
-em = ais.EMPIRE(stardat, setup)
+em = EMPIRE(stardat, setup)  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
 #em.betas = None #array([1.0])  # beta factor for each temperature, None for automatic
 #em.MOAV = 0
 # em.MUSIC= True
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
+#em.ACC = 3
+em.MOAV = sp.array([1,1])
+em.MUSIC = False
 em.conquer(0, 2)
