@@ -195,11 +195,11 @@ class EMPIRE:
 
     def change_val(self, commands):
         object_id, action, whato = commands
-        for theta in t:
+        for theta in self.theta:
             if theta.name == object_id:
                 setattr(theta, action, whato)
-
-        pass
+                return True
+        return False
 
 
     def _ndim(self):
@@ -490,13 +490,23 @@ class EMPIRE:
 
 
         # FINAL MODEL STEP, apply commands
+            #'''
+
+
+
             for j in range(len(self.changes_list))[::-1]:
-                try:
-                    self.change_val(self.changes_list[j])
+                if self.change_val(self.changes_list[j]):
+                    print('Following condition has been applied: ', self.changes_list[j])
+                    self.changes_list = sp.append(self.changes_list[:j], self.changes_list[j+1:])
+                    self.changes_list = self.changes_list.reshape((len(self.changes_list)//3, 3))
 
-                except:
-                    pass
+            print('asdasdasd', self.changes_list.shape)
+            for t in self.theta:
+                print(t.name, t.prior, t.val)
 
+            ##########
+            #self.change_val(['Acceleration', 'prior', 'fixed'])
+            #self.change_val(['Acceleration', 'val', '0.1'])
         # 3 generate values for said model, different step as this should allow configuration
             self.pos0 = emplib.neo_p0(self.setup, self.theta, self._ndim())
         # 4 run chain
@@ -505,13 +515,20 @@ class EMPIRE:
             from emperors_mirror import neo_logp_rv
             p=em.pos0[0][1]
 
-            neo_logp_rv(p, [em.theta, em._ndim()])
 
+
+            em.a = neo_logp_rv(p, [em.theta, em._ndim()])
+
+            #em.aa = neo_logl_rv(p, [em.theta, em._ndim()])
+
+
+
+            '''
             s0 = chrono.time()
             for _ in range(10000):
                 neo_logp_rv(p, [em.theta, em._ndim()])
             print('________', chrono.time()-s0)
-
+            '''
             kplan += 1
 
 
@@ -538,6 +555,15 @@ em.CORNER = False  # corner plot disabled as it takes some time to plot
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
 #em.ACC = 3
-em.MOAV = sp.array([1,1])
+em.MOAV = sp.array([2,1])
 em.MUSIC = False
+em.changes_list = sp.array([['Acceleration', 'prior', 'fixed'],
+                            ['Acceleration', 'val', 0.1],
+                            ['Period_2', 'val', 31.],
+                            ['Period_2', 'prior', 'fixed']])
+
+
+
+
 em.conquer(0, 2)
+#

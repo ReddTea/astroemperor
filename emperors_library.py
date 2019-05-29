@@ -65,7 +65,7 @@ class DATA:
 
         for i in range(self.nins):  # stack all data
             dat0, dat1, cornum = self.insert_labels(self.all_data[i], i)  # rvs, activities
-            print dat1, cornum
+            print(dat1, cornum)
             if i == 0:
                 self.rv = dat0
             else:
@@ -168,31 +168,43 @@ def read_data_f(instruments):
     return fd, staract, starflag, totcornum
 
 
-
 def normal_pdf(x, mean, variance):
     var = 2 * variance
     return ( - (x - mean) ** 2 / var)
 
 
-def pt_pos(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcornum,
-           PACC):
+def gaussian(x, sigma):
+    coef = -(x*x)/(2*sigma*sigma)
+    return 1/np.sqrt(2*np.pi*sigma*sigma) * np.exp(coef)
+
+
+def pt_pos(setup, *args):
+
+    if args:
+        kplanets, nins, boundaries = args[0], args[1], args[2]
+        inslims, acc_lims, MOAV = args[3], args[4], args[5]
+        totcornum, PACC = args[6], args[7]
+
     ntemps, nwalkers, nsteps = setup
-    ndim = 1 + 5 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
-    pos = sp.array([sp.zeros(ndim) for i in range(nwalkers)])
+    k_params = 5 * kplanets
+    i_params = nins*2*(MOAV+1)
+
+    ndim = 1 + k_params + i_params + totcornum + PACC
+    pos = sp.zeros((nwalkers, ndim))
     k = -2
     l = -2
     ll = -2  ##
     for j in range(ndim):
-        if j < 5 * kplanets:
+        if j < k_params:
             k += 2
-            if j%5==1:
+            if j%5==0:
                 fact = sp.absolute(boundaries[k] - boundaries[k+1]) / nwalkers
             else:
                 #fact = sp.absolute(boundaries[k]) / (self.nwalkers)
                 fact = (sp.absolute(boundaries[k] - boundaries[k+1]) * 2) / (5 * nwalkers)
             dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
             for i in range(nwalkers):
-                if j%5==1:
+                if j%5==0:
                     pos[i][j] = boundaries[k] + (dif[i] + fact/2.0)
                 else:
                     #pos[i][j] = boundaries[k] * 0.5 + (dif[i] + fact/2.0)
@@ -210,12 +222,12 @@ def pt_pos(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcornum
                     pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
 
         # instruments
-        if 5 * kplanets + PACC < j < 5*kplanets + nins*2*(MOAV+1) + 1 + PACC:
+        if 5 * kplanets + PACC < j < k_params + i_params + 1 + PACC:
             l += 2
             fact = sp.absolute(inslims[l] - inslims[l+1]) / nwalkers
             dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
 
-            if (j-5*kplanets-1-PACC) % nins*2*(MOAV+1) == 0:  # ojo aqui
+            if (j-k_params-1-PACC) % i_params == 0:  # ojo aqui
                 jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
                 dif = jitt_ini * sp.random.uniform(0.9, 0.999)
 
@@ -223,7 +235,7 @@ def pt_pos(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcornum
                 pos[i][j] = inslims[l] + (dif[i] + fact/2.0)
             #print(pos[j][:])
         if totcornum:
-            if j > 5*kplanets + nins*2*(MOAV+1) + PACC:
+            if j > k_params + i_params + PACC:
                 fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
 
                 dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.8, 0.999)
@@ -235,8 +247,12 @@ def pt_pos(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcornum
     return pos
 
 
-def pt_pos_PM(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcornum,
-              PACC):
+def pt_pos_4(setup, *args):
+
+    if args:
+        kplanets, nins, boundaries = args[0], args[1], args[2]
+        inslims, acc_lims, MOAV = args[3], args[4], args[5]
+        totcornum, PACC = args[6], args[7]
     ntemps, nwalkers, nsteps = setup
     ndim = 1 + 4 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
     pos = sp.array([sp.zeros(ndim) for i in range(nwalkers)])
@@ -288,5 +304,113 @@ def pt_pos_PM(setup, kplanets, nins, boundaries, inslims, acc_lims, MOAV, totcor
                     pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
                     #print(pos[i][j])
 
+    pos = sp.array([pos for _ in range(ntemps)])
+    return pos
+
+
+def pt_pos_rvpm(setup, *args):
+    '''
+    MAKE A WAY TO DIFFERENTIATE BETWEEN RV AND RVPM
+    '''
+
+    if args:
+        kplanets, nins, boundaries = args[0], args[1], args[2]
+        inslims, acc_lims, MOAV = args[3], args[4], args[5]
+        totcornum, PACC = args[6], args[7]
+    ntemps, nwalkers, nsteps = setup
+
+    k_params = 5 * kplanets
+    i_params = nins*2*(MOAV+1)
+    fsig, lenppm, nins_pm, boundaries_pm = args[-4:]  # PM ONLY
+    ndim = k_params + i_params + totcornum + PACC + 1
+    if kplanets > 0:
+        if args:
+            ndim += fsig*lenppm
+    pos = sp.zeros((nwalkers, ndim))
+    k, kk = -2, -2
+    l, ll = -2, -2
+
+    for j in range(ndim):
+        if j < k_params:  # planetary params
+            k += 2
+            if j%5==0:
+                fact = sp.absolute(boundaries[k] - boundaries[k+1]) / nwalkers
+                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+                pos[:, j] = boundaries[k] + (dif + fact/2.0)
+                act0 = pos
+            else:
+                fact = (sp.absolute(boundaries[k] - boundaries[k+1]) * 2) / (5 * nwalkers)
+                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+                pos[:, j] = (boundaries[k+1]+3*boundaries[k])/4 + (dif + fact/2.0)
+                act1 = pos
+        if j == k_params:  # acc
+            fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
+            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+            pos[:, j] = acc_lims[0] + (dif + fact/2.0)
+        if PACC:  # pacc
+            if j == k_params + PACC:  # parabolic accel
+                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
+                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+                pos[:, j] = acc_lims[0] + (dif + fact/2.0)
+        act2 = pos
+        # instruments
+        if k_params + PACC < j < k_params + i_params + 1 + PACC:
+            l += 2
+            fact = sp.absolute(inslims[l] - inslims[l+1]) / nwalkers
+            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+
+            if (j-k_params-1-PACC) % i_params == 0:  # ojo aqui
+                jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
+                dif = jitt_ini * sp.random.uniform(0.9, 0.999)
+
+            for i in range(nwalkers):
+                pos[i][j] = inslims[l] + (dif[i] + fact/2.0)
+        if totcornum:
+            if k_params + i_params + PACC < j < k_params + i_params + totcornum + PACC + 1:
+                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
+
+                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.8, 0.999)
+                for i in range(nwalkers):
+                    pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
+        if kplanets > 0 and k_params + i_params + totcornum + PACC < j:
+            if args:  # pm thingy
+                kk += 2
+                fact = sp.absolute(boundaries_pm[kk] - boundaries_pm[kk+1]) / nwalkers
+                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
+                pos[:, j] = (boundaries_pm[kk+1] + 3*boundaries_pm[kk])/4 + (dif + fact/2.)
+
+    pos = sp.array([pos for h in range(ntemps)])
+
+
+    return pos
+
+
+def neo_p0(setup, *args):
+    ntemps, nwalkers, nsteps = setup
+    t = args[0]
+    ndim = args[1]
+    pos = sp.zeros((nwalkers, ndim))
+
+    for j in range(ndim):
+        boundaries = t[j].lims
+        rnd = sp.random.uniform(0.9, 0.999)
+        fact = sp.absolute(boundaries[0]-boundaries[1]) / nwalkers
+        dif = sp.arange(nwalkers) * fact * rnd
+        if t[j].prior=='uniform_spe' or t[j].prior=='joined':
+            for i in range(nwalkers):
+                pos[i][j] = (boundaries[1]+3*boundaries[0])/4 + (dif[i]*2./5. + fact/2.0)
+        elif t[j].name.split('_')[0]=='Jitter':
+            jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
+            dif = jitt_ini * rnd
+            for i in range(nwalkers):
+                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
+
+        else:
+            for i in range(nwalkers):
+                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
     pos = sp.array([pos for h in range(ntemps)])
     return pos
+
+
+
+#
