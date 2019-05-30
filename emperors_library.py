@@ -389,17 +389,19 @@ def neo_p0(setup, *args):
     ntemps, nwalkers, nsteps = setup
     t = args[0]
     ndim = args[1]
+    C = args[2]
+
     pos = sp.zeros((nwalkers, ndim))
 
     for j in range(ndim):
-        boundaries = t[j].lims
+        boundaries = t[C[j]].lims
         rnd = sp.random.uniform(0.9, 0.999)
         fact = sp.absolute(boundaries[0]-boundaries[1]) / nwalkers
         dif = sp.arange(nwalkers) * fact * rnd
-        if t[j].prior=='uniform_spe' or t[j].prior=='joined':
+        if t[C[j]].prior=='uniform_spe' or t[C[j]].prior=='joined':
             for i in range(nwalkers):
                 pos[i][j] = (boundaries[1]+3*boundaries[0])/4 + (dif[i]*2./5. + fact/2.0)
-        elif t[j].name.split('_')[0]=='Jitter':
+        elif t[C[j]].tag()=='Jitter':
             jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
             dif = jitt_ini * rnd
             for i in range(nwalkers):

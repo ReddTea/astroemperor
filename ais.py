@@ -90,8 +90,9 @@ class EMPIRE:
         self.setup = setup
         self.ntemps, self.nwalkers, self.nsteps = setup
         self.betas = None
-        self.changes_list = sp.array([])
 
+        self.changes_list = sp.array([])
+        self.coordinator = sp.array([])
 
         self.burn_out = self.nsteps // 2
         self.RV = False
@@ -219,7 +220,10 @@ class EMPIRE:
         for i in range(5):
             t = spec(names[i], units[i], priors[i], [limits[2*i], limits[2*i+1]], -sp.inf)
             new = sp.append(new, t)
-        self.theta = sp.append(new, self.theta)
+        if kplanets == 1:
+            self.theta = sp.append(new, self.theta)
+        else:
+            self.theta = sp.insert(self.theta, (kplanets-1)*len(names), new)
         pass
 
     def _theta_ins(self, limits, conditions, nin, MOAV):
@@ -240,7 +244,7 @@ class EMPIRE:
                 names1 = names
             t = spec(names1[j%2+2], units[j%2+2], priors[j%2+2], [limits[j%2+2], limits[j%2+2]], -sp.inf)
             new = sp.append(new, t)
-        self.theta = sp.append(new, self.theta)
+        self.theta = sp.append(self.theta, new)
         pass
 
     def _theta_star(self, limits, conditions, instruments):
@@ -504,20 +508,28 @@ class EMPIRE:
             for t in self.theta:
                 print(t.name, t.prior, t.val)
 
+
+            ### COORDINATOR
+            self.coordinator = []
+            for i in range(len(self.theta)):
+                if self.theta[i].prior == 'fixed':
+                    pass
+                else:
+                    self.coordinator.append(i)
             ##########
             #self.change_val(['Acceleration', 'prior', 'fixed'])
             #self.change_val(['Acceleration', 'val', '0.1'])
         # 3 generate values for said model, different step as this should allow configuration
-            self.pos0 = emplib.neo_p0(self.setup, self.theta, self._ndim())
+            self.pos0 = emplib.neo_p0(self.setup, self.theta, self._ndim(), self.coordinator)
         # 4 run chain
             #thetas_raw, ajuste_raw, thetas_hen, ajuste_hen, p, lnprob, lnlike, posteriors, betas, interesting_thetas, interesting_posts, sigmas, sigmas_raw = self.MCMC(kplan, mod_lims, ins_lims, acc_lims, sigmas_raw, pos0, logl, logp)
 
             from emperors_mirror import neo_logp_rv
-            p=em.pos0[0][1]
+            p=self.pos0[0][1]
 
 
 
-            em.a = neo_logp_rv(p, [em.theta, em._ndim()])
+            self.a = neo_logp_rv(p, [self.theta, self._ndim(), self.coordinator])
 
             #em.aa = neo_logl_rv(p, [em.theta, em._ndim()])
 
@@ -555,14 +567,17 @@ em.CORNER = False  # corner plot disabled as it takes some time to plot
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
 #em.ACC = 3
-em.MOAV = sp.array([2,1])
+em.MOAV = sp.array([1,1])
 em.MUSIC = False
+#'''
 em.changes_list = sp.array([['Acceleration', 'prior', 'fixed'],
                             ['Acceleration', 'val', 0.1],
-                            ['Period_2', 'val', 31.],
-                            ['Period_2', 'prior', 'fixed']])
+                            ['Eccentricity', 'prior', 'fixed'],
+                            ['Eccentricity', 'val', 0.0],
+                            ['Period_2', 'prior', 'fixed'],
+                            ['Period_2', 'val', 31.]])
 
-
+#'''
 
 
 em.conquer(0, 2)

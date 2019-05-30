@@ -793,14 +793,23 @@ D = {'uniform':uniform,
      'joined':joined}
 
 def neo_logp_rv(theta, params):
-    _theta, ndim = params
+    _theta, ndim, C = params
     c, lp = 0, 0.
 
     for j in range(ndim):
+        '''
         p = _theta[j+c].prior
         if p =='fixed' or p=='joined':
             c += 1
         lp += D[p](theta[j], _theta[j+c].lims, _theta[j+c].args)
+        print(D[p](theta[j], _theta[j+c].lims, _theta[j+c].args))
+        '''
+
+        print(_theta[j+c].name)
+        print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
+        lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
+        #C = sp.array([1,  2,  3,  4,  5,  6,  7,  9, 10, 11, 12, 13, 14,15, 16, 17])
+        #print('priorrrrrrrrr')
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
     #MP = sp.zeros(kplanets)  # this goes in hill
@@ -808,7 +817,9 @@ def neo_logp_rv(theta, params):
     return lp
 
 def neo_logl_rv(theta, params):
-    _t = params
+    _t, C = params
+
+    '''
     t_, c = [], 0  # auxiliary theta, counter
     for i in range(len(_t)):
         if _t[i+c].prior != 'fixed' and _t[i+c].prior != 'joined':
@@ -816,7 +827,7 @@ def neo_logl_rv(theta, params):
         else:
             t_[i] = _t[i].val
             c += 1
-
+    '''
 
     a1 = (theta[:model_params])
     MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC
