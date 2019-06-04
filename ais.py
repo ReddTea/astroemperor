@@ -511,9 +511,10 @@ class EMPIRE:
 
             ### COORDINATOR
             self.coordinator = []
+            self.ac = []
             for i in range(len(self.theta)):
                 if self.theta[i].prior == 'fixed':
-                    pass
+                    self.ac.append(i)
                 else:
                     self.coordinator.append(i)
             ##########
@@ -530,6 +531,13 @@ class EMPIRE:
 
 
             self.a = neo_logp_rv(p, [self.theta, self._ndim(), self.coordinator])
+
+
+            logl_params = sp.array([self.time, self.rv, self.err, self.ins,
+                                    self.staract, self.starflag, kplanets, self.nins,
+                                    self.MOAV, self.totcornum, self.PACC])
+
+            self.b = neo_logl_rv(p, [self.theta, self.anticoordinator(), logl_params])
 
             #em.aa = neo_logl_rv(p, [em.theta, em._ndim()])
 

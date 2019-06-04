@@ -797,13 +797,6 @@ def neo_logp_rv(theta, params):
     c, lp = 0, 0.
 
     for j in range(ndim):
-        '''
-        p = _theta[j+c].prior
-        if p =='fixed' or p=='joined':
-            c += 1
-        lp += D[p](theta[j], _theta[j+c].lims, _theta[j+c].args)
-        print(D[p](theta[j], _theta[j+c].lims, _theta[j+c].args))
-        '''
 
         print(_theta[j+c].name)
         print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
@@ -816,23 +809,81 @@ def neo_logp_rv(theta, params):
     #SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
     return lp
 
-def neo_logl_rv(theta, params):
-    _t, C = params
+def neo_logl_rv(theta, paramis):
+    # PARAMS DEFINITIONS
 
-    '''
-    t_, c = [], 0  # auxiliary theta, counter
-    for i in range(len(_t)):
-        if _t[i+c].prior != 'fixed' and _t[i+c].prior != 'joined':
-            t_[i] = theta[i-c]
-        else:
-            t_[i] = _t[i].val
-            c += 1
-    '''
+    _t, AC, params = paramis
 
+    time, rv, err = params[0], params[1], params[2]
+    ins, staract, starflag = params[3], params[4], params[5]
+    kplanets, nins, MOAV = params[6], params[7], params[8]
+    totcornum, ACC = params[9], params[10]
+    i, lnl = 0, 0
+    ndat = len(time)
+    jitter, offset, macoef, timescale = sp.zeros(ndat), sp.zeros(ndat), sp.array([sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
+    model_params = kplanets * 5
+    ins_params = nins * 2 * (MOAV + 1)
+    acc_params = ACC
+
+    # THIS SHOULD BE WITH A POLYNOMIAL
+    if ACC == 2:
+        ACC = theta[model_params] * (time - time[0]) + theta[model_params + 1] * (time - time[0]) ** 2
+    else:
+        ACC = theta[model_params] * (time - time[0])
+    # THETA CORRECTION FOR FIXED THETAS
+    for a in AC:
+        theta = sp.insert(theta, a, _t[a].val)
+
+
+    # SETUP
+
+    residuals = sp.zeros(ndat)
+    for i in range(ndat):
+        jitpos = int(model_params + acc_params + ins[i] * 2 * (MOAV+1))
+        jitter[i], offset[i] = theta[jitpos], theta[jitpos + 1]  # jitt
+        for j in range(MOAV):
+            macoef[j][i], timescale[j][i] = theta[jitpos + 2*(j+1)], theta[jitpos + 2*(j+1) + 1]
     a1 = (theta[:model_params])
+
+    if totcornum:
+        #print 'SE ACTIBOY'
+        COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
+        SA = theta[model_params+acc_params+ins_params:]
+
+        assert len(SA) == totcornum, 'error in correlations'
+        AR = 0.0  # just to remember to add this
+        counter = -1
+
+        for i in range(nins):
+            for j in range(len(starflag[i])):
+                counter += 1
+                passer = -1
+                for k in range(ndat):
+                    if starflag[i][j] == ins[k]:  #
+                        passer += 1
+                        COR[i][j][k] = SA[counter] * staract[i][j][passer]
+
+        FMC = 0
+        for i in range(len(COR)):
+            for j in range(len(COR[i])):
+                FMC += COR[i][j]
+    else:
+        #print 'NO SE AKTIBOY'
+        FMC = 0
+
     MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC
 
 
+    for i in range(ndat):
+        residuals[i] = rv[i] - MODEL[i]
+        for c in range(MOAV):
+            if i > c:
+                MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1-c] - time[i]) / timescale[c][i]) * residuals[i-1-c]
+                residuals[i] -= MA
+
+    inv_sigma2 = 1.0 / (err**2 + jitter**2)
+    lnl = sp.sum(residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
+    return -0.5 * lnl
 
 
 
