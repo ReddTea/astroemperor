@@ -797,12 +797,10 @@ def neo_logp_rv(theta, params):
     c, lp = 0, 0.
 
     for j in range(ndim):
-
-        print(_theta[j+c].name)
-        print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
+        #print(_theta[j+c].name)
+        #print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
         lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-        #C = sp.array([1,  2,  3,  4,  5,  6,  7,  9, 10, 11, 12, 13, 14,15, 16, 17])
-        #print('priorrrrrrrrr')
+
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
     #MP = sp.zeros(kplanets)  # this goes in hill
@@ -820,31 +818,35 @@ def neo_logl_rv(theta, paramis):
     totcornum, ACC = params[9], params[10]
     i, lnl = 0, 0
     ndat = len(time)
-    jitter, offset, macoef, timescale = sp.zeros(ndat), sp.zeros(ndat), sp.array([sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
+    jitter, offset = sp.zeros(ndat), sp.zeros(ndat)
+
+    macoef, timescale = sp.array([sp.zeros(ndat) for i in range(sp.amax(MOAV))]), sp.array([sp.zeros(ndat) for i in range(sp.amax(MOAV))])
+
     model_params = kplanets * 5
-    ins_params = nins * 2 * (MOAV + 1)
+    ins_params = (nins + sp.sum(MOAV)) * 2
     acc_params = ACC
 
-    # THIS SHOULD BE WITH A POLYNOMIAL
-    if ACC == 2:
-        ACC = theta[model_params] * (time - time[0]) + theta[model_params + 1] * (time - time[0]) ** 2
-    else:
-        ACC = theta[model_params] * (time - time[0])
     # THETA CORRECTION FOR FIXED THETAS
     for a in AC:
         theta = sp.insert(theta, a, _t[a].val)
+
+    if ACC > 0:
+        ACC = sp.polyval(sp.r_[0, theta[model_params:model_params+ACC]], (time-time[0]))
 
 
     # SETUP
 
     residuals = sp.zeros(ndat)
     for i in range(ndat):
-        jitpos = int(model_params + acc_params + ins[i] * 2 * (MOAV+1))
-        jitter[i], offset[i] = theta[jitpos], theta[jitpos + 1]  # jitt
-        for j in range(MOAV):
-            macoef[j][i], timescale[j][i] = theta[jitpos + 2*(j+1)], theta[jitpos + 2*(j+1) + 1]
+        jitpos = int(model_params + acc_params + (ins[i] + sp.sum(MOAV[:int(ins[i])])) * 2)
+        jitter[i], offset[i] = theta[jitpos], theta[jitpos + 1]  #
+        for jj in range(MOAV[int(ins[i])]):
+            macoef[jj][i] = theta[jitpos + 2*(jj+1)]
+            timescale[jj][i] = theta[jitpos + 2*(jj+1) + 1]
     a1 = (theta[:model_params])
 
+    #raise Exception('dele al debug mijo')
+    # CHECK THIS CHECK THIS
     if totcornum:
         #print 'SE ACTIBOY'
         COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
@@ -876,7 +878,7 @@ def neo_logl_rv(theta, paramis):
 
     for i in range(ndat):
         residuals[i] = rv[i] - MODEL[i]
-        for c in range(MOAV):
+        for c in range(sp.amax(MOAV)):
             if i > c:
                 MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1-c] - time[i]) / timescale[c][i]) * residuals[i-1-c]
                 residuals[i] -= MA
