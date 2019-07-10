@@ -2,7 +2,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # EMPEROR Exoplanet Mcmc Parallel tEmpering Radial velOcity fitteR
-# version 0.-432,12.78
+# version 0.572.-47/31,64
 
 # DEPENDENCIES
 from __future__ import division
