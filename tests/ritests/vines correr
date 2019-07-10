@@ -1,0 +1,16 @@
+    params.ecc = 0.                      #eccentricity
+    params.w = 0.                        #longitude of periastron (in degrees)
+    params.u = [0.1, 0.3]                #limb darkening coefficients [u1, u2]
+    params.limb_dark = "quadratic" 
+
+    params.per = 24.73712                       #orbital period in days
+    params.a = 101.1576001138329                      #semi-major axis (in units of stellar radii)
+    params.inc = 89.912                     #orbital inclination (in degrees)
+
+
+	rp y T0, k_a y k_r
+
+priors
+
+    if not (2456915.67 < T0  < 2456915.73 and 0.05 < r  < 0.09 and
+        0 < k_a < 5.0e-2 and 0 < k_r < 6.):

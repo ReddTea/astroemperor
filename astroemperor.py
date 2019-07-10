@@ -48,7 +48,7 @@ def logl(theta, func_logl, args):
 
 
 class EMPIRE:
-    def __init__(self, stardat, setup, file_type='rv_file'):
+    def __init__(self, stardat, setup):
         assert len(stardat) >= 1, 'stardat has to contain at least 1 file ! !'
         assert len(setup) == 3, 'setup has to be [ntemps, nwalkers, nsteps]'
         #  Setup
@@ -61,7 +61,6 @@ class EMPIRE:
         self.burn_out = self.nsteps // 2
         self.PM = False
         #  Reading data
-
 
         if len(stardat.shape) > 1:
             # RV
@@ -97,40 +96,21 @@ class EMPIRE:
             self.PACC_pm = False
 
         else:  # RV
-            if file_type=='rv_file':
-                self.rvfiles = stardat
-                rvdat = emplib.read_data(stardat)
-                self.time, self.rv, self.err, self.ins = rvdat[0]  # time, radial velocities, error and instrument flag
-                self.all_data = rvdat[0]
-                self.staract, self.starflag = rvdat[1], rvdat[2]  # time, star activity index and flag
-                self.totcornum = rvdat[3]  # quantity if star activity indices
 
-                self.nins = len(self.rvfiles)  # number of instruments autodefined
-                self.ndat = len(self.time)  # number of datapoints
+            self.rvfiles = stardat
+            rvdat = emplib.read_data(stardat)
+            self.time, self.rv, self.err, self.ins = rvdat[0]  # time, radial velocities, error and instrument flag
+            self.all_data = rvdat[0]
+            self.staract, self.starflag = rvdat[1], rvdat[2]  # time, star activity index and flag
+            self.totcornum = rvdat[3]  # quantity if star activity indices
 
-                # PM
-                self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
-                self.totcornum_pm = 0.
+            self.nins = len(self.rvfiles)  # number of instruments autodefined
+            self.ndat = len(self.time)  # number of datapoints
 
-            if file_type=='pm_file':
-                self.pmfiles = stardat
-                pmdat = emplib.read_data(stardat)
-                self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = pmdat[0]
-                self.all_data_pm = pmdat[0]
-                self.staract_pm, self.starflag_pm = pmdat[1], pmdat[2]  # time, star activity index and flag
-                self.totcornum_pm = pmdat[3]  # ?
+            # PM
+            self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
+            self.totcornum_pm = 0.
 
-                self.nins_pm = len(self.pmfiles)
-                self.ndat_pm = len(self.time_pm)
-                self.MOAV_pm = 0  # for flat model
-                self.fsig = 1
-                self.f2k = None
-                self.PM = True
-
-                self.params_pm = sp.array([1, 2, 3, 4])
-                self.lenppm = len(self.params_pm)
-
-                self.PACC_pm = False
         #  Statistical Tools
         self.bayes_factor = sp.log(150)  # inside chain comparison (smaller = stricter)
         self.model_comparison = 5
@@ -327,6 +307,10 @@ class EMPIRE:
 
 
     def instigator(self, chain, post, saveplace, kplanets):
+        '''
+        Automatically saves chains and posteriors.
+        '''
+
         def mk_header(kplanets):
             h = []
             kepler = ['Period                  ', 'Amplitude               ', 'Phase                   ', 'Longitude               ', 'Eccentricity            ', 'Minimum Mass            ', 'SemiMajor Axis          ']
@@ -499,6 +483,11 @@ class EMPIRE:
                                      logpargs=[empmir.logp_rv, logp_params],
                                      threads=self.cores, betas=self.betas)
         # RVPM THINGY
+
+            s0 = chrono.time()
+            for _ in range(10000):
+                empmir.logp_rv(pos0[0][0], logp_params)
+            print('________', chrono.time()-s0)
 
         print('\n --------------------- BURN IN --------------------- \n')
 

@@ -1,3 +1,4 @@
+# @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import scipy as sp
@@ -13,7 +14,7 @@ def read_data(instruments):
     instruments = sp.array([sp.loadtxt('datafiles/'+x) for x in instruments])
     def data(data, ins_no):
         Time, Radial_Velocity, Err = data.T[:3]  # el error de la rv
-        Radial_Velocity -= sp.mean(Radial_Velocity)
+        #Radial_Velocity -= sp.mean(Radial_Velocity)  # DEL for pm testing
         Flag = sp.ones(len(Time)) * ins_no  # marca el instrumento al q pertenece
         Staract = data.T[3:]
         return sp.array([Time, Radial_Velocity, Err, Flag, Staract])
@@ -29,7 +30,7 @@ def read_data(instruments):
         t, rv, er, flag, star = data(instruments[k], k)
         fd = sp.hstack((fd, [t, rv, er, flag] ))  # ojo this, list not array
 
-    fd[0] = fd[0] - min(fd[0])
+    #fd[0] = fd[0] - min(fd[0])  # min t
     alldat = sp.array([])
     #    try:
     staract = []
@@ -52,7 +53,7 @@ def read_data(instruments):
             totcornum += len(correlations)
     #print fd[0]  # THISLINE
     #print sp.argsort(fd[0])  # THISLINE
-    return fd, staract, starflag, totcornum
+    return tryin, staract, starflag, totcornum
 
 class DATA:
     def __init__(self, instruments):
@@ -95,7 +96,8 @@ class DATA:
         order = sp.argsort(data_all.T[0])  # by time
         return sp.array([x[order] for x in data_all.T])
 
-    '''  # this goes in __init__ in astroemperor.py
+        '''
+        # this goes in __init__ in astroemperor.py
                 rvdat = emplib.DATA(stardat[0])
                 self.time, self.rv, self.err, self.ins = rvdat.rv_sorted  # time, radial velocities, error and instrument flag
                 self.all_data = rvdat.all_data
@@ -133,9 +135,8 @@ class DATA:
                 # PM
                 self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
                 self.totcornum_pm = 0.
-    '''
+        '''
 
-    pass
 
 def read_data_f(instruments):
     '''
@@ -247,67 +248,6 @@ def pt_pos(setup, *args):
     return pos
 
 
-def pt_pos_4(setup, *args):
-
-    if args:
-        kplanets, nins, boundaries = args[0], args[1], args[2]
-        inslims, acc_lims, MOAV = args[3], args[4], args[5]
-        totcornum, PACC = args[6], args[7]
-    ntemps, nwalkers, nsteps = setup
-    ndim = 1 + 4 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
-    pos = sp.array([sp.zeros(ndim) for i in range(nwalkers)])
-    k = -2
-    l = -2
-    ll = -2  ##
-    for j in range(ndim):
-        if j < 4 * kplanets:
-            k += 2
-            if j%4==0 or j%4==3:  # period or ecc
-                fact = sp.absolute(boundaries[k] - boundaries[k+1]) / nwalkers
-            else:
-                fact = (sp.absolute(boundaries[k] - boundaries[k+1]) * 2) / (5 * nwalkers)
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-            for i in range(nwalkers):
-                if j%5==0 or j%4==3:  # period or ecc
-                    pos[i][j] = boundaries[k] + (dif[i] + fact/2.0)
-                else:
-                    pos[i][j] = (boundaries[k+1]+3*boundaries[k])/4 + (dif[i] + fact/2.0)
-        if j == 4 * kplanets:  # acc
-            fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-            for i in range(nwalkers):
-                pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
-        if PACC:
-            if j == 4 * kplanets + PACC:  # parabolic accel
-                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-                for i in range(nwalkers):
-                    pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
-
-            # instruments
-        if 4 * kplanets + PACC < j < 4*kplanets + nins*2*(MOAV+1) + 1 + PACC:
-            l += 2
-            fact = sp.absolute(inslims[l] - inslims[l+1]) / nwalkers
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-
-            if (j-4*kplanets-1) % nins*2*(MOAV+1) == 0:  # ojo aqui
-                jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
-                dif = jitt_ini * sp.random.uniform(0.9, 0.999)
-            for i in range(nwalkers):
-                pos[i][j] = inslims[l] + (dif[i] + fact/2.0)
-        if totcornum:
-            if j > 4*kplanets + nins*2*(MOAV+1) + PACC:
-                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.8, 0.999)
-                for i in range(nwalkers):
-                    pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
-                    #print(pos[i][j])
-
-    pos = sp.array([pos for _ in range(ntemps)])
-    return pos
-
-
 def pt_pos_rvpm(setup, *args):
     '''
     MAKE A WAY TO DIFFERENTIATE BETWEEN RV AND RVPM
@@ -415,5 +355,12 @@ def neo_p0(setup, *args):
     return pos
 
 
-
+def ensure(condition, warning, MUSIC):
+    try:
+        assert condition
+    except:
+        if MUSIC:
+            MUSIC.play()
+        assert condition, warning
+    pass
 #
