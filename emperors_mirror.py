@@ -639,6 +639,26 @@ def logl_rv(theta, params):
 
 import george
 from george import kernels
+from george.modeling import Model
+'''
+class neo_model_PM(Model):
+
+    ###
+    names = ['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
+             'Eccentricity', 'Longitude']
+    names_ld = ['coef1', 'coef2', 'coef3', 'coef4']
+    if kplanets >= 2:
+        names = [str(name)+'_'+str(kplanets) for name in names]
+        names_ld = [str(name_ld)+'_'+str(kplanets) for name_ld in names_ld]
+    ###
+    names = ['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
+             'Eccentricity', 'Longitude']
+    names_ld = ['coef%i' %(i+1) for i in range(ldn)]
+    parameter_names = tuple(names+names_ld)
+
+    def get_value(self, t):
+        pass
+'''
 
 def logl_pm(theta, params, P):
     #'''#
@@ -902,7 +922,12 @@ def neo_logl_pm(theta, paramis):
     gp.set_parameter_vector(theta_gp)  # last <gp> params, check for fixed shit?
     # should be jitter with err
     #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
-    return gp.lnlikelihood(PM_residuals, quiet=True)
+
+    try:
+        return -gp.log_likelihood(PM_residuals)  # celerite
+    except:
+        return -sp.inf
+    #return gp.lnlikelihood(PM_residuals, quiet=True)  # george
     '''
     try:
         # check which is which in gp
@@ -986,7 +1011,7 @@ def neo_model_pm(t, ld_mod, ldn):
     model = batman.TransitModel(params, t)
     return model, params
 
-K = {'Constant': 2. ** 2,
+K = {'Constant': 1. ** 2,
      'ExpSquaredKernel': kernels.ExpSquaredKernel(metric=1.**2),
      'ExpSine2Kernel': kernels.ExpSine2Kernel(gamma=1.0, log_period=1.0),
      'Matern32Kernel': kernels.Matern32Kernel(2.)}
@@ -1020,15 +1045,25 @@ def neo_update_kernel(theta, params):
 from celerite import terms as cterms
 
 #  2 or sp.log(10.) ?
-KC = {'RealTerm':cterms.RealTerm(log_a=2., log_c=2.),
-      'ComplexTerm':cterms.ComplexTerm(log_a=2., log_b=2., log_c=2., log_d=2.),
-      'SHOTerm':cterms.SHOTerm(log_S0=2., log_Q=2., log_omega0=2.),
-      'Matern32Term':cterms.Matern32Term(log_sigma=2., log_rho=2.0),
-      'JitterTerm':cterms.JitterTerm(log_sigma=2.0)}
+T = {'Constant': 1. ** 2,
+     'RealTerm':cterms.RealTerm(log_a=2., log_c=2.),
+     'ComplexTerm':cterms.ComplexTerm(log_a=2., log_b=2., log_c=2., log_d=2.),
+     'SHOTerm':cterms.SHOTerm(log_S0=2., log_Q=2., log_omega0=2.),
+     'Matern32Term':cterms.Matern32Term(log_sigma=2., log_rho=2.0),
+     'JitterTerm':cterms.JitterTerm(log_sigma=2.0)}
 
 
-def neo_term(kernels):
-
+def neo_term(terms):
+    for func in terms[0]:
+        t_out = T[func]
+    for i in range(len(terms)):
+        if i == 0:
+            pass
+        else:
+            for func in terms[i]:
+                t = T[func]
+            t_out += t
+    return t_out
 
     pass
 

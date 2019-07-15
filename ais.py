@@ -96,7 +96,10 @@ class spec_list:
         '''
         To change values only knowing the name!
         '''
-        object_id, action, whato = commands
+        object_id, action = commands[:2]
+        whato = commands[2:]
+        if len(whato) == 1:  # dictionary quickfix
+            whato = commands[2]  # dictionary quickfix
         for theta in self.list_:
             if theta.name == object_id:
                 setattr(theta, action, whato)
@@ -215,10 +218,11 @@ class EMPIRE:
             self.george_kernels = sp.array([])
             self.george_jitter = True
 
-            self.celerite_kernels = sp.array([['ExpSquaredKernel'],
-                                              ['ExpSquaredKernel']])
+            self.celerite_kernels = sp.array([])
+            self.celerite_jitter = True
 
 
+            self.emperors_gp = 0
             #  Correlate with rv's
             self.time, self.rv, self.err, self.ins = 0., 0., 0., 0.
             self.totcornum = 0.
@@ -360,17 +364,17 @@ class EMPIRE:
 
         for kn in range(len(self.george_kernels)):
             for c in range(len(self.george_kernels[kn])+1):
-                t = spec(names[kn]+'_'+str(c), '', 'uniform', [-10, 10], -sp.inf, 'georgian')
+                t = spec(names[kn]+'_'+str(c), '', 'uniform', limits, -sp.inf, 'georgian')
                 self.theta.list_ = sp.append(self.theta.list_, t)
 
         pass
 
-    def _theta_celerite_pm(self, limits, conditions, kplanets, limb_dark):
+    def _theta_celerite_pm(self, limits, conditions, kplanets):
         names = sp.array(['kernel%i' % kn for kn in range(len(self.celerite_kernels))])
 
         for kn in range(len(self.celerite_kernels)):
             for c in range(len(self.celerite_kernels[kn])+1):
-                t = spec(names[kn]+'_'+str(c), '', 'uniform', [-10, 10], -sp.inf, 'celeritian')
+                t = spec(names[kn]+'_'+str(c), '', 'uniform', limits, -sp.inf, 'celeritian')
                 self.theta.list_ = sp.append(self.theta.list_, t)
         t = spec('Jitter', 'm/s', 'uniform', [0, 10], -sp.inf, 'celeritian')
         self.theta.list_ = sp.append(self.theta.list_, t)
@@ -447,7 +451,7 @@ class EMPIRE:
             logl_params_aux = sp.array([self.time_pm, self.rv_pm, self.err_pm,
                                         self.ins_pm, kplan, self.nins_pm,
                                         self.batman_ldn, self.batman_m, self.batman_p,
-                                        self.george_gp])
+                                        self.emperors_gp])
 
             logl_params = [self.theta.list_, self.anticoor, logl_params_aux]
 
@@ -639,9 +643,9 @@ class EMPIRE:
                                                fit_white_noise = True)
                 else:
                     self.george_gp = george.GP(self.george_k)
-
+                    self.emperors_gp = self.george_gp
                 # DEL combinar lo de abajo con el p0 aleatorio
-                self.george_gp.compute(self.time_pm, self.err_pm)  # DEL  que ondi esto
+                self.emperors_gp.compute(self.time_pm, self.err_pm)  # DEL  que ondi esto
 
                 ins_bnd = sp.array([-1, 1])
                 self._theta_george_pm(ins_bnd, None, 0)
@@ -649,12 +653,18 @@ class EMPIRE:
             if self.gaussian_processor == 'celerite':
                 import celerite
                 self.celerite_k = empmir.neo_term(self.celerite_kernels)
-                self.celerite_gp = celerite.GP(self.celerite_k,
-                                           mean = 0., fit_mean = False,
-                                           white_noise = sp.log(0.1**2), fit_white_noise = True)
+                if self.celerite_jitter:
+                    self.celerite_gp = celerite.GP(self.celerite_k,
+                                                   mean = 0., fit_mean = False,
+                                                   white_noise = sp.log(0.1**2),
+                                                   fit_white_noise = True)
+                else:
+                    self.celerite_gp = celerite.GP(self.celerite_k)
+                    self.emperors_gp = self.celerite_gp
 
+                self.emperors_gp.compute(self.time_pm, self.err_pm)
                 ins_bnd = sp.array([-10, 10])
-                self._theta_george_pm(ins_bnd, None, 0, self.MOAV_pm[0])
+                self._theta_celerite_pm(ins_bnd, None, 0)
 
         # raise Exception('DEBUG')  # DEL
         while kplan <= to_k:
@@ -676,13 +686,20 @@ class EMPIRE:
         # FINAL MODEL STEP, apply commands
             #'''
 
-
+            '''
             for j in range(len(self.changes_list))[::-1]:
                 if self.theta.change_val(self.changes_list[j]):
                     print('Following condition has been applied: ', self.changes_list[j])
                     self.changes_list = sp.append(self.changes_list[:j], self.changes_list[j+1:])
                     self.changes_list = self.changes_list.reshape((len(self.changes_list)//3, 3))
-
+            '''
+            used = []
+            for j in self.changes_list.keys():
+                if self.theta.change_val(self.changes_list[j]):
+                    print('Following condition has been applied: ', self.changes_list[j])
+                    used.append(j)
+            for j in used[::-1]:
+                del self.changes_list[j]
             # print('changes_list.shape es ', self.changes_list.shape) DEL
 
             #'''  # DEL
@@ -735,7 +752,7 @@ class EMPIRE:
                 logl_params = sp.array([self.time_pm, self.rv_pm, self.err_pm,
                                         self.ins_pm, kplan, self.nins_pm,
                                         self.batman_ldn, self.batman_m, self.batman_p,
-                                        self.george_gp])
+                                        self.emperors_gp])
 
             # rv and pm testing
             if self.RV:
@@ -770,6 +787,8 @@ class EMPIRE:
             cherry_chain = sp.array([self.sampler.flatchain[temp][cherry_locat[temp]] for temp in sp.arange(self.ntemps)])
             cherry_post = sp.array([posteriors[temp][cherry_locat[temp]] for temp in range(self.ntemps)])
 
+            em.cherry_chain = cherry_chain
+            em.ajuste = ajuste
             # sigmas are taken from cold chain
             sigmas = sp.array([sp.std(cherry_chain[0][:, i]) for i in range(self.theta.ndim_)])
 
@@ -843,8 +862,6 @@ class EMPIRE:
 
 
 
-
-# import ais
 #stardat = sp.array(['GJ357_1_HARPS3.dat',
 #                    'GJ357_2_UVES3.dat',
 #                    'GJ357_3_KECK3.vels'])
@@ -854,79 +871,58 @@ class EMPIRE:
 pmfiles = sp.array(['flux/transit_ground_r.flux'])
 stardat = pmfiles
 #stardat = sp.array([])
-setup = sp.array([3, 50, 1000])
+setup = sp.array([2, 50, 500])
 #em = EMPIRE(stardat, setup)
 em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
 em.betas = None #array([1.0])  # beta factor for each temperature, None for automatic
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 
-# em.MUSIC= True
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
 #em.ACC = 1
 #em.MOAV = sp.array([0,0])  # not needed
-#em.MOAV = sp.array([1,1,1])  # not needed
 
 
 em.batman_ld = ['quadratic']
 
-em.gaussian_processor = 'george'
-em.george_kernels = sp.array([['Matern32Kernel']])
-em.george_jitter = False
+em.gaussian_processor = 'celerite'
 
+#em.george_kernels = sp.array([['Matern32Kernel']])
+#em.george_jitter = False
+em.celerite_kernels = sp.array([['Matern32Term']])
+em.celerite_jitter = False
 
 em.MUSIC = False
 #'''
 
 #plims = sp.array([sp.log(59), sp.log(61)])
 
-'''
-em.changes_list = sp.array([['Eccentricity', 'prior', 'fixed'],
-                            ['Eccentricity', 'val', 0.0],
-                            ['Eccentricity_2', 'prior', 'fixed'],
-                            ['Eccentricity_2', 'val', 0.],
-                            ['Eccentricity_3', 'prior', 'fixed'],
-                            ['Eccentricity_3', 'val', 0.],
-                            ])
-'''
-'''
-em.changes_list = sp.array([['Period', 'prior', 'fixed'],
-                            ['Period', 'val', 24.73712],
-                            ['SemiMajor Axis', 'prior', 'fixed'],
-                            ['SemiMajor Axis', 'val', 101.1576001138329],
-                            ['Inclination', 'prior', 'fixed'],
-                            ['Inclination', 'val', 89.912],
-                            ['Eccentricity', 'prior', 'fixed'],
-                            ['Eccentricity', 'val', 0.],
-                            ['Longitude', 'prior', 'fixed'],
-                            ['Longitude', 'val', 0.],
-                            ['coef1', 'prior', 'fixed'],
-                            ['coef1', 'val', 0.1],
-                            ['coef2', 'prior', 'fixed'],
-                            ['coef2', 'val', 0.3]
-                            ])
-
-'''
 #'''
-em.changes_list = sp.array([['Period', 'prior', 'fixed'],
-                            ['Period', 'val', 3.93],
-                            ['Eccentricity', 'prior', 'fixed'],
-                            ['Eccentricity', 'val', 0.0],
-                            ['Inclination', 'prior', 'fixed'],
-                            ['Inclination', 'val', 88.49]])
+
+em.changes_list = {0:['Period', 'prior', 'fixed'],
+                   1:['Period', 'val', 24.73712],
+                   2:['SemiMajor Axis', 'prior', 'fixed'],
+                   3:['SemiMajor Axis', 'val', 101.1576001138329],
+                   4:['Inclination', 'prior', 'fixed'],
+                   5:['Inclination', 'val', 89.912],
+                   6:['Eccentricity', 'prior', 'fixed'],
+                   7:['Eccentricity', 'val', 0.],
+                   8:['Longitude', 'prior', 'fixed'],
+                   9:['Longitude', 'val', 0.],
+                   10:['coef1', 'prior', 'fixed'],
+                   11:['coef1', 'val', 0.1],
+                   12:['coef2', 'prior', 'fixed'],
+                   13:['coef2', 'val', 0.3],
+                   14:['t0', 'lims', 2456910., 2456920.]}
+
+
+
 
 em.conquer(0, 1)
 #
 
-
-
-
-
-
-
-
-
+x, y, y_error = em.time_pm, em.rv_pm, em.err_pm
 
 '''
 array(['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
