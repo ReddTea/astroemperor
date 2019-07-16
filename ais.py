@@ -106,6 +106,16 @@ class spec_list:
                 return True
         return False
 
+    def apply_changes_list(self, changes_list):
+        used = []
+        for j in changes_list.keys():
+            if self.change_val(changes_list[j]):
+                print('Following condition has been applied: ', changes_list[j])
+                used.append(j)
+        for j in used[::-1]:
+            del changes_list[j]
+        pass
+
 
 class spec:
     def __init__(self, name, units, prior, lims, val, type, args=[]):
@@ -145,6 +155,7 @@ class EMPIRE:
         self.PM = False
 
         self.START = chrono.time()
+        self.VINES = True  # jaja
         # initialize flat model, this should go elsewhere
         # name  # units     # prior     # lims  # args
         self.theta = spec_list()
@@ -406,6 +417,9 @@ class EMPIRE:
         pass
 
     def mklogfile(self, kplanets):
+        '''
+        BROKEN
+        '''
         dayis = dt.date.today()  # This is for the folder name
         def ensure_dir(date='datalogs/'+self.starname+'/'+str(dayis.month)+'.'+str(dayis.day)+'.'+str(dayis.year)[2:]):
             if not os.path.exists(date):
@@ -489,6 +503,31 @@ class EMPIRE:
         sp.savetxt(name+'/log.dat', sp.array([logdat]), fmt='%100s')
         #sp.savetxt(name+'/residuals.dat', sp.c_[self.time, residuals])
         return name
+
+    def instigator(self, chain, post, saveplace):
+        '''
+        Automatically saves chains and posteriors.
+        BROKEN
+        '''
+
+        def mk_header():
+            h = []
+            # there should be a method for calling this arrays directly from self.theta
+            for name in [self.theta.list_[self.coordinator[i]].name for i in range(self.theta.ndim_)]:
+                h.append(str(name))
+            return ' '.join(h)
+
+        def savechain(chain):
+            for i in range(self.ntemps):
+                sp.savetxt(saveplace + '/chain_'+str(i)+'.dat', chain[i], header=mk_header())
+            pass
+        def savepost(post):
+            for i in range(self.ntemps):
+                sp.savetxt(saveplace + '/posterior_'+str(i)+'.dat', post[i], header=mk_header())
+            pass
+        savechain(chain)
+        savepost(post)
+        pass
 
     def MCMC(self, *args):
         if args:
@@ -634,7 +673,6 @@ class EMPIRE:
 
         if self.MUSIC:
             imperial.play()
-
 
         #Here should be how to run! Where does it start? Full auto?
 
@@ -785,13 +823,7 @@ class EMPIRE:
                     self.changes_list = sp.append(self.changes_list[:j], self.changes_list[j+1:])
                     self.changes_list = self.changes_list.reshape((len(self.changes_list)//3, 3))
             '''
-            used = []
-            for j in self.changes_list.keys():
-                if self.theta.change_val(self.changes_list[j]):
-                    print('Following condition has been applied: ', self.changes_list[j])
-                    used.append(j)
-            for j in used[::-1]:
-                del self.changes_list[j]
+            self.theta.apply_changes_list(self.changes_list)
 
             for j in range(len(self.theta.list_)):
                 if (self.theta.list_[j].prior == 'uniform_spe_a' and
@@ -923,10 +955,14 @@ class EMPIRE:
             self.sample_sizes = sp.array([len(self.cherry_chain[i]) for i in range(self.ntemps)])
 
             # ojo esto
-            thetas_hen = sp.array([empmir.henshin(self.sampler.flatchain[i], kplan) for i in sp.arange(self.ntemps)])
-            thetas_hen = sp.array([thetas_hen[temp] for temp in sp.arange(self.ntemps)])
-
-            self.ajuste_h = thetas_hen[0][sp.argmax(self.posteriors[0])]
+            if self.RV and self.VINES:
+                '''
+                henshin actual asume los change of variable (cov) de hou
+                para todos los parametros... si fixeas cosas no respondo
+                '''
+                self.cherry_chain_h = sp.array([empmir.henshin(self.cherry_chain[i], kplan) for i in sp.arange(self.ntemps)])
+                #self.cherry_chain_h = sp.array([self.cherry_chain[temp] for temp in sp.arange(self.ntemps)])  # no se pq doble pero no lo voy a mirar
+                self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
 
 
 
@@ -945,14 +981,14 @@ class EMPIRE:
                 self.NEW_AIC = 2 * self.theta.ndim_ - 2 * self.post_max
                 self.OLD_AIC = 2 *  - 2 * self.oldlogpost
             if self.PM:
-                NEW_BIC = sp.log(self.ndat_pm) * self.theta.ndim_ - 2 * self.post_max
-                OLD_BIC = sp.log(self.ndat_pm) * self.theta.ndim_ - 2 * self.oldlogpost
-                NEW_AIC = 2 * self.theta.ndim_ - 2 * self.post_max
-                OLD_AIC = 2 *  - 2 * self.oldlogpost
+                self.NEW_BIC = sp.log(self.ndat_pm) * self.theta.ndim_ - 2 * self.post_max
+                self.OLD_BIC = sp.log(self.ndat_pm) * self.theta.ndim_ - 2 * self.oldlogpost
+                self.NEW_AIC = 2 * self.theta.ndim_ - 2 * self.post_max
+                self.OLD_AIC = 2 *  - 2 * self.oldlogpost
 
             saveplace = self.mklogfile(kplan)
-            if False:  # saves chains, posteriors and log
-                self.instigator(cherry_chain, cherry_post, saveplace, kplan)
+            if self.VINES:  # saves chains, posteriors and log
+                self.instigator(self.cherry_chain_h, self.cherry_post, saveplace)
 
             if self.MUSIC:
                 thybiding.play()
@@ -1010,7 +1046,7 @@ stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #stardat = pmfiles
 #stardat = sp.array([])
-setup = sp.array([2, 100, 1100])
+setup = sp.array([2, 60, 120])
 em = EMPIRE(stardat, setup)
 #em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1037,30 +1073,65 @@ em.MOAV = sp.array([0,0])  # not needed
 em.MUSIC = False
 
 
-#em.changes_list = {0:['Period', 'lims', 4.0943445, 4.1271343]
-#                   }
+# this is for you vines
+#gj876 lims
+em.changes_list = {0:['Period', 'lims', 4.11098843, 4.11105404],
+                   1:['Amplitude', 'lims', -10.1515928, -6.33312469],
+                   2:['Phase', 'lims', 1.00520806e+01,   1.35949748e+01],
+                   3:['Eccentricity', 'lims', 4.14811179e-02, 1.38568310e-01],
+                   4:['Longitude', 'lims', -1.24823254e-02,   2.27443388e-02],
+                   5:['Period_2', 'lims', 3.40831451, 3.40863545],
+                   6:['Amplitude_2', 'lims', -5.69294095, 0.0605896817],
+                   7:['Phase_2', 'lims', -9.33328013e+00, -8.07370401e+00],
+                   8:['Eccentricity_2', 'lims', 3.47811764e-02,   1.79877743e-01],
+                   9:['Longitude_2', 'lims', -2.48303912e-01,  -7.10641857e-02]
+                   }
 
-em.conquer(1, 2)
 '''
-                   2:['Eccentricity', 'prior', 'fixed'],
-                   3:['Eccentricity', 'val', 0.0],
-                   6:['Eccentricity', 'prior', 'fixed'],
-                   7:['Eccentricity', 'val', 0.]
-em.changes_list = {0:['Period', 'prior', 'fixed'],
-                   1:['Period', 'val', 24.73712],
-                   2:['SemiMajor Axis', 'prior', 'fixed'],
-                   3:['SemiMajor Axis', 'val', 101.1576001138329],
-                   4:['Inclination', 'prior', 'fixed'],
-                   5:['Inclination', 'val', 89.912],
-                   6:['Eccentricity', 'prior', 'fixed'],
-                   7:['Eccentricity', 'val', 0.],
-                   8:['Longitude', 'prior', 'fixed'],
-                   9:['Longitude', 'val', 0.],
-                   10:['coef1', 'prior', 'fixed'],
-                   11:['coef1', 'val', 0.1],
-                   12:['coef2', 'prior', 'fixed'],
-                   13:['coef2', 'val', 0.3],
-                   14:['t0', 'lims', 2456910., 2456920.]}
+em.changes_list = {0:['t0', 'lims', 2456915.67, 2456915.73],
+                   1:['Planet Radius', 'lims', 0.05, 0.09],
+                   2:['Period', 'prior', 'fixed'],
+                   3:['Period', 'val', 24.73712],
+                   4:['SemiMajor Axis', 'prior', 'fixed'],
+                   5:['SemiMajor Axis', 'val', 101.1576001138329],
+                   6:['Inclination', 'prior', 'fixed'],
+                   7:['Inclination', 'val', 89.912],
+                   8:['Eccentricity', 'prior', 'fixed'],
+                   9:['Eccentricity', 'val', 0.],
+                   10:['Longitude', 'prior', 'fixed'],
+                   11:['Longitude', 'val', 90.],
+                   12:['coef1', 'prior', 'fixed'],
+                   13:['coef1', 'val', 0.1],
+                   14:['coef2', 'prior', 'fixed'],
+                   15:['coef2', 'val', 0.3]}
+'''
+em.conquer(1, 1)
+
+'''
+em.changes_list = {:['t0', 'prior', 'fixed'],
+                   :['t0', 'val', 2456915.6997],
+                   :['Planet Radius', 'prior', 'fixed'],
+                   :['Planet Radius', 'val', 0.0704],
+                   :['Period', 'prior', 'fixed'],
+                   :['Period', 'val', 24.73712],
+                   :['SemiMajor Axis', 'prior', 'fixed'],
+                   :['SemiMajor Axis', 'val', 101.1576001138329],
+                   :['Inclination', 'prior', 'fixed'],
+                   :['Inclination', 'val', 89.912],
+                   :['Eccentricity', 'prior', 'fixed'],
+                   :['Eccentricity', 'val', 0.],
+                   :['Longitude', 'prior', 'fixed'],
+                   :['Longitude', 'val', 90.],
+                   :['coef1', 'prior', 'fixed'],
+                   :['coef1', 'val', 0.1],
+                   :['coef2', 'prior', 'fixed'],
+                   :['coef2', 'val', 0.3]}
+'''
+
+'''
+em.changes_list = {0:['Period', 'lims', 4.0943445, 4.1271343],
+                   1:['Period_2', 'lims', 3.38, 3.42]
+                   }
 
 em.changes_list = {0:['Period', 'prior', 'fixed'],
                    1:['Period', 'val', 3.93],
