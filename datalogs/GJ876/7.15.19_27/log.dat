@@ -1,0 +1,33 @@
+
+Star Name                         : GJ876
+Used datasets                     : GJ876_1_LICK.vels
+                                  : GJ876_2_KECK.vels
+--------------------------------------------------------------------
+The sample sizes are        :    [54  2]
+The maximum posterior is    :    -318549.7360531728
+The BIC is                  :    637176.5970596931
+The AIC is                  :    637129.4721063456
+The most probable chain values are as follows...
+Period [Days]:   0.5948528727997712
+Amplitude $[\frac{m}{s}]$:   -21.891066004112844
+Phase $[rad]$:   -21.86753193054309
+Eccentricity:   0.15923169968607312
+Longitude $[rads]$:   0.9753184158618824
+Period_2 [Days]:   0.4044473932144043
+Period_2 [Days]:   0.4044473932144043
+Phase_2 $[rad]$:   -21.953131500945865
+Eccentricity_2:   0.15601357115123854
+Longitude_2 $[rads]$:   0.9571390134337378
+Acceleration[' $[\\frac{m}{s1}]$']:   -0.6917934924145642
+Jitter $[\frac{m}{s}]$:   9.901459311038137
+Offset $[\frac{m}{s}]$:   -227.6235242602726
+Jitter_2 $[\frac{m}{s}]$:   9.94617585861142
+Offset_2 $[\frac{m}{s}]$:   -224.13768777440825
+------------------------------ RV DATA ------------------------------
+Temperatures, Walkers, Steps      : (2, 50, 120)
+N Instruments, K planets, N data  : (2, 2, 171)
+Number of Dimensions              : 15
+N Moving Average                  : [0 0]
+Beta Detail                       : None
+--------------------------------------------------------------------
+Running Time                      : 20 seconds

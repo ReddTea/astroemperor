@@ -12,17 +12,17 @@ def RV_model(THETA, time, kplanets):
     if kplanets == 0:
         return 0.0
     for i in range(kplanets):
-        #P, As, Ac, S, C = THETA[5*i:5*(i+1)]
-        P, As, Ac, ecc, w = THETA[5*i:5*(i+1)]
+        P, As, Ac, S, C = THETA[5*i:5*(i+1)]
+        #P, As, Ac, ecc, w = THETA[5*i:5*(i+1)]
         A = As ** 2 + Ac ** 2
-        #ecc = S ** 2 + C ** 2
+        ecc = S ** 2 + C ** 2
 
         phase = sp.arccos(Ac / (A ** 0.5))
-        #w = sp.arccos(C / (ecc ** 0.5))  # longitude of periastron
+        w = sp.arccos(C / (ecc ** 0.5))  # longitude of periastron
 
         ### test
-        #if S < 0:
-        #    w = 2 * sp.pi - sp.arccos(C / (ecc ** 0.5))
+        if S < 0:
+            w = 2 * sp.pi - sp.arccos(C / (ecc ** 0.5))
         if As < 0:
             phase = 2 * sp.pi - sp.arccos(Ac / (A ** 0.5))
 
@@ -38,7 +38,7 @@ def RV_model(THETA, time, kplanets):
 
 
 def mini_RV_model(params, time):
-    P, A, phase, w, ecc = params
+    P, A, phase, ecc, w = params
     freq = 2. * sp.pi / P
     M = freq * time + phase
     E = sp.array([MarkleyKESolver().getE(m, ecc) for m in M])
@@ -207,435 +207,8 @@ def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, 
 
 ### P R I O R S  ###
 
-def logp_rv(theta, params):
-    time, kplanets, nins = params[0], params[1], params[2]
-    MOAV, totcornum, boundaries = params[3], params[4], params[5]
-    inslims, acc_lims, sigmas = params[6], params[7], params[8]
-    eccprior, jittprior, jittmean = params[9], params[10], params[11]
-    STARMASS, HILL, PACC = params[12], params[13], params[14]
-    CHECK = params[15]
-    #CHECK = True
-
-    G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
-    lp_flat_fix, lp_flat_ins, lp_ecc, lp_jitt = 0., 0., 0., 0.
-    lp_correl = 0.
-    lp_jeffreys = 0.
-
-    k_params = kplanets * 5
-    acc_params = 1 + PACC
-    ins_params = nins * 2 * (MOAV + 1)
-    MP = sp.zeros(kplanets)
-    SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
-    for k in range(kplanets):
-        Pk, Ask, Ack, Sk, Ck = theta[k*5:(k+1)*5]
-
-        if (boundaries[k*10+2] <= Ask <= boundaries[k*10+3] and
-            boundaries[k*10+4] <= Ack <= boundaries[k*10+5] and
-            boundaries[k*10+6] <= Sk <= boundaries[k*10+7] and
-            boundaries[k*10 + 8] <= Ck <= boundaries[k*10 + 9]):
-            lp_flat_fix += 0.0
-            #print('GOOD_ONE_1')
-        else:
-            if CHECK:
-                print('mark 1', boundaries[k*10+2],Ask, boundaries[k*10+3],
-                      boundaries[k*10+4], Ack, boundaries[k*10+5],
-                      boundaries[k*10+6], Sk, boundaries[k*10+7],
-                      boundaries[k*10 + 8], Ck, boundaries[k*10 + 9])
-            return -sp.inf
-
-        Pmin, Pmax = boundaries[k*10], boundaries[k*10+1]
-        if Pmin <= Pk <= Pmax:
-            #lp_jeffreys += sp.log(Pk**-1 / (sp.log(Pmax/Pmin)))
-            lp_jeffreys += 0.  # Because it is logp ??
-            #print('GOOD_ONE_2', Pmin, Pk, Pmax)
-        else:
-            if CHECK:
-                print('mark 2', Pmin, Pk, Pmax)
-            return -sp.inf
-
-        Ak = Ask ** 2 + Ack ** 2
-        ecck = Sk ** 2 + Ck ** 2
-
-        if 0.0 <= ecck <= 1.0:
-            lp_ecc += normal_pdf(ecck, 0, eccprior**2)
-        else:
-            if CHECK:
-                print('ecc')
-            return -sp.inf
-
-
-
-        if kplanets > 1:
-            if HILL:
-                per_s = Pk * 24. * 3600.
-                SMA[k] = ((per_s**2.0) / ( (4.0*sp.pi**2.0) / (6.67e-11 * STARMASS * 1.99e30) ))**(1./3) / 1.49598e11
-                MP[k] = Ak / ( (28.4/sp.sqrt(1. - ecck**2.)) * (STARMASS**(-0.5)) * (SMA[k]**(-0.5)) ) * 317.8
-                #SMA[k] = (((sp.exp(Pk)/365.242199) ** 2) * G * STARMASS / (4 * sp.pi ** 2)) ** (1/3.)
-                #MP[k] = sp.sqrt(1 - ecck ** 2) * Ak * sp.exp(Pk) ** (1/3.) * STARMASS ** (2/3.) / 203.
-                GAMMA[k] = sp.sqrt(1 - ecck)
-    if kplanets > 1:
-        if HILL:
-            orden = sp.argsort(SMA)
-            SMA = SMA[orden]  # in AU
-            MP = MP[orden]  # in Earth Masses
-            #M = STARMASS * 1047.56 + sp.sum(MP)  # to Jupyter masses
-            M = STARMASS * 332946 + sp.sum(MP)  # to Earth Masses
-
-            mu = MP / M
-            for kk in range(kplanets-1):
-                alpha = mu[kk] + mu[kk+1]
-                delta = sp.sqrt(SMA[kk+1] / SMA[kk])
-
-                if alpha ** -3 * (mu[kk] + (mu[kk+1] / (delta ** 2))) * (mu[kk] * GAMMA[kk] + mu[kk+1] * GAMMA[kk+1] * delta)**2 < 1 + (3./alpha)**(4./3) * (mu[kk] * mu[kk+1]):
-                    if CHECK:
-                        print('HILL UNSTABLE')
-                    return -sp.inf
-                else:
-                    pass
-
-    acc_k = theta[k_params]
-    if acc_lims[0] <= acc_k <= acc_lims[1]:
-        lp_flat_fix += 0
-    else:
-        if CHECK:
-            print('ACCEL')
-        return -sp.inf
-
-    if PACC:
-        if acc_lims[0] <= theta[k_params + PACC] <= acc_lims[1]:
-            lp_flat_fix += 0
-        else:
-            if CHECK:
-                print('PACCEL ')
-            return -sp.inf
-
-    j = 0
-    lp_flat_ins = 0.0
-    lp_jitt = 0.0
-    for j in range(nins):
-        for c in range(MOAV):
-            macoef_j = theta[k_params + acc_params + j*2*(MOAV+1) + 2*(c+1)]
-            timescale_j = theta[k_params + acc_params + j*2*(MOAV+1) + 2*(c+1) + 1]
-            bookmark = 4 * (j*MOAV + j + c + 1)
-            if (inslims[bookmark] <= macoef_j <= inslims[bookmark+1] and
-                inslims[bookmark+2] <= timescale_j <= inslims[bookmark+3]):
-                lp_flat_ins += 0.0
-            else:
-                if CHECK:
-                    print('MOVING AVERAGE')
-                return -sp.inf
-        jitt_j = theta[k_params + acc_params + j*2*(MOAV+1)]
-        offset_j = theta[k_params + acc_params + j*2*(MOAV+1) + 1]
-        jittmin, jittmax = inslims[4*(j*MOAV+j)], inslims[4*(j*MOAV+j)+1]
-        if jittmin <= jitt_j <= jittmax:
-            lp_jitt += normal_pdf(jitt_j, jittmean, jittprior**2)
-        else:
-            if CHECK:
-                print('SI JITT')
-            return -sp.inf
-        if inslims[4*(j*MOAV+j)+2] <= offset_j <= inslims[4*(j*MOAV+j)+3]:
-            lp_flat_ins += 0.0
-        else:
-            if CHECK:
-                print('NO JITT')
-            return -sp.inf
-    for h in range(totcornum):
-        cork = theta[k_params + acc_params + ins_params + h]
-        if 0. <= cork <= 1.:  # hmmm
-            lp_correl += 0
-        else:
-            return -sp.inf
-
-    return lp_ecc + lp_flat_fix + lp_flat_ins + lp_jitt + lp_correl
-
-
-def logp_pm(theta, params):
-    '''
-    FLAT POR AHORA
-    sp.array([self.time_pm, fsig, self.nins_pm, self.MOAV_pm,
-    self.totcornum_pm, boundaries, sigmas_raw,
-    self.PACC_pm])]
-    '''
-    '''#
-    print 'prior1\n\n'  # PMPMPM
-    time, fsig, lenppm  = params[0], params[1], params[2]
-    nins, MOAV, totcornum = params[3], params[4], params[5]
-    boundaries, sigmas, PACC = params[6], params[7], params[8]
-
-    T0, r, k_a, k_r = theta
-    '''#
-    '''
-    if not (2456915.67 < T0  < 2456915.73 and 0.05 < r  < 0.09 and
-        0 < k_a < 5.0e-2 and 0 < k_r < 6.):
-        return -np.inf
-    '''
-    '''#
-    prior = 0.
-    k = -2
-    for j in fsig:
-        for i in range(lenppm):
-            k += 2
-            if boundaries[k] <= theta[i] <= boundaries[k+1]:  # keep an eye on this as different fsigns WILL fail
-                prior += 0
-            else:
-                return -sp.inf
-
-            ###
-            #
-            mu = 0.07 # mean of the Normal prior
-            sigma = 0.004 # standard deviation of the Normal prior
-            prob_r = normal_pdf(r - mu, sigma)
-
-            mu = 2456915.70
-            sigma =  0.005
-            prob_t0 = normal_pdf(T0 - mu, sigma)
-            prob = prob_t0
-            return prob
-            #
-            ###
-    print prior, 'prior2\n\n'  # PMPMPM
-    '''#
-    prior = 0.0
-    return prior
-    pass
-
-
-def logp_rvpm(theta, params):
-    params_rv, params_pm = params
-    time, kplanets, nins = params_rv[0], params_rv[1], params_rv[2]  # checked
-    MOAV, totcornum, boundaries = params_rv[3], params_rv[4], params_rv[5]  # checked
-    PACC = params_rv[14]
-    ndim_rv = 5*kplanets + 2*nins*(MOAV+1) + (1 + PACC) + totcornum
-
-    theta_rv = theta[:ndim_rv]
-    theta_pm = theta[ndim_rv:]
-
-
-
-    LOGP_RV = logp_rv(theta_rv, params_rv)
-    if kplanets > 0:
-        LOGP_PM = logp_pm(theta_pm, params_pm)
-        #print LOGP_RV, LOGP_PM, 'LOGP_RV, LOGP_PM'  # PMPMPM
-    else:
-        LOGP_PM = 0.0
-    return LOGP_RV + LOGP_PM
-    pass
-
-
-def logp_4mod(theta):
-    time, kplanets, nins = params[0], params[1], params[2]
-    MOAV, totcornum, boundaries = params[3], params[4], params[5]
-    inslims, acc_lims, sigmas = params[6], params[7], params[8]
-    eccprior, jittprior, jittmean = params[9], params[10], params[11]
-    STARMASS, HILL, PACC = params[12], params[13], params[14]
-    CHECK = params[15]
-    fsig, f2k = 1, 1
-
-    pm_dim = 3
-
-
-    G = 39.5 ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
-    lp_flat_fix, lp_flat_ins, lp_ecc, lp_jitt = 0., 0., 0., 0.
-    lp_correl = 0.
-    lp_jeffreys = 0.
-
-    model_params = kplanets * 5
-    acc_params = 1 + PACC
-    ins_params = nins * 2 * (MOAV + 1)
-    MP = sp.zeros(kplanets)
-    SMA, GAMMA = sp.zeros(kplanets), sp.zeros(kplanets)
-    for k in range(kplanets):
-        Pk, Ask, Ack, Sk, Ck = theta[k*5:(k+1)*5]
-
-        if (boundaries[k*10+2] <= Ask <= boundaries[k*10+3] and
-            boundaries[k*10+4] <= Ack <= boundaries[k*10+5] and
-            boundaries[k*10+6] <= Sk <= boundaries[k*10+7] and
-            boundaries[k*10 + 8] <= Ck <= boundaries[k*10 + 9]):
-            lp_flat_fix += 0.0
-            #print('GOOD_ONE_1')
-        else:
-            if CHECK:
-                print('mark 1', boundaries[k*10+2],Ask, boundaries[k*10+3],
-                      boundaries[k*10+4], Ack, boundaries[k*10+5],
-                      boundaries[k*10+6], Sk, boundaries[k*10+7],
-                      boundaries[k*10 + 8], Ck, boundaries[k*10 + 9])
-            return -sp.inf
-
-        Pmin, Pmax = boundaries[k*10], boundaries[k*10+1]
-        if Pmin <= Pk <= Pmax:
-            #lp_jeffreys += sp.log(Pk**-1 / (sp.log(Pmax/Pmin)))
-            lp_jeffreys += 0.  # Because it is logp ??
-            #print('GOOD_ONE_2', Pmin, Pk, Pmax)
-        else:
-            if CHECK:
-                print('mark 2', Pmin, Pk, Pmax)
-            return -sp.inf
-
-        Ak = Ask ** 2 + Ack ** 2
-        ecck = Sk ** 2 + Ck ** 2
-
-        if 0.0 <= ecck <= 1.0:
-            lp_ecc += normal_pdf(ecck, 0, eccprior**2)
-        else:
-            if CHECK:
-                print('ecc')
-            return -sp.inf
-
-
-
-        if kplanets > 1:
-            if HILL:
-                per_s = Pk * 24. * 3600.
-                SMA[k] = ((per_s**2.0) / ( (4.0*sp.pi**2.0) / (6.67e-11 * STARMASS * 1.99e30) ))**(1./3) / 1.49598e11
-                MP[k] = Ak / ( (28.4/sp.sqrt(1. - ecck**2.)) * (STARMASS**(-0.5)) * (SMA[k]**(-0.5)) ) * 317.8
-                #SMA[k] = (((sp.exp(Pk)/365.242199) ** 2) * G * STARMASS / (4 * sp.pi ** 2)) ** (1/3.)
-                #MP[k] = sp.sqrt(1 - ecck ** 2) * Ak * sp.exp(Pk) ** (1/3.) * STARMASS ** (2/3.) / 203.
-                GAMMA[k] = sp.sqrt(1 - ecck)
-    if kplanets > 1:
-        if HILL:
-            orden = sp.argsort(SMA)
-            SMA = SMA[orden]  # in AU
-            MP = MP[orden]  # in Earth Masses
-            #M = STARMASS * 1047.56 + sp.sum(MP)  # to Jupyter masses
-            M = STARMASS * 332946 + sp.sum(MP)  # to Earth Masses
-
-            mu = MP / M
-            for kk in range(kplanets-1):
-                alpha = mu[kk] + mu[kk+1]
-                delta = sp.sqrt(SMA[kk+1] / SMA[kk])
-
-                if alpha ** -3 * (mu[kk] + (mu[kk+1] / (delta ** 2))) * (mu[kk] * GAMMA[kk] + mu[kk+1] * GAMMA[kk+1] * delta)**2 < 1 + (3./alpha)**(4./3) * (mu[kk] * mu[kk+1]):
-                    if CHECK:
-                        print('HILL UNSTABLE')
-                    return -sp.inf
-                else:
-                    pass
-
-    acc_k = theta[kplanets * 5]
-    if acc_lims[0] <= acc_k <= acc_lims[1]:
-        lp_flat_fix += 0
-    else:
-        if CHECK:
-            print('ACCEL')
-        return -sp.inf
-
-    if PACC:
-        if acc_lims[0] <= theta[kplanets * 5 + 1] <= acc_lims[1]:
-            lp_flat_fix += 0
-        else:
-            if CHECK:
-                print('PACCEL ')
-            return -sp.inf
-
-    j = 0
-    lp_flat_ins = 0.0
-    lp_jitt = 0.0
-    for j in range(nins):
-        for c in range(MOAV):
-            macoef_j = theta[model_params + acc_params + j*2*(MOAV+1) + 2*(c+1)]
-            timescale_j = theta[model_params + acc_params + j*2*(MOAV+1) + 2*(c+1) + 1]
-            bookmark = 4 * (j*MOAV + j + c + 1)
-            if (inslims[bookmark] <= macoef_j <= inslims[bookmark+1] and
-                inslims[bookmark+2] <= timescale_j <= inslims[bookmark+3]):
-                lp_flat_ins += 0.0
-            else:
-                if CHECK:
-                    print('MOVING AVERAGE')
-                return -sp.inf
-        jitt_j = theta[model_params + acc_params + j*2*(MOAV+1)]
-        offset_j = theta[model_params + acc_params + j*2*(MOAV+1) + 1]
-        jittmin, jittmax = inslims[4*(j*MOAV+j)], inslims[4*(j*MOAV+j)+1]
-        if jittmin <= jitt_j <= jittmax:
-            lp_jitt += normal_pdf(jitt_j, jittmean, jittprior**2)
-        else:
-            if CHECK:
-                print('SI JITT')
-            return -sp.inf
-        if inslims[4*(j*MOAV+j)+2] <= offset_j <= inslims[4*(j*MOAV+j)+3]:
-            lp_flat_ins += 0.0
-        else:
-            if CHECK:
-                print('NO JITT')
-            return -sp.inf
-    for h in range(totcornum):
-        cork = theta[model_params + acc_params + ins_params + h]
-        if 0. <= cork <= 1.:  # hmmm
-            lp_correl += 0
-        else:
-            return -sp.inf
-
-    return lp_ecc + lp_flat_fix + lp_flat_ins + lp_jitt + lp_correl
-
-
 
 ### L I K E L I H O O D S ###
-
-
-
-def logl_rv(theta, params):
-    time, rv, err = params[0], params[1], params[2]
-    ins, staract, starflag = params[3], params[4], params[5]
-    kplanets, nins, MOAV = params[6], params[7], params[8]
-    totcornum, PACC = params[9], params[10]
-    i, lnl = 0, 0
-    ndat = len(time)
-    model_params = kplanets * 5
-    acc_params = 1 + PACC
-    ins_params = nins * 2 * (MOAV + 1)
-    jitter, offset, macoef, timescale = sp.zeros(ndat), sp.zeros(ndat), sp.array([sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
-    if PACC:
-        ACC = theta[model_params] * (time - time[0]) + theta[model_params + 1] * (time - time[0]) ** 2
-    else:
-        ACC = theta[model_params] * (time - time[0])
-
-    residuals = sp.zeros(ndat)
-    for i in range(ndat):
-        jitpos = int(model_params + acc_params + ins[i] * 2 * (MOAV+1))
-        jitter[i], offset[i] = theta[jitpos], theta[jitpos + 1]  # jitt
-        for j in range(MOAV):
-            macoef[j][i], timescale[j][i] = theta[jitpos + 2*(j+1)], theta[jitpos + 2*(j+1) + 1]
-    a1 = (theta[:model_params])
-
-    if totcornum:
-        #print 'SE ACTIBOY'
-        COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
-        SA = theta[model_params+acc_params+ins_params:]
-
-        assert len(SA) == totcornum, 'error in correlations'
-        AR = 0.0  # just to remember to add this
-        counter = -1
-
-        for i in range(nins):
-            for j in range(len(starflag[i])):
-                counter += 1
-                passer = -1
-                for k in range(ndat):
-                    if starflag[i][j] == ins[k]:  #
-                        passer += 1
-                        COR[i][j][k] = SA[counter] * staract[i][j][passer]
-
-        FMC = 0
-        for i in range(len(COR)):
-            for j in range(len(COR[i])):
-                FMC += COR[i][j]
-    else:
-        #print 'NO SE AKTIBOY'
-        FMC = 0
-
-    MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC
-
-
-    for i in range(ndat):
-        residuals[i] = rv[i] - MODEL[i]
-        for c in range(MOAV):
-            if i > c:
-                MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1-c] - time[i]) / timescale[c][i]) * residuals[i-1-c]
-                residuals[i] -= MA
-
-    inv_sigma2 = 1.0 / (err**2 + jitter**2)
-    lnl = sp.sum(residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
-    return -0.5 * lnl
-
 
 import george
 from george import kernels
@@ -659,38 +232,6 @@ class neo_model_PM(Model):
     def get_value(self, t):
         pass
 '''
-
-def logl_pm(theta, params, P):
-    #'''#
-    #print 'lnl1\n'  # PMPMPM
-    time, flux, err = params[0], params[1], params[2]
-    ins, staract, starflag = params[3], params[4], params[5]
-    fsig, f2k, nins = params[6], params[7], params[8]
-    MOAV, totcornum, PACC = params[9], params[10], params[11]
-    kplanets = params[12]
-
-    i, lnl = 0, 0
-    ndat = len(time)
-    model_params = kplanets * 5
-    acc_params = 1 + PACC
-    ins_params = nins * 2 * (MOAV + 1)
-    #totcornum
-    pm_params = 4 * fsig  # PMPMPM
-    #def lnlike_gp(param, x, y, yerr):
-    radius = 10.**theta[-1]
-    gp = george.GP(theta[-2] * kernels.Matern32Kernel(radius))
-    #raise ImportError
-    '''
-    gp.compute(time, err)
-    '''
-    lnl = gp.lnlikelihood(flux - pm_model(theta[:-4][:2], P, time))
-    # pm_model(subtheta, P, time, params)
-    print(lnl, 'lnl2\n')  # PMPMPM
-
-    #pm_model(theta, P, time, params)
-    #'''#
-    lnl = 0.0
-    return lnl
 
 
 def logl_rvpm(theta, params):
@@ -773,6 +314,10 @@ D = {'uniform':uniform,
      'jeffreys':jeffreys,
      'normal':normal,
      'uniform_spe':uniform_spe,
+     'uniform_spe_a':uniform_spe,
+     'uniform_spe_b':uniform_spe,
+     'uniform_spe_c':uniform_spe,
+     'uniform_spe_d':uniform_spe,
      'fixed':fixed,
      'joined':joined,
      'hou_cov':hou_cov
@@ -786,11 +331,21 @@ def neo_logp_rv(theta, params):
         #print(_theta[j+c].name)
         #print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
         lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-        if (_theta[C[j]].prior == 'uniform_spe' and
+        #if lp0 == -sp.inf:
+        #    print(_theta[C[j]].name)
+        #lp += lp0
+        if (_theta[C[j]].prior == 'uniform_spe_c' and
             _theta[C[j+1]].prior != 'fixed'):
-            lp += D['normal'](theta[j]**2+theta[j+1]**2, [0, 1], [0., 0.3**2])
-
-
+            lp += D['normal'](theta[j]**2+theta[j+1]**2, [0, 1], [0., 0.1**2])
+        #    if lp1 == -sp.inf:
+        #        print('lp1')
+            #lp += lp1
+        if (_theta[C[j]].prior == 'uniform_spe_a' and
+            _theta[C[j+1]].prior != 'fixed'):
+            lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
+        #    if lp2 == -sp.inf:
+        #        print('lp')
+            #lp += lp2
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
     #MP = sp.zeros(kplanets)  # this goes in hill
@@ -820,7 +375,7 @@ def neo_logl_rv(theta, paramis):
     for a in AC:
         theta = sp.insert(theta, a, _t[a].val)
 
-    if ACC > 0:  # recheck this at some point
+    if ACC > 0:  # recheck this at some point # DEL
         ACC = sp.polyval(sp.r_[0, theta[model_params:model_params+ACC]], (time-sp.amin(time)))
 
 
@@ -899,7 +454,7 @@ def neo_logl_pm(theta, paramis):
     ins, kplanets, nins = params[3], params[4], params[5]
     # for linear, linear should be [1, 1]
     ld, batman_m, batman_p = params[6], params[7], params[8]
-    gp = params[9]
+    gp, gaussian_processor = params[9], params[10]
 
     ndat = len(time)
     #logl_params = sp.array([self.time_pm, self.rv_pm, self.err_pm,
@@ -922,12 +477,13 @@ def neo_logl_pm(theta, paramis):
     gp.set_parameter_vector(theta_gp)  # last <gp> params, check for fixed shit?
     # should be jitter with err
     #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
-
-    try:
-        return -gp.log_likelihood(PM_residuals)  # celerite
-    except:
-        return -sp.inf
-    #return gp.lnlikelihood(PM_residuals, quiet=True)  # george
+    if gaussian_processor == 'george':
+        return -gp.lnlikelihood(PM_residuals, quiet=True)  # george
+    if gaussian_processor == 'celerite':
+        try:
+            return -gp.log_likelihood(PM_residuals)  # celerite
+        except:
+            return -sp.inf
     '''
     try:
         # check which is which in gp
@@ -1054,18 +610,24 @@ T = {'Constant': 1. ** 2,
 
 
 def neo_term(terms):
-    for func in terms[0]:
-        t_out = T[func]
+    t_out = T[terms[0][0]]
+    for f in range(len(terms[0])):
+        if f == 0:
+            pass
+        else:
+            t_out *= T[terms[0][f]]
+
     for i in range(len(terms)):
         if i == 0:
             pass
         else:
-            for func in terms[i]:
-                t = T[func]
+            for f in range(len(terms[i])):
+                if f == 0:
+                    t = T[terms[i][0]]
+                else:
+                    t *= T[func]
             t_out += t
     return t_out
-
-    pass
 
 
 
