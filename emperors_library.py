@@ -496,7 +496,6 @@ def credibility_interval(post, alpha=.68):
     lower_percentile = 100 * (1 - alpha) / 2
     upper_percentile = 100 * (1 + alpha) / 2
     low, med, up = sp.percentile(
-        post,
-        [lower_percentile, 50, upper_percentile]
+        post, [lower_percentile, 50, upper_percentile]
     )
     return med, low, up
