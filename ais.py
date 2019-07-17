@@ -544,11 +544,11 @@ class EMPIRE:
         #sp.savetxt(name+'/residuals.dat', sp.c_[self.time, residuals])
         return name
 
-    def instigator(self, chain, post, saveplace):
+    def instigator(self, saveplace):
         """Save chains and posteriors in a pickle file for later use."""
-
-        emplib.savechain(chain, saveplace)
-        emplib.savepost(post, saveplace)
+        emplib.save_chains(self.cherry_chain_h, saveplace)
+        emplib.save_posteriors(self.cherry_post, saveplace)
+        emplib.save_rv_data(self.all_data, saveplace)
         pass
 
     def MCMC(self, *args):
@@ -649,8 +649,8 @@ class EMPIRE:
         p0, lnprob0, lnlike0 = p, lnprob, lnlike
         print("\nMean acceptance fraction: {0:.3f}".format(
             sp.mean(self.sampler.acceptance_fraction)))
-        emplib.ensure(sp.mean(self.sampler.acceptance_fraction)
-                      != 0, 'Mean acceptance fraction = 0 ! ! !', fault)
+        emplib.ensure(sp.mean(self.sampler.acceptance_fraction) !=
+                      0, 'Mean acceptance fraction = 0 ! ! !', fault)
         self.sampler.reset()
 
         print('\n ---------------------- CHAIN ---------------------- \n')
@@ -876,20 +876,22 @@ class EMPIRE:
             self.theta.apply_changes_list(self.changes_list)
 
             for j in range(len(self.theta.list_)):
-                if (self.theta.list_[j].prior == 'uniform_spe_a'e_a' and
-                        and self.theta.list_[j + 1].prior == 'fixed'):  # phase fixed, so amplitude
-                    self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                 'prior', 'uniform']
+                if (self.theta.list_[j].prior == 'uniform_spe_a'
+                        and self.theta.list_[j + 1].prior == 'fixed'):
+                    # phase fixed, so amplitude
+                    self.changes_list[len(self.changes_list)] = \
+                        [str(self.theta.list_[j].name), 'prior', 'uniform']
                     l1, l2 = self.theta.list_[j].args
-                    self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                 'lims', 0., l1, l2]
+                    self.changes_list[len(self.changes_list)] = \
+                        [str(self.theta.list_[j].name), 'lims', 0., l1, l2]
 
-                if (self.theta.list_[j].prior == 'uniform_spe_b'e_b' and
-                        and self.theta.list_[j - 1].prior == 'fixed'):  # amplitude fixed, so phase
-                    self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                 'prior', 'uniform']
-                    self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                 'lims', 0., 2 * sp.pi]
+                if (self.theta.list_[j].prior == 'uniform_spe_b'
+                        and self.theta.list_[j - 1].prior == 'fixed'):
+                    # amplitude fixed, so phase
+                    self.changes_list[len(self.changes_list)] = \
+                        [str(self.theta.list_[j].name), 'prior', 'uniform']
+                    self.changes_list[len(self.changes_list)] = \
+                        [str(self.theta.list_[j].name), 'lims', 0., 2 * sp.pi]
 
             # print('changes_list.shape es ', self.changes_list.shape) DEL
 
@@ -1004,8 +1006,8 @@ class EMPIRE:
                       self.coordinator[i]].val)
 
             # TOP OF THE POSTERIOR
-            cherry_locat = sp.array([max(self.posteriors[temp]) - self.posteriors[temp] <
-                                     self.bayes_factor for temp in sp.arange(self.ntemps)])
+            cherry_locat = sp.array([max(self.posteriors[temp]) - self.posteriors[temp]
+                                     < self.bayes_factor for temp in sp.arange(self.ntemps)])
             self.cherry_chain = sp.array(
                 [self.sampler.flatchain[temp][cherry_locat[temp]] for temp in sp.arange(self.ntemps)])
             self.cherry_post = sp.array(
@@ -1055,9 +1057,8 @@ class EMPIRE:
                 self.OLD_AIC = 2 * - 2 * self.oldlogpost
 
             saveplace = self.mklogfile(kplan)
-            if self.VINES:  # saves chains, posteriors and log
-                self.instigator(self.cherry_chain_h,
-                                self.cherry_post, saveplace)
+            if self.VINES:  # saves chains, posteriors, rv data and log
+                self.instigator(saveplace)
 
             if self.MUSIC:
                 thybiding.play()
@@ -1093,8 +1094,8 @@ class EMPIRE:
             self.constrain = [38.15, 61.85]
             if kplan > 0:
                 for i in range(self.theta.ndim_):
-                    if (self.theta.list_[self.coordinator[i]].prior != 'fixed' and
-                            self.theta.list_[self.coordinator[i]].type == 'keplerian'):
+                    if (self.theta.list_[self.coordinator[i]].prior != 'fixed'
+                            and self.theta.list_[self.coordinator[i]].type == 'keplerian'):
                         self.theta.list_[self.coordinator[i]].lims = sp.percentile(
                             self.cherry_chain[0][:, i], self.constrain)
                         #self.theta.list_[self.coordinator[i]].args = [ajuste[i], sigmas[i]]

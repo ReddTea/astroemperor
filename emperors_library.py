@@ -1,16 +1,15 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 # -*- coding: utf-8 -*-
-import scipy as sp
 import pickle
+
+import scipy as sp
 
 a = sp.array(['RV_dataset1.vels', 'RV_dataset14.vels'])
 aa = sp.array(['RV_dataset14.vels'])
 
 
 def read_data(instruments):
-    '''
-    Data pre-processing
-    '''
+    """Data pre-processing."""
     nins = len(instruments)
     instruments = sp.array([sp.loadtxt('datafiles/' + x) for x in instruments])
 
@@ -35,12 +34,11 @@ def read_data(instruments):
 
     # fd[0] = fd[0] - min(fd[0])  # min t
     alldat = sp.array([])
-    #    try:
     staract = []
     for i in range(nins):
         hold = data(instruments[i], i)[4]
         staract.append(hold)
-    #staract = sp.array([data(instruments[i], i)[4] for i in range(nins)])
+    # staract = sp.array([data(instruments[i], i)[4] for i in range(nins)])
     # print 'alr'
     #    except:
     #        staract = sp.array([sp.array([]) for i in range(nins)])
@@ -402,8 +400,17 @@ def save_chains(chains, out_dir):
 
 def save_posteriors(posteriors, out_dir):
     """Pickle the posteriors."""
-    pickle_out = open(out_dir + '/posterios.pkl', 'wb')
+    pickle_out = open(out_dir + '/posteriors.pkl', 'wb')
     pickle.dump(posteriors, pickle_out)
+    pickle_out.close()
+    pass
+
+
+def save_rv_data(all_data, out_dir):
+    """Save radial-velocity data."""
+    # TODO: save bisector.
+    pickle_out = open(out_dir + '/rv_data.pkl', 'wb')
+    pickle.dump(all_data, pickle_out)
     pickle_out.close()
     pass
 
@@ -422,3 +429,74 @@ def read_posteriors(in_dir):
     posteriors = pickle.load(pickle_in)
     pickle_in.close()
     return posteriors
+
+
+def read_rv_data(in_dir):
+    """Read radial-velocity pickle file."""
+    pickle_in = open(in_dir, 'rb')
+    all_rv_data = pickle.load(pickle_in)
+    pickle_in.close()
+    return all_rv_data
+
+
+def phasefold(time, rv, err, period):
+    """Phasefold an rv timeseries with a given period.
+
+    Parameters
+    ----------
+    time : array_like
+        An array containing the times of measurements.
+    rv : array_like
+        An array containing the radial-velocities.
+    err : array_like
+        An array containing the radial-velocity uncertainties.
+    period : float
+        The period with which to phase fold.
+
+    Returns
+    -------
+    time_phased : array_like
+        The phased timestamps.
+    rv_phased : array_like
+        The phased RVs.
+    err_phased : array_like
+        The phased RV uncertainties.
+
+    """
+    phases = (time / period) % 1
+    sortIndi = sp.argsort(phases)  # sorts the points
+    # gets the indices so we sort the RVs correspondingly(?)
+    time_phased = phases[sortIndi]
+    rv_phased = rv[sortIndi]
+    err_phased = err[sortIndi]
+    return time_phased, rv_phased, err_phased
+
+
+def credibility_interval(post, alpha=.68):
+    """Calculate bayesian credibility interval.
+
+    Parameters:
+    -----------
+    post : array_like
+        The posterior sample over which to calculate the bayesian credibility
+        interval.
+    alpha : float, optional
+        Confidence level.
+
+    Returns:
+    --------
+    med : float
+        Median of the posterior.
+    low : float
+        Lower part of the credibility interval.
+    up : float
+        Upper part of the credibility interval.
+
+    """
+    lower_percentile = 100 * (1 - alpha) / 2
+    upper_percentile = 100 * (1 + alpha) / 2
+    low, med, up = sp.percentile(
+        post,
+        [lower_percentile, 50, upper_percentile]
+    )
+    return med, low, up
