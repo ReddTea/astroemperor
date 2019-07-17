@@ -99,11 +99,12 @@ class CourtPainter:
 
     def paint_fold(self):
         """Create phasefold plot."""
+        print('\nPAINTING PHASE FOLDED PLOTS.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
-        for k in range(self.kplanets):
+        for k in tqdm(range(self.kplanets)):
             params = self.__get_params(k)
 
             fig = plt.figure(figsize=self.phase_figsize)
@@ -145,8 +146,8 @@ class CourtPainter:
                 im_r.set_clim(cmin, cmax)
             fig.colorbar(
                 im, cax=cbar_ax).set_label(
-                'JD - 2450000', rotation=270, labelpad=25,
-                fontsize=self.label_fontsize
+                'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
+                fontsize=self.label_fontsize, fontname=self.fontname
             )
 
             time_m = sp.linspace(self.time.min(), self.time.max(), 10000)
@@ -175,17 +176,37 @@ class CourtPainter:
 
             # Labels and tick stuff.
             ax.set_ylabel(
-                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
+                fontname=self.fontname
             )
-            ax_r.set_ylabel('Residuals', fontsize=self.label_fontsize)
-            ax_r.set_xlabel('Phase', fontsize=self.label_fontsize)
+            ax_r.set_ylabel(
+                'Residuals', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_xlabel(
+                'Phase', fontsize=self.label_fontsize, fontname=self.fontname
+            )
 
             ax_r.get_yticklabels()[-1].set_visible(False)
             ax_r.minorticks_on()
             ax.set_xticks([])
-            ax.tick_params(axis='both', which='major', labelsize=20)
-            ax_r.tick_params(axis='both', which='major', labelsize=20)
-            cbar_ax.tick_params(labelsize=20)
+            ax.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            ax_r.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            for tick in ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_xticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in cbar_ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            cbar_ax.tick_params(labelsize=self.tick_labelsize)
 
             ax.set_xlim(-.01, 1.01)
             ax_r.set_xlim(-.01, 1.01)
@@ -200,11 +221,12 @@ class CourtPainter:
 
     def paint_timeseries(self):
         """Create timeseries plot."""
+        print('\nPAINTING TIMESERIES PLOTS.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
-        for k in range(self.kplanets):
+        for k in tqdm(range(self.kplanets)):
             params = self.__get_params(k)
 
             fig = plt.figure(figsize=self.full_figsize)
@@ -218,14 +240,14 @@ class CourtPainter:
                 ins = self.ins == i
 
                 ax.errorbar(
-                    self.time[ins], self.rv[ins], yerr=self.err[ins],
+                    self.time[ins] - 2450000, self.rv[ins], yerr=self.err[ins],
                     linestyle='', marker=None, ecolor=self.error_color,
                     **self.error_kwargs
                 )
                 im = ax.scatter(
-                    self.time[ins], self.rv[ins], marker=self.markers[i],
-                    edgecolors='k', s=self.full_size, c=self.time_cb[ins],
-                    cmap=self.full_cmap
+                    self.time[ins] - 2450000, self.rv[ins],
+                    marker=self.markers[i], edgecolors='k', s=self.full_size,
+                    c=self.time_cb[ins], cmap=self.full_cmap
                 )
                 im.set_clim(cmin, cmax)
 
@@ -233,11 +255,12 @@ class CourtPainter:
                 res = self.rv_residuals()[ins]
 
                 ax_r.errorbar(
-                    self.time[ins], res, yerr=self.err[ins], linestyle='',
-                    marker=None, ecolor=self.error_color, **self.error_kwargs
+                    self.time[ins] - 2450000, res, yerr=self.err[ins],
+                    linestyle='', marker=None, ecolor=self.error_color,
+                    **self.error_kwargs
                 )
                 im_r = ax_r.scatter(
-                    self.time[ins], res, marker=self.markers[i],
+                    self.time[ins] - 2450000, res, marker=self.markers[i],
                     edgecolors='k', s=self.full_size, c=self.time_cb[ins],
                     cmap=self.full_cmap
                 )
@@ -245,10 +268,11 @@ class CourtPainter:
                 im_r.set_clim(cmin, cmax)
             fig.colorbar(
                 im, cax=cbar_ax).set_label(
-                'JD - 2450000', rotation=270, labelpad=25,
-                fontsize=self.label_fontsize
+                'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
+                fontsize=self.label_fontsize, fontname=self.fontname
             )
             time_m = sp.linspace(self.time.min(), self.time.max(), 10000)
+            time_m -= 2450000
             rv_m = empmir.mini_RV_model(params, time_m)
 
             # Plot best model.
@@ -270,20 +294,41 @@ class CourtPainter:
 
             # Labels and tick stuff.
             ax.set_ylabel(
-                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
+                fontname=self.fontname
             )
-            ax_r.set_ylabel('Residuals', fontsize=self.label_fontsize)
-            ax_r.set_xlabel('Time (JD)', fontsize=self.label_fontsize)
+            ax_r.set_ylabel(
+                'Residuals', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_xlabel(
+                'Time (JD - 2450000)', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
 
             ax_r.get_yticklabels()[-1].set_visible(False)
             ax_r.minorticks_on()
             ax.set_xticks([])
-            ax.tick_params(axis='both', which='major', labelsize=20)
-            ax_r.tick_params(axis='both', which='major', labelsize=20)
-            cbar_ax.tick_params(labelsize=20)
+            ax.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            ax_r.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            for tick in ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_xticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in cbar_ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            cbar_ax.tick_params(labelsize=self.tick_labelsize)
 
-            ax.set_xlim(self.time.min() - 25, self.time.max() + 25)
-            ax_r.set_xlim(self.time.min() - 25, self.time.max() + 25)
+            ax.set_xlim(time_m.min() - 25, time_m.max() + 25)
+            ax_r.set_xlim(time_m.min() - 25, time_m.max() + 25)
             if self.pdf:
                 fig.savefig(self.working_dir + 'timeseries_' +
                             str(k + 1) + '.pdf', bbox_inches='tight')
@@ -304,4 +349,7 @@ class CourtPainter:
         self.label_fontsize = 22
         self.CI_color = 'darkturquoise'
         self.error_color = 'k'
+        self.fontname = 'serif'
+        self.tick_labelsize = 20
+        self.cbar_labelpad = 30
         pass
