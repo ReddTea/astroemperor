@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import scipy as sp
 from scipy.stats import norm
-from tqdm import tqdm
+from tqdm import tqdm_notebook as tqdm
 
 import corner
 import emperors_library as emplib
@@ -19,6 +19,14 @@ class CourtPainter:
 
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
     error_kwargs = {'lw': 1.75, 'zorder': 0}
+    chain_titles = [
+        'Amplitude', 'Period', 'Longitude', 'Phase', 'Eccentricity',
+        'Acceleration', 'Jitter', 'Offset'
+    ]
+    chain_units = [
+        r' $[\frac{m}{s}]$', ' [Days]', r' $[rad]$', r' $[rads]$', '',
+        r' $[\frac{m}{s^2}]$', r' $[\frac{m}{s}]$', ' r$[\frac{m}{s}]$'
+    ]
 
     def __init__(self, setup, kplanets, working_dir, pdf, png):
         self.ntemps, self.nwalkers, self.nsteps = setup
@@ -26,6 +34,7 @@ class CourtPainter:
         self.working_dir = working_dir
         self.pdf = pdf
         self.png = png
+        self.nsamp = 100
 
         # Read chains, posteriors and data for plotting.
         self.chains = emplib.read_chains(working_dir + 'chains.pkl')
@@ -41,10 +50,43 @@ class CourtPainter:
         # Setup plots.
         self.read_config()
         self.time_cb = copy.deepcopy(self.time) - 2450000
+
+        # Setup RV models.
+        self.create_models()
         pass
 
-    def __get_params(self, kplanet):
-        """Retrieve model parameters."""
+    def create_models(self):
+        # Calculate median model.
+        time_m = sp.linspace(self.time.min() - 10,
+                             self.time.max() + 10, 10000)
+        rv_models = []  # Models sample by sample.
+        rv_models_p = []
+        rv_m = []  # Median model.
+        for k in range(self.kplanets):
+            params = self.__get_median_params(k)
+            rv_m.append(empmir.mini_RV_model(params, time_m))
+            rv_model = []
+            rv_phased = []
+            desc = 'Sampling models for planet {}'.format(k + 1)
+            for i in tqdm(range(self.nsamp), desc=desc):
+                iparams = self.__get_params(k, i)  # get params for sample i
+                model = empmir.mini_RV_model(iparams, time_m)
+                rv_model.append(model)
+                # Phasefold models.
+                _, model_p, _ = emplib.phasefold(
+                    time_m, model, time_m, iparams[0]
+                )
+                rv_phased.append(model_p)
+            rv_models.append(sp.array(rv_model))
+            rv_models_p.append(sp.array(rv_phased))
+        self.time_m = time_m
+        self.rv_models = sp.array(rv_models)
+        self.rv_models_p = sp.array(rv_models_p)
+        self.rv_m = sp.array(rv_m)
+        pass
+
+    def __get_median_params(self, kplanet):
+        """Retrieve best model parameters."""
         period = sp.median(self.cold[:, 5 * kplanet])
         amplitude = sp.median(self.cold[:, 5 * kplanet + 1])
         phase = sp.median(self.cold[:, 5 * kplanet + 2])
@@ -53,29 +95,21 @@ class CourtPainter:
         params = (period, amplitude, phase, eccentricity, longitude)
         return params
 
-    def __get_CI_params(self, kplanet, alpha):
-        """Retrieve model credibility interval for a given alpha."""
-        _, period_lo, period_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet], alpha)
-        _, amplitude_lo, amplitude_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 1], alpha)
-        _, phase_lo, phase_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 2], alpha)
-        _, eccentricity_lo, eccentricity_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 3], alpha)
-        _, longitude_lo, longitude_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 4], alpha)
-        params_lo = (period_lo, amplitude_lo, phase_lo,
-                     eccentricity_lo, longitude_lo)
-        params_up = (period_up, amplitude_up, phase_up,
-                     eccentricity_up, longitude_up)
-        return params_lo, params_up
+    def __get_params(self, kplanet, i):
+        """Retrieve best model parameters."""
+        period = self.cold[i, 5 * kplanet]
+        amplitude = self.cold[i, 5 * kplanet + 1]
+        phase = self.cold[i, 5 * kplanet + 2]
+        eccentricity = self.cold[i, 5 * kplanet + 3]
+        longitude = self.cold[i, 5 * kplanet + 4]
+        params = (period, amplitude, phase, eccentricity, longitude)
+        return params
 
     def rv_residuals(self):
         """Calculate model residuals."""
         model = 0.
         for k in range(self.kplanets):
-            params = self.__get_params(k)
+            params = self.__get_median_params(k)
             model += empmir.mini_RV_model(params, self.time)
         residuals = self.rv - model
         return residuals
@@ -99,13 +133,13 @@ class CourtPainter:
 
     def paint_fold(self):
         """Create phasefold plot."""
-        print('\nPAINTING PHASE FOLDED PLOTS.')
+        print('\nPAINTING PHASE FOLDS.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
         for k in tqdm(range(self.kplanets)):
-            params = self.__get_params(k)
+            params = self.__get_median_params(k)
 
             fig = plt.figure(figsize=self.phase_figsize)
             gs = gridspec.GridSpec(3, 4)
@@ -150,26 +184,28 @@ class CourtPainter:
                 fontsize=self.label_fontsize, fontname=self.fontname
             )
 
-            time_m = sp.linspace(self.time.min(), self.time.max(), 10000)
-            rv_m = empmir.mini_RV_model(params, time_m)
             time_m_p, rv_m_p, _ = emplib.phasefold(
-                time_m, rv_m, sp.zeros(10000), params[0])
+                self.time_m, self.rv_m[k][:], sp.zeros(10000), params[0])
 
             # Plot best model.
             ax.plot(time_m_p, rv_m_p, '-k', linewidth=2)
             # Plot models CI.
-            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
-            for s in cred_intervals:
-                params_lo, params_up = self.__get_CI_params(k, s)
-                # Calculate new models.
-                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
-                rv_m_up = empmir.mini_RV_model(params_up, time_m)
-                _, rv_m_lo_p, _ = emplib.phasefold(
-                    time_m, rv_m_lo, sp.zeros(10000), params[0])
-                _, rv_m_up_p, _ = emplib.phasefold(
-                    time_m, rv_m_up, sp.zeros(10000), params[0])
-                ax.fill_between(time_m_p, rv_m_lo_p, rv_m_up_p,
-                                color=self.CI_color, alpha=.25)
+            # First we caculate a bunch of models.
+
+            alphas = [.99, .95, .68]  # 3, 2, and 1 sigma
+            for s in alphas:
+                low_m = []
+                up_m = []
+                for it in range(len(self.time_m)):
+                    _, low, up = emplib.credibility_interval(
+                        self.rv_models_p[k][:, it], s
+                    )
+                    low_m.append(low)
+                    up_m.append(up)
+
+                ax.fill_between(
+                    time_m_p, low_m, up_m, color=self.CI_color, alpha=.25
+                )
 
             # A line to guide the eye.
             ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
@@ -221,13 +257,13 @@ class CourtPainter:
 
     def paint_timeseries(self):
         """Create timeseries plot."""
-        print('\nPAINTING TIMESERIES PLOTS.')
+        print('\nPAINTING TIMESERIES.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
         for k in tqdm(range(self.kplanets)):
-            params = self.__get_params(k)
+            params = self.__get_median_params(k)
 
             fig = plt.figure(figsize=self.full_figsize)
             gs = gridspec.GridSpec(3, 4)
@@ -271,7 +307,8 @@ class CourtPainter:
                 'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
                 fontsize=self.label_fontsize, fontname=self.fontname
             )
-            time_m = sp.linspace(self.time.min(), self.time.max(), 10000)
+            time_m = sp.linspace(self.time.min() - 10,
+                                 self.time.max() + 10, 10000)
             time_m -= 2450000
             rv_m = empmir.mini_RV_model(params, time_m)
 
@@ -335,13 +372,26 @@ class CourtPainter:
             if self.png:
                 fig.savefig(self.working_dir + 'timeseries_' +
                             str(k + 1) + '.png', bbox_inches='tight')
-    pass
+        pass
+
+    def paint_chains(self):
+        """Create traceplots or chain plots for each temperature."""
+        for t in range(self.ntemps):
+            print('\nPAINTING CHAINS FOR TEMPERATURE', end=' ')
+            print(t)
+            chain = self.chains[t]
+            for i in tqdm(range(self.ndim)):
+                fig, ax = plt.subplots(figsize=self.chain_figsize)
+                pass
+        pass
 
     def read_config(self):
         """Read configuration file for plotting."""
         # TODO: implement.
         self.phase_figsize = (20, 10)
         self.full_figsize = (20, 10)
+        self.chain_figsize = (12, 7)
+        self.post_figsize = (12, 7)
         self.phase_cmap = 'cool_r'
         self.full_cmap = 'cool_r'
         self.phase_size = 100
