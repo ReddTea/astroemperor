@@ -1,5 +1,4 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import scipy as sp
 import pickle
@@ -386,7 +385,7 @@ def neo_p0(setup, *args):
 def ensure(condition, warning, MUSIC):
     try:
         assert condition
-    except:
+    except Exception as e:
         if MUSIC:
             MUSIC.play()
         assert condition, warning
@@ -395,7 +394,7 @@ def ensure(condition, warning, MUSIC):
 
 def savechains(chains, out_dir):
     """Pickle the chains."""
-    pickle_out = open(out_dir + '.pkl', 'wb')
+    pickle_out = open(out_dir + '/chains.pkl', 'wb')
     pickle.dump(chains, pickle_out)
     pickle_out.close()
     pass
@@ -403,7 +402,7 @@ def savechains(chains, out_dir):
 
 def saveposts(posteriors, out_dir):
     """Pickle the posteriors."""
-    pickle_out = open(out_dir + '.pkl', 'wb')
+    pickle_out = open(out_dir + '/posterios.pkl', 'wb')
     pickle.dump(posteriors, pickle_out)
     pickle_out.close()
     pass
