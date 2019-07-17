@@ -392,7 +392,7 @@ def ensure(condition, warning, MUSIC):
     pass
 
 
-def savechains(chains, out_dir):
+def save_chains(chains, out_dir):
     """Pickle the chains."""
     pickle_out = open(out_dir + '/chains.pkl', 'wb')
     pickle.dump(chains, pickle_out)
@@ -400,9 +400,25 @@ def savechains(chains, out_dir):
     pass
 
 
-def saveposts(posteriors, out_dir):
+def save_posteriors(posteriors, out_dir):
     """Pickle the posteriors."""
     pickle_out = open(out_dir + '/posterios.pkl', 'wb')
     pickle.dump(posteriors, pickle_out)
     pickle_out.close()
     pass
+
+
+def read_chains(in_dir):
+    """Read chains file."""
+    pickle_in = open(in_dir, 'rb')
+    chains = pickle.load(pickle_in)
+    pickle_in.close()
+    return chains
+
+
+def read_posteriors(in_dir):
+    """Read posteriors file."""
+    pickle_in = open(in_dir, 'rb')
+    posteriors = pickle.load(pickle_in)
+    pickle_in.close()
+    return posteriors
