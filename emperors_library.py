@@ -2,6 +2,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import scipy as sp
+import pickle
 
 a=sp.array(['RV_dataset1.vels', 'RV_dataset14.vels'])
 aa=sp.array(['RV_dataset14.vels'])
@@ -363,4 +364,19 @@ def ensure(condition, warning, MUSIC):
             MUSIC.play()
         assert condition, warning
     pass
-#
+
+
+def savechains(chains, out_dir):
+    """Pickle the chains."""
+    pickle_out = open(out_dir + '.pkl', 'wb')
+    pickle.dump(chains, pickle_out)
+    pickle_out.close()
+    pass
+
+
+def saveposts(posteriors, out_dir):
+    """Pickle the posteriors."""
+    pickle_out = open(out_dir + '.pkl', 'wb')
+    pickle.dump(posteriors, pickle_out)
+    pickle_out.close()
+    pass
