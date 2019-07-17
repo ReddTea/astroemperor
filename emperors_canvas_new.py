@@ -99,6 +99,10 @@ class CourtPainter:
 
     def paint_fold(self):
         """Create phasefold plot."""
+        # Get globbal max and min for plots
+        minx, maxx = self.time.min(), self.time.max()
+        cmin, cmax = self.time_cb.min(), self.time_cb.max()
+
         for k in range(self.kplanets):
             params = self.__get_params(k)
 
@@ -109,11 +113,7 @@ class CourtPainter:
             cbar_ax = fig.add_axes([.85, .125, .015, .755])
             fig.subplots_adjust(right=.84, hspace=0)
 
-            # Get globbal max and min for plots
-            minx, maxx = self.time.min(), self.time.max()
-            cmin, cmax = self.time_cb.min(), self.time_cb.max()
-
-            for i in range(self.nins):
+            for i in range(self.nins):  # plot per instrument.
                 ins = self.ins == i
                 t_p, rv_p, err_p = emplib.phasefold(
                     self.time[ins], self.rv[ins], self.err[ins], params[0]
@@ -125,7 +125,7 @@ class CourtPainter:
                 # phasefold plot.
                 ax.errorbar(
                     t_p, rv_p, yerr=err_p, linestyle='', marker=None,
-                    alpha=.75, ecolor='k', **self.error_kwargs
+                    alpha=.75, ecolor=self.error_color, **self.error_kwargs
                 )
                 im = ax.scatter(
                     t_p, rv_p, marker=self.markers[i], edgecolors='k',
@@ -135,7 +135,7 @@ class CourtPainter:
                 im.set_clim(cmin, cmax)
                 ax_r.errorbar(
                     t_p, res_p, yerr=err_p, linestyle='', marker=None,
-                    ecolor='k', **self.error_kwargs
+                    ecolor=self.error_color, **self.error_kwargs
                 )
                 im_r = ax_r.scatter(
                     t_p, res_p, marker=self.markers[i], edgecolors='k',
@@ -143,10 +143,8 @@ class CourtPainter:
                     cmap=self.phase_cmap
                 )
                 im_r.set_clim(cmin, cmax)
-                ax.set_xticks([])
-                ax.set_xlim(-.01, 1.01)
-                ax_r.set_xlim(-.01, 1.01)
-            fig.colorbar(im, cax=cbar_ax).set_label(
+            fig.colorbar(
+                im, cax=cbar_ax).set_label(
                 'JD - 2450000', rotation=270, labelpad=25,
                 fontsize=self.label_fontsize
             )
@@ -172,29 +170,127 @@ class CourtPainter:
                 ax.fill_between(time_m_p, rv_m_lo_p, rv_m_up_p,
                                 color=self.CI_color, alpha=.25)
 
-            ax.set_ylabel(r'Radial Velocity (m s$^{-1}$)',
-                          fontsize=self.label_fontsize)
-
+            # A line to guide the eye.
             ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+
+            # Labels and tick stuff.
+            ax.set_ylabel(
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize
+            )
+            ax_r.set_ylabel('Residuals', fontsize=self.label_fontsize)
+            ax_r.set_xlabel('Phase', fontsize=self.label_fontsize)
+
             ax_r.get_yticklabels()[-1].set_visible(False)
             ax_r.minorticks_on()
+            ax.set_xticks([])
             ax.tick_params(axis='both', which='major', labelsize=20)
             ax_r.tick_params(axis='both', which='major', labelsize=20)
             cbar_ax.tick_params(labelsize=20)
-            ax_r.set_ylabel('Residuals', fontsize=self.label_fontsize)
-            ax_r.set_xlabel('Phase', fontsize=self.label_fontsize)
+
+            ax.set_xlim(-.01, 1.01)
+            ax_r.set_xlim(-.01, 1.01)
             if self.pdf:
                 fig.savefig(self.working_dir + 'phase_fold_' +
-                            str(k) + '.pdf', bbox_inches='tight')
+                            str(k + 1) + '.pdf', bbox_inches='tight')
             if self.png:
                 fig.savefig(self.working_dir + 'phase_fold_' +
-                            str(k) + '.png', bbox_inches='tight')
+                            str(k + 1) + '.png', bbox_inches='tight')
 
-            continue
         pass
 
     def paint_timeseries(self):
-        pass
+        """Create timeseries plot."""
+        # Get globbal max and min for plots
+        minx, maxx = self.time.min(), self.time.max()
+        cmin, cmax = self.time_cb.min(), self.time_cb.max()
+
+        for k in range(self.kplanets):
+            params = self.__get_params(k)
+
+            fig = plt.figure(figsize=self.full_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            ax = fig.add_subplot(gs[:2, :])
+            ax_r = fig.add_subplot(gs[-1, :])
+            cbar_ax = fig.add_axes([.85, .125, .015, .755])
+            fig.subplots_adjust(right=.84, hspace=0)
+
+            for i in range(self.nins):
+                ins = self.ins == i
+
+                ax.errorbar(
+                    self.time[ins], self.rv[ins], yerr=self.err[ins],
+                    linestyle='', marker=None, ecolor=self.error_color,
+                    **self.error_kwargs
+                )
+                im = ax.scatter(
+                    self.time[ins], self.rv[ins], marker=self.markers[i],
+                    edgecolors='k', s=self.full_size, c=self.time_cb[ins],
+                    cmap=self.full_cmap
+                )
+                im.set_clim(cmin, cmax)
+
+                # Get residuals.
+                res = self.rv_residuals()[ins]
+
+                ax_r.errorbar(
+                    self.time[ins], res, yerr=self.err[ins], linestyle='',
+                    marker=None, ecolor=self.error_color, **self.error_kwargs
+                )
+                im_r = ax_r.scatter(
+                    self.time[ins], res, marker=self.markers[i],
+                    edgecolors='k', s=self.full_size, c=self.time_cb[ins],
+                    cmap=self.full_cmap
+                )
+
+                im_r.set_clim(cmin, cmax)
+            fig.colorbar(
+                im, cax=cbar_ax).set_label(
+                'JD - 2450000', rotation=270, labelpad=25,
+                fontsize=self.label_fontsize
+            )
+            time_m = sp.linspace(self.time.min(), self.time.max(), 10000)
+            rv_m = empmir.mini_RV_model(params, time_m)
+
+            # Plot best model.
+            ax.plot(time_m, rv_m, '-k', linewidth=2)
+            # Plot models CI.
+            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
+            for s in cred_intervals:
+                params_lo, params_up = self.__get_CI_params(k, s)
+                # Calculate new models.
+                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up = empmir.mini_RV_model(params_up, time_m)
+
+                ax.fill_between(
+                    time_m, rv_m_lo, rv_m_up, color=self.CI_color, alpha=.25
+                )
+
+            # A line to guide the eye.
+            ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+
+            # Labels and tick stuff.
+            ax.set_ylabel(
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize
+            )
+            ax_r.set_ylabel('Residuals', fontsize=self.label_fontsize)
+            ax_r.set_xlabel('Time (JD)', fontsize=self.label_fontsize)
+
+            ax_r.get_yticklabels()[-1].set_visible(False)
+            ax_r.minorticks_on()
+            ax.set_xticks([])
+            ax.tick_params(axis='both', which='major', labelsize=20)
+            ax_r.tick_params(axis='both', which='major', labelsize=20)
+            cbar_ax.tick_params(labelsize=20)
+
+            ax.set_xlim(self.time.min() - 25, self.time.max() + 25)
+            ax_r.set_xlim(self.time.min() - 25, self.time.max() + 25)
+            if self.pdf:
+                fig.savefig(self.working_dir + 'timeseries_' +
+                            str(k + 1) + '.pdf', bbox_inches='tight')
+            if self.png:
+                fig.savefig(self.working_dir + 'timeseries_' +
+                            str(k + 1) + '.png', bbox_inches='tight')
+    pass
 
     def read_config(self):
         """Read configuration file for plotting."""
@@ -207,4 +303,5 @@ class CourtPainter:
         self.full_size = 100
         self.label_fontsize = 22
         self.CI_color = 'darkturquoise'
+        self.error_color = 'k'
         pass
