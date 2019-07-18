@@ -47,6 +47,7 @@ class CourtPainter:
         self.nins = len(sp.unique(self.ins))
         self.ndim = 1 + 5 * kplanets + self.nins * 2
 
+        self.__clean_rvs()
         # Setup plots.
         self.read_config()
         self.time_cb = copy.deepcopy(self.time) - 2450000
@@ -92,16 +93,16 @@ class CourtPainter:
                      eccentricity_up, longitude_up)
         return params_lo, params_up
 
-    def rv_residuals(self):
+    def __rv_residuals(self):
         """Calculate model residuals."""
         model = 0.
         for k in range(self.kplanets):
             params = self.__get_params(k)
             model += empmir.mini_RV_model(params, self.time)
-        residuals = self.rv - model
+        residuals = self.rv0 - model
         return residuals
 
-    def clean_rvs(self):
+    def __clean_rvs(self):
         """Clean radial-velocities by adding the offset and jitter."""
         instrumental = self.cold[:, -2 * self.nins:]
         rv0 = copy.deepcopy(self.rv)
@@ -138,10 +139,10 @@ class CourtPainter:
             for i in range(self.nins):  # plot per instrument.
                 ins = self.ins == i
                 t_p, rv_p, err_p = emplib.phasefold(
-                    self.time[ins], self.rv[ins], self.err[ins], params[0]
+                    self.time[ins], self.rv0[ins], self.err0[ins], params[0]
                 )
                 _, res_p, _p = emplib.phasefold(
-                    self.time[ins], self.rv_residuals()[ins], self.err[ins],
+                    self.time[ins], self.__rv_residuals()[ins], self.err0[ins],
                     params[0]
                 )
                 # phasefold plot.
@@ -262,22 +263,22 @@ class CourtPainter:
                 ins = self.ins == i
 
                 ax.errorbar(
-                    self.time[ins] - 2450000, self.rv[ins], yerr=self.err[ins],
-                    linestyle='', marker=None, ecolor=self.error_color,
-                    **self.error_kwargs
+                    self.time[ins] - 2450000, self.rv0[ins],
+                    yerr=self.err0[ins], linestyle='', marker=None,
+                    ecolor=self.error_color, **self.error_kwargs
                 )
                 im = ax.scatter(
-                    self.time[ins] - 2450000, self.rv[ins],
+                    self.time[ins] - 2450000, self.rv0[ins],
                     marker=self.markers[i], edgecolors='k', s=self.full_size,
                     c=self.time_cb[ins], cmap=self.full_cmap
                 )
                 im.set_clim(cmin, cmax)
 
                 # Get residuals.
-                res = self.rv_residuals()[ins]
+                res = self.__rv_residuals()[ins]
 
                 ax_r.errorbar(
-                    self.time[ins] - 2450000, res, yerr=self.err[ins],
+                    self.time[ins] - 2450000, res, yerr=self.err0[ins],
                     linestyle='', marker=None, ecolor=self.error_color,
                     **self.error_kwargs
                 )
@@ -615,6 +616,10 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
+        pass
+
+    def paint_histograms(self):
+        """Create histograms."""
         pass
 
     def read_config(self):
