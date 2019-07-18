@@ -389,6 +389,10 @@ class CourtPainter:
 
             for i in tqdm(range(self.ndim), desc='Brush type'):
                 fig, ax = plt.subplots(figsize=self.chain_figsize)
+                ax.tick_params(
+                    axis='both', which='major',
+                    labelsize=self.tick_labelsize
+                )
 
                 # plot only accel and instrumental chains.
                 if self.kplanets == 0:
@@ -398,6 +402,7 @@ class CourtPainter:
                     )
                     cb = plt.colorbar(im, ax=ax)
                     cb.set_label('Step Number', fontsize=self.label_fontsize)
+                    cb.ax.tick_params(labelsize=self.tick_labelsize)
                     ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                     if i == 0:
@@ -432,6 +437,7 @@ class CourtPainter:
                     )
                     cb = plt.colorbar(im, ax=ax)
                     cb.set_label('Step Number', fontsize=self.label_fontsize)
+                    cb.ax.tick_params(labelsize=self.tick_labelsize)
                     ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                     if pcount <= self.kplanets:
@@ -477,6 +483,9 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
+        pass
+
+    def paint_posteriors(self):
         pass
 
     def read_config(self):
