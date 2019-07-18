@@ -6,6 +6,7 @@
 
 # DEPENDENCIES
 from __future__ import division
+
 if True:
     import os
     import sys
@@ -544,13 +545,6 @@ class EMPIRE:
         #sp.savetxt(name+'/residuals.dat', sp.c_[self.time, residuals])
         return name
 
-    def instigator(self, saveplace):
-        """Save chains and posteriors in a pickle file for later use."""
-        emplib.save_chains(self.cherry_chain_h, saveplace)
-        emplib.save_posteriors(self.cherry_post, saveplace)
-        emplib.save_rv_data(self.all_data, saveplace)
-        pass
-
     def MCMC(self, *args):
         if args:
             pos0, kplan, sigmas_raw, logl, logp = args
@@ -1058,7 +1052,10 @@ class EMPIRE:
 
             saveplace = self.mklogfile(kplan)
             if self.VINES:  # saves chains, posteriors, rv data and log
-                self.instigator(saveplace)
+                emplib.instigator(
+                    self.cherry_chain, self.cherry_post, self.all_data,
+                    saveplace
+                )
 
             if self.MUSIC:
                 thybiding.play()

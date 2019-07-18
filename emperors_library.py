@@ -394,6 +394,14 @@ def ensure(condition, warning, MUSIC):
     pass
 
 
+def instigator(self, cherry_chain, cherry_post, all_data, saveplace):
+    """Save chains and posteriors in a pickle file for later use."""
+    save_chains(cherry_chain_h, saveplace)
+    save_posteriors(cherry_post, saveplace)
+    save_rv_data(all_data, saveplace)
+    pass
+
+
 def save_chains(chains, out_dir):
     """Pickle the chains."""
     pickle_out = open(out_dir + '/chains.pkl', 'wb')
