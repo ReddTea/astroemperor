@@ -391,21 +391,22 @@ class CourtPainter:
 
             for i in tqdm(range(self.ndim), desc='Brush type'):
                 fig, ax = plt.subplots(figsize=self.chain_figsize)
-                ax.tick_params(
-                    axis='both', which='major',
-                    labelsize=self.tick_labelsize
-                )
 
                 im = ax.scatter(
                     sp.arange(chain.shape[0]), chain[:, i],
                     c=colors, lw=0, cmap=self.chain_cmap, s=self.chain_size
                 )
 
+                ax.set_xlabel('N', fontsize=self.label_fontsize)
+                ax.tick_params(
+                    axis='both', which='major',
+                    labelsize=self.tick_labelsize
+                )
+
                 cb = plt.colorbar(im, ax=ax)
                 cb.set_label('Step Number', fontsize=self.label_fontsize,
                              rotation=270, labelpad=self.cbar_labelpad)
                 cb.ax.tick_params(labelsize=self.tick_labelsize)
-                ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                 # plot only accel and instrumental chains.
                 if self.kplanets == 0:
@@ -494,28 +495,43 @@ class CourtPainter:
                 pass
             else:
                 chain = chain[:-leftovers]
+                post = post[:-(len(post) % self.nwalkers)]
             quasisteps = len(chain) // self.nwalkers
             color = sp.arange(quasisteps)
             colors = sp.array(
                 [color for i in range(self.nwalkers)]).reshape(-1)
 
+            # Auxiliary variables to coordinate labels and filenames.
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+
             for i in tqdm(range(self.ndim), desc='Brush type'):
                 fig, ax = plt.subplots(figsize=self.post_figsize)
 
                 im = ax.scatter(
-                    chains[:, i], post, s=self.post_size, c=colors, lw=0,
+                    chain[:, i], post, s=self.post_size, c=colors, lw=0,
                     cmap=self.post_cmap, alpha=self.post_alpha
                 )
 
                 ax.axvline(
                     chain[sp.argmax(post), i], color=self.post_v_color,
-                    linestyle=self.post_v_linestyle, alpha=self.post_v_alpha
+                    linestyle=self.post_v_linestyle, alpha=self.post_v_alpha,
+                    zorder=10
                 )
 
+                ax.tick_params(
+                    axis='both', which='major',
+                    labelsize=self.tick_labelsize
+                )
+                ax.tick_params(axis='x', rotation=45)
                 ax.set_ylabel('Posterior', fontsize=self.label_fontsize)
                 cb = plt.colorbar(im, ax=ax)
                 cb.set_label('Step Number', fontsize=self.label_fontsize,
                              rotation=270, labelpad=self.cbar_labelpad)
+                cb.ax.tick_params(labelsize=self.tick_labelsize)
 
                 xaxis = ax.get_xaxis()
                 xaxis.set_major_locator(
@@ -528,42 +544,77 @@ class CourtPainter:
 
                 # plot only accel and instrumental chains.
                 if self.kplanets == 0:
-                    im = ax.scatter(
-                        sp.arange(chain.shape[0]), chain[:, i],
-                        c=colors, lw=0, cmap=self.chain_cmap, s=self.chain_size
-                    )
-                    cb = plt.colorbar(im, ax=ax)
-                    cb.set_label('Step Number', fontsize=self.label_fontsize,
-                                 rotation=270, labelpad=self.cbar_labelpad)
-                    cb.ax.tick_params(labelsize=self.tick_labelsize)
-                    ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                     if i == 0:
                         title = self.chain_titles[5]
-                        ax.set_ylabel(
+                        ax.set_xlabel(
                             title + self.chain_units[-1],
                             fontsize=self.label_fontsize
                         )
                         counter = 0
                     else:
                         title = self.chain_titles[6 + counter % 2]
-                        ax.set_ylabel(
+                        ax.set_xlabel(
                             title + self.chain_units[1],
                             fontsize=self.label_fontsize
                         )
                         counter += 1
 
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'chains/' + title
+                        plt.savefig(self.working_dir + 'posteriors/' + title
                                     + '_INS' + str(ins) + '_' + str(t)
                                     + 'T_K0.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'chains/' + title
+                        plt.savefig(self.working_dir + 'posteriors/' + title
                                     + '_INS' + str(ins) + '_' + str(t)
                                     + 'T_K0.pdf')
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
-                pass
+                else:
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_xlabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_xlabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_xlabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'posteriors/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'posteriors/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'posteriors/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'posteriors/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
         pass
 
     def read_config(self):
