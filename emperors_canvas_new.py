@@ -20,10 +20,12 @@ class CourtPainter:
 
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
     error_kwargs = {'lw': 1.75, 'zorder': 0}
-    chain_titles = [
-        'Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude',
-        'Acceleration', 'Jitter', 'Offset'
-    ]
+    chain_titles = sp.array(
+        [
+            'Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude',
+            'Acceleration', 'Jitter', 'Offset'
+        ]
+    )
     chain_units = [
         ' [Days]', r' $[\frac{m}{s}]$',  r' $[rad]$', '', r' $[rad]$',
         r' $[\frac{m}{s^2}]$'
@@ -169,7 +171,7 @@ class CourtPainter:
             fig.colorbar(
                 im, cax=cbar_ax).set_label(
                 'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
-                fontsize=self.label_fontsize, fontname=self.label_fontname
+                fontsize=self.label_fontsize, fontname=self.fontname
             )
 
             time_m = sp.linspace(self.time.min() - 10,
@@ -796,9 +798,85 @@ class CourtPainter:
                 pcount += 1 if tcount % 5 == 0 else 0
         pass
 
-    def pain_corner(self):
+    def paint_corners(self):
         """Create corner plots. Cold chain only."""
         print('\nPAINTING CORNERS.')
+        titles = ['P', 'K', r'$\phi$', 'e', r'$\omega$']
+        if self.kplanets == 0:
+            print('No cornerplots for K0.')
+            return
+        for k in tqdm(range(self.kplanets), desc='Brush number'):
+            labels = [t + ' ' + str(k + 1) + '\n' + u
+                      for t, u in zip(
+                      self.chain_titles[:-1 - self.nins],
+                      self.chain_units[:-1]
+                      )]
+            fig = corner.corner(
+                self.cold[:, k * 5:(k + 1) * 5],
+                plot_contours=True,
+                fill_contours=False,
+                plot_datapoints=True,
+                no_fill_contours=True,
+                max_n_ticks=3
+            )
+            params = self.__get_params(k)
+            params_lo, params_up = self.__get_CI_params(k, .68)
+
+            axes = sp.array(fig.axes).reshape((5, 5))
+
+            for i in range(5):
+                ax = axes[i, i]
+                ax.axvline(params[i], color=self.corner_med_c,
+                           linestyle=self.corner_med_style)
+                ax.axvline(params_lo[i], color=self.corner_v_c,
+                           linestyle=self.corner_v_style)
+                ax.axvline(params_up[i], color=self.corner_v_c,
+                           linestyle=self.corner_v_style)
+                t = titles[i] + '={:.2f}'.format(params[i]) + \
+                    r'$^{+' + '{:.2f}'.format(params_up[i] - params[i]) + \
+                    r'}_{-' + '{:.2f}'.format(params[i] - params_lo[i]) + r'}$'
+
+                ax.set_title(t, fontsize=self.corner_fontsize,
+                             fontname=self.fontname)
+
+            for yi in range(5):
+                for xi in range(yi):
+                    ax = axes[yi, xi]
+                    if xi == 0:
+                        for tick in ax.yaxis.get_major_ticks():
+                            tick.label.set_fontsize(self.corner_tick_fontsize)
+                            tick.label.set_fontname(self.fontname)
+                            ax.set_ylabel(
+                                labels[yi],
+                                labelpad=self.corner_labelpad,
+                                fontsize=self.corner_fontsize,
+                                fontname=self.fontname
+                            )
+                    if yi == 4:
+                        for tick in ax.xaxis.get_major_ticks():
+                            tick.label.set_fontsize(self.corner_tick_fontsize)
+                            tick.label.set_fontname(self.fontname)
+                            ax.set_xlabel(
+                                labels[xi],
+                                labelpad=self.corner_labelpad,
+                                fontsize=self.corner_fontsize,
+                                fontname=self.fontname
+                            )
+                    ax.axvline(params[xi], color=self.corner_med_c,
+                               linestyle=self.corner_med_style)
+                    ax.axhline(params[yi], color=self.corner_med_c,
+                               linestyle=self.corner_med_style)
+                    ax.plot(params[xi], params[yi], self.corner_marker)
+                axes[-1, -1].set_xlabel(
+                    labels[-1],
+                    labelpad=self.corner_labelpad,
+                    fontsize=self.corner_fontsize,
+                    fontname=self.fontname
+                )
+                for tick in axes[-1, -1].xaxis.get_major_ticks():
+                    tick.label.set_fontsize(self.corner_tick_fontsize)
+                    tick.label.set_fontname(self.fontname)
+            fig.show()
         pass
 
     def __read_config(self):
@@ -830,6 +908,14 @@ class CourtPainter:
         self.CI_color = 'mediumseagreen'
         self.error_color = 'k'
         self.fontname = 'serif'
+        self.corner_med_c = 'firebrick'
+        self.corner_v_c = 'lightcoral'
+        self.corner_v_style = '-.'
+        self.corner_med_style = '--'
         self.tick_labelsize = 20
         self.cbar_labelpad = 30
+        self.corner_fontsize = 20
+        self.corner_tick_fontsize = 15
+        self.corner_labelpad = 15
+        self.corner_marker = 'sr'
         pass
