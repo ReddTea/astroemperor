@@ -368,6 +368,7 @@ class CourtPainter:
 
     def paint_chains(self):
         """Create traceplots or chain plots for each temperature."""
+        print('\nPAINTING CHAINS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
             chain = self.chains[t]
 
@@ -381,6 +382,7 @@ class CourtPainter:
             colors = sp.array(
                 [color for i in range(self.nwalkers)]).reshape(-1)
 
+            # Auxiliary variables to coordinate labels and filenames.
             tcount = 0
             pcount = 1
             acc = True
@@ -394,16 +396,19 @@ class CourtPainter:
                     labelsize=self.tick_labelsize
                 )
 
+                im = ax.scatter(
+                    sp.arange(chain.shape[0]), chain[:, i],
+                    c=colors, lw=0, cmap=self.chain_cmap, s=self.chain_size
+                )
+
+                cb = plt.colorbar(im, ax=ax)
+                cb.set_label('Step Number', fontsize=self.label_fontsize,
+                             rotation=270, labelpad=self.cbar_labelpad)
+                cb.ax.tick_params(labelsize=self.tick_labelsize)
+                ax.set_xlabel('N', fontsize=self.label_fontsize)
+
                 # plot only accel and instrumental chains.
                 if self.kplanets == 0:
-                    im = ax.scatter(
-                        sp.arange(chain.shape[0]), chain[:, i],
-                        c=colors, lw=0, cmap='viridis'
-                    )
-                    cb = plt.colorbar(im, ax=ax)
-                    cb.set_label('Step Number', fontsize=self.label_fontsize)
-                    cb.ax.tick_params(labelsize=self.tick_labelsize)
-                    ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                     if i == 0:
                         title = self.chain_titles[5]
@@ -431,14 +436,6 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 else:
-                    im = ax.scatter(
-                        sp.arange(chain.shape[0]), chain[:, i],
-                        c=colors, lw=0, cmap='viridis'
-                    )
-                    cb = plt.colorbar(im, ax=ax)
-                    cb.set_label('Step Number', fontsize=self.label_fontsize)
-                    cb.ax.tick_params(labelsize=self.tick_labelsize)
-                    ax.set_xlabel('N', fontsize=self.label_fontsize)
 
                     if pcount <= self.kplanets:
                         title = self.chain_titles[tcount % 5]
@@ -486,6 +483,87 @@ class CourtPainter:
         pass
 
     def paint_posteriors(self):
+        """Create posterior plots."""
+        print('\nPAINTING POSTERIORS.')
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+            chain = self.chains[t]
+            post = self.posteriors[t]
+
+            leftovers = len(chain) % self.nwalkers
+            if leftovers == 0:
+                pass
+            else:
+                chain = chain[:-leftovers]
+            quasisteps = len(chain) // self.nwalkers
+            color = sp.arange(quasisteps)
+            colors = sp.array(
+                [color for i in range(self.nwalkers)]).reshape(-1)
+
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.post_figsize)
+
+                im = ax.scatter(
+                    chains[:, i], post, s=self.post_size, c=colors, lw=0,
+                    cmap=self.post_cmap, alpha=self.post_alpha
+                )
+
+                ax.axvline(
+                    chain[sp.argmax(post), i], color=self.post_v_color,
+                    linestyle=self.post_v_linestyle, alpha=self.post_v_alpha
+                )
+
+                ax.set_ylabel('Posterior', fontsize=self.label_fontsize)
+                cb = plt.colorbar(im, ax=ax)
+                cb.set_label('Step Number', fontsize=self.label_fontsize,
+                             rotation=270, labelpad=self.cbar_labelpad)
+
+                xaxis = ax.get_xaxis()
+                xaxis.set_major_locator(
+                    ticker.LinearLocator(numticks=self.post_ticknum)
+                )
+                yaxis = ax.get_yaxis()
+                yaxis.set_major_locator(
+                    ticker.LinearLocator(numticks=self.post_ticknum)
+                )
+
+                # plot only accel and instrumental chains.
+                if self.kplanets == 0:
+                    im = ax.scatter(
+                        sp.arange(chain.shape[0]), chain[:, i],
+                        c=colors, lw=0, cmap=self.chain_cmap, s=self.chain_size
+                    )
+                    cb = plt.colorbar(im, ax=ax)
+                    cb.set_label('Step Number', fontsize=self.label_fontsize,
+                                 rotation=270, labelpad=self.cbar_labelpad)
+                    cb.ax.tick_params(labelsize=self.tick_labelsize)
+                    ax.set_xlabel('N', fontsize=self.label_fontsize)
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_ylabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_ylabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pass
         pass
 
     def read_config(self):
@@ -499,8 +577,18 @@ class CourtPainter:
         self.full_cmap = 'cool_r'
         self.phase_size = 100
         self.full_size = 100
+        self.chain_size = 20
+        self.chain_cmap = 'viridis'
+        self.post_size = 20
+        self.post_ticknum = 10
+        self.post_alpha = .8
+        self.post_cmap = 'viridis'
+        self.post_v_color = 'red'
+        self.post_v_linestyle = '--'
+        self.post_v_linewidth = 2
+        self.post_v_alpha = .7
         self.label_fontsize = 22
-        self.CI_color = 'darkturquoise'
+        self.CI_color = 'mediumseagreen'
         self.error_color = 'k'
         self.fontname = 'serif'
         self.tick_labelsize = 20
