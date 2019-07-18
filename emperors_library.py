@@ -187,6 +187,10 @@ def gaussian(x, sigma):
     return 1 / np.sqrt(2 * np.pi * sigma * sigma) * np.exp(coef)
 
 
+def hist_gaussian(x, mu, sig):
+    return sp.exp(-sp.power((x - mu) / sig, 2.) / 2.)
+
+
 def pt_pos(setup, *args):
 
     if args:
