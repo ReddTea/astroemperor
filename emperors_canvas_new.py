@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 
 import copy
+import os
 from decimal import Decimal  # histograms
 
 import matplotlib.gridspec as gridspec
@@ -20,12 +21,12 @@ class CourtPainter:
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
     error_kwargs = {'lw': 1.75, 'zorder': 0}
     chain_titles = [
-        'Amplitude', 'Period', 'Longitude', 'Phase', 'Eccentricity',
+        'Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude',
         'Acceleration', 'Jitter', 'Offset'
     ]
     chain_units = [
-        r' $[\frac{m}{s}]$', ' [Days]', r' $[rad]$', r' $[rads]$', '',
-        r' $[\frac{m}{s^2}]$', r' $[\frac{m}{s}]$', ' r$[\frac{m}{s}]$'
+        ' [Days]', r' $[\frac{m}{s}]$',  r' $[rad]$', '', r' $[rad]$',
+        r' $[\frac{m}{s^2}]$'
     ]
 
     def __init__(self, setup, kplanets, working_dir, pdf, png):
@@ -49,6 +50,18 @@ class CourtPainter:
         # Setup plots.
         self.read_config()
         self.time_cb = copy.deepcopy(self.time) - 2450000
+
+        # Create directories.
+        dirs = ['chains', 'posteriors', 'histograms']
+        print('\nCREATING SHOWROOMS.')
+        for d in dirs:
+            path = self.working_dir + d
+            try:
+                os.mkdir(path)
+            except OSError:
+                print("Creation of the showroom %s failed" % path)
+            else:
+                print("Successfully created the showroom %s " % path)
         pass
 
     def __get_params(self, kplanet):
@@ -355,13 +368,115 @@ class CourtPainter:
 
     def paint_chains(self):
         """Create traceplots or chain plots for each temperature."""
-        for t in range(self.ntemps):
-            print('\nPAINTING CHAINS FOR TEMPERATURE', end=' ')
-            print(t)
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
             chain = self.chains[t]
-            for i in tqdm(range(self.ndim)):
-                fig, ax = plt.subplots(figsize=self.chain_figsize)
+
+            leftovers = len(chain) % self.nwalkers
+            if leftovers == 0:
                 pass
+            else:
+                chain = chain[:-leftovers]
+            quasisteps = len(chain) // self.nwalkers
+            color = sp.arange(quasisteps)
+            colors = sp.array(
+                [color for i in range(self.nwalkers)]).reshape(-1)
+
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.chain_figsize)
+
+                # plot only accel and instrumental chains.
+                if self.kplanets == 0:
+                    im = ax.scatter(
+                        sp.arange(chain.shape[0]), chain[:, i],
+                        c=colors, lw=0, cmap='viridis'
+                    )
+                    cb = plt.colorbar(im, ax=ax)
+                    cb.set_label('Step Number', fontsize=self.label_fontsize)
+                    ax.set_xlabel('N', fontsize=self.label_fontsize)
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_ylabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_ylabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                else:
+                    im = ax.scatter(
+                        sp.arange(chain.shape[0]), chain[:, i],
+                        c=colors, lw=0, cmap='viridis'
+                    )
+                    cb = plt.colorbar(im, ax=ax)
+                    cb.set_label('Step Number', fontsize=self.label_fontsize)
+                    ax.set_xlabel('N', fontsize=self.label_fontsize)
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_ylabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_ylabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_ylabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
         pass
 
     def read_config(self):
