@@ -49,7 +49,7 @@ class CourtPainter:
 
         self.__clean_rvs()
         # Setup plots.
-        self.read_config()
+        self.__read_config()
         self.time_cb = copy.deepcopy(self.time) - 2450000
 
         # Create directories.
@@ -169,7 +169,7 @@ class CourtPainter:
             fig.colorbar(
                 im, cax=cbar_ax).set_label(
                 'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
-                fontsize=self.label_fontsize, fontname=self.fontname
+                fontsize=self.label_fontsize, fontname=self.label_fontname
             )
 
             time_m = sp.linspace(self.time.min() - 10,
@@ -620,15 +620,195 @@ class CourtPainter:
 
     def paint_histograms(self):
         """Create histograms."""
+        print('\nPAINTING HISTOGRAMS.')
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+            chain = self.chains[t]
+            post = self.posteriors[t]
+
+            # Auxiliary variables to coordinate labels and filenames.
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.post_figsize)
+
+                ax.set_ylabel('Frequency', fontsize=self.label_fontsize)
+
+                dist = chain[:, i]
+
+                peak = dist[sp.argmax(post)]
+                n, bins = sp.histogram(dist, self.num_bins, density=1)
+                dif = sp.fabs(peak - bins)
+                his_peak = bins[sp.argmin(dif)]
+
+                res = sp.where(n == 0)[0]
+
+                if res.size:
+                    if len(res) > 2:
+                        for j in range(len(res)):
+                            if res[j + 2] - res[j] == 2:
+                                sub = j
+                                break
+                    else:
+                        sub = res[0]
+
+                    if bins[sub] > his_peak:
+                        idx = sp.where(dist <= bins[sub])
+                        post_sub = post[idx]
+                        dist_sub = dist[idx]
+                    else:
+                        idx = sp.where(dist >= bins[sub])
+                        post_sub = post[idx]
+                        dist_sub = dist[idx]
+                else:
+                    dist_sub = dist
+                    post_sub = post
+
+                n, bins, patches = ax.hist(
+                    dist_sub, self.num_bins, density=1,
+                    facecolor=self.hist_facecolor, alpha=self.hist_alpha
+                )
+
+                mu, sigma = norm.fit(dist_sub)
+                var = sigma ** 2
+
+                # Statistics.
+                skew = '{:.4e}'.format(Decimal(sp.stats.skew(dist_sub)))
+                kurt = '{:.4e}'.format(Decimal(sp.stats.kurtosis(dist_sub)))
+                gmod = '{:.4e}'.format(Decimal(bins[sp.argmax(n)]))
+                med = '{:.4e}'.format(Decimal(sp.median(dist_sub)))
+
+                span = bins[len(bins) - 1] - bins[0]
+                bins_x = ((sp.arange(self.num_bins * 100) /
+                           (self.num_bins * 100)) * span) + bins[0]
+
+                # Make a renormalised gaussian plot.
+                y = emplib.hist_gaussian(bins_x, mu, sigma) * n.max()
+
+                ax.plot(bins_x, y, 'r-', linewidth=3)
+
+                fig.subplots_adjust(left=.15)
+
+                ax.set_ylim([0, n.max() * 1.7])
+
+                ax.autoscale(enable=True, axis='x', tight=True)
+
+                # Add stats to plot as text.
+
+                ymin, ymax = ax.get_ylim()
+                xmin, xmax = ax.get_xlim()
+
+                mu_o = '{:.4e}'.format(Decimal(mu))
+                sigma_o = '{:.4e}'.format(Decimal(sigma))
+                var_o = '{:.4e}'.format(Decimal(var))
+
+                ax.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
+                        * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$",
+                        size=25)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.180, r"$\mu_1 ={}$".format(mu_o), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.255, r"$\sigma^2 ={}$".format(var_o), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.330, r"$\mu_3 ={}$".format(skew), size=20)
+
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.180, r"$\mu_4 ={}$".format(kurt), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.255, r"$Median ={}$".format(med), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.330, r"$Mode ={}$".format(gmod), size=20)
+
+                if self.kplanets == 0:
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_xlabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_xlabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_' + str(t)
+                                    + 'T_K0.pdf')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+
+                else:
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_xlabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_xlabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_xlabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'histograms/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'histograms/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
         pass
 
-    def read_config(self):
+    def pain_corner(self):
+        """Create corner plots. Cold chain only."""
+        print('\nPAINTING CORNERS.')
+        pass
+
+    def __read_config(self):
         """Read configuration file for plotting."""
         # TODO: implement.
         self.phase_figsize = (20, 10)
         self.full_figsize = (20, 10)
         self.chain_figsize = (12, 7)
         self.post_figsize = (12, 7)
+        self.hist_figsize = (12, 7)
         self.phase_cmap = 'cool_r'
         self.full_cmap = 'cool_r'
         self.phase_size = 100
@@ -644,6 +824,9 @@ class CourtPainter:
         self.post_v_linewidth = 2
         self.post_v_alpha = .7
         self.label_fontsize = 22
+        self.num_bins = 12
+        self.hist_facecolor = 'blue'
+        self.hist_alpha = .5
         self.CI_color = 'mediumseagreen'
         self.error_color = 'k'
         self.fontname = 'serif'
