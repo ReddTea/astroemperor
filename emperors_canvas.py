@@ -55,7 +55,7 @@ class CourtPainter:
         self.time_cb = copy.deepcopy(self.time) - 2450000
 
         # Create directories.
-        dirs = ['chains', 'posteriors', 'histograms']
+        dirs = ['chains', 'posteriors', 'histograms', 'corners']
         print('\nCREATING SHOWROOMS.')
         for d in dirs:
             path = self.working_dir + d
@@ -876,7 +876,12 @@ class CourtPainter:
                 for tick in axes[-1, -1].xaxis.get_major_ticks():
                     tick.label.set_fontsize(self.corner_tick_fontsize)
                     tick.label.set_fontname(self.fontname)
-            fig.show()
+            if self.pdf:
+                plt.savefig(self.working_dir + 'corners/' +
+                            'corner_K' + str(k + 1) + '.pdf')
+            if self.png:
+                plt.savefig(self.working_dir + 'corners/' +
+                            'corner_K' + str(k + 1) + '.png')
         pass
 
     def __read_config(self):
