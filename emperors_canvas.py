@@ -242,7 +242,7 @@ class CourtPainter:
                 fig.savefig(self.working_dir + 'phase_fold_' +
                             str(k + 1) + '.png', bbox_inches='tight')
 
-        pass
+        plt.close('all')
 
     def paint_timeseries(self):
         """Create timeseries plot."""
@@ -367,7 +367,7 @@ class CourtPainter:
             if self.png:
                 fig.savefig(self.working_dir + 'timeseries_' +
                             str(k + 1) + '.png', bbox_inches='tight')
-        pass
+        plt.close('all')
 
     def paint_chains(self):
         """Create traceplots or chain plots for each temperature."""
@@ -484,7 +484,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        pass
+        plt.close('all')
 
     def paint_posteriors(self):
         """Create posterior plots."""
@@ -618,7 +618,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        pass
+        plt.close('all')
 
     def paint_histograms(self):
         """Create histograms."""
@@ -796,7 +796,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        pass
+        plt.close('all')
 
     def paint_corners(self):
         """Create corner plots. Cold chain only."""
@@ -882,7 +882,7 @@ class CourtPainter:
             if self.png:
                 plt.savefig(self.working_dir + 'corners/' +
                             'corner_K' + str(k + 1) + '.png')
-        pass
+        plt.close('all')
 
     def __read_config(self):
         """Read configuration file for plotting."""
