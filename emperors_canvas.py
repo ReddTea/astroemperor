@@ -38,6 +38,9 @@ class CourtPainter:
         self.pdf = pdf
         self.png = png
 
+        if self.pdf:
+            print('\nWARNING: pdf output might be slow for long chains.')
+
         # Read chains, posteriors and data for plotting.
         self.chains = emplib.read_chains(working_dir + 'chains.pkl')
         self.cold = self.chains[0]
