@@ -428,17 +428,6 @@ class CourtPainter:
                             fontsize=self.label_fontsize
                         )
                         counter += 1
-
-                    if self.pdf:
-                        plt.savefig(self.working_dir + 'chains/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    if self.png:
-                        plt.savefig(self.working_dir + 'chains/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    ins_count += 1
-                    ins += 1 if ins_count % 2 == 0 else 0
                 else:
 
                     if pcount <= self.kplanets:
@@ -562,17 +551,6 @@ class CourtPainter:
                             fontsize=self.label_fontsize
                         )
                         counter += 1
-
-                    if self.pdf:
-                        plt.savefig(self.working_dir + 'posteriors/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    if self.png:
-                        plt.savefig(self.working_dir + 'posteriors/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    ins_count += 1
-                    ins += 1 if ins_count % 2 == 0 else 0
                 else:
 
                     if pcount <= self.kplanets:
@@ -739,18 +717,6 @@ class CourtPainter:
                             fontsize=self.label_fontsize
                         )
                         counter += 1
-
-                    if self.pdf:
-                        plt.savefig(self.working_dir + 'histograms/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    if self.png:
-                        plt.savefig(self.working_dir + 'histograms/' + title
-                                    + '_INS' + str(ins) + '_' + str(t)
-                                    + 'T_K0.pdf')
-                    ins_count += 1
-                    ins += 1 if ins_count % 2 == 0 else 0
-
                 else:
 
                     if pcount <= self.kplanets:
