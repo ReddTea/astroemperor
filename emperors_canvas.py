@@ -39,7 +39,7 @@ class CourtPainter:
         self.png = png
 
         if self.pdf:
-            print('\nWARNING: pdf output might be slow for long chains.')
+            print('\n\t\tWARNING: pdf output might be slow for long chains.')
 
         # Read chains, posteriors and data for plotting.
         self.chains = emplib.read_chains(working_dir + 'chains.pkl')
@@ -59,7 +59,7 @@ class CourtPainter:
 
         # Create directories.
         dirs = ['chains', 'posteriors', 'histograms', 'corners']
-        print('\nCREATING SHOWROOMS.')
+        print('\n\t\tCREATING SHOWROOMS.')
         for d in dirs:
             path = self.working_dir + d
             try:
@@ -126,7 +126,9 @@ class CourtPainter:
 
     def paint_fold(self):
         """Create phasefold plot."""
-        print('\nPAINTING PHASE FOLDS.')
+        print('\n\t\tPAINTING PHASE FOLDS.')
+        if not self.kplanets:
+            print('\n\t\tNo planets to paint.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
@@ -249,7 +251,9 @@ class CourtPainter:
 
     def paint_timeseries(self):
         """Create timeseries plot."""
-        print('\nPAINTING TIMESERIES.')
+        print('\n\t\tPAINTING TIMESERIES.')
+        if not self.kplanets:
+            print('\n\t\tNo planets to paint.')
         # Get globbal max and min for plots
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
@@ -374,7 +378,7 @@ class CourtPainter:
 
     def paint_chains(self):
         """Create traceplots or chain plots for each temperature."""
-        print('\nPAINTING CHAINS.')
+        print('\n\t\tPAINTING CHAINS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
             chain = self.chains[t]
 
@@ -415,7 +419,7 @@ class CourtPainter:
                 cb.ax.tick_params(labelsize=self.tick_labelsize)
 
                 # plot only accel and instrumental chains.
-                if self.kplanets == 0:
+                if not self.kplanets:
 
                     if i == 0:
                         title = self.chain_titles[5]
@@ -480,7 +484,7 @@ class CourtPainter:
 
     def paint_posteriors(self):
         """Create posterior plots."""
-        print('\nPAINTING POSTERIORS.')
+        print('\n\t\tPAINTING POSTERIORS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
             chain = self.chains[t]
             post = self.posteriors[t]
@@ -538,7 +542,7 @@ class CourtPainter:
                 )
 
                 # plot only accel and instrumental chains.
-                if self.kplanets == 0:
+                if not self.kplanets:
 
                     if i == 0:
                         title = self.chain_titles[5]
@@ -603,7 +607,7 @@ class CourtPainter:
 
     def paint_histograms(self):
         """Create histograms."""
-        print('\nPAINTING HISTOGRAMS.')
+        print('\n\t\tPAINTING HISTOGRAMS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
             chain = self.chains[t]
             post = self.posteriors[t]
@@ -704,7 +708,7 @@ class CourtPainter:
                 ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
                         * 0.330, r"$Mode ={}$".format(gmod), size=20)
 
-                if self.kplanets == 0:
+                if not self.kplanets:
 
                     if i == 0:
                         title = self.chain_titles[5]
@@ -769,9 +773,9 @@ class CourtPainter:
 
     def paint_corners(self):
         """Create corner plots. Cold chain only."""
-        print('\nPAINTING CORNERS.')
+        print('\n\t\tPAINTING CORNERS.')
         titles = ['P', 'K', r'$\phi$', 'e', r'$\omega$']
-        if self.kplanets == 0:
+        if not self.kplanets:
             print('No cornerplots for K0.')
             return
         for k in tqdm(range(self.kplanets), desc='Brush number'):
