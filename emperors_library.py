@@ -396,7 +396,7 @@ def ensure(condition, warning, MUSIC):
 
 def instigator(cherry_chain, cherry_post, all_data, saveplace):
     """Save chains and posteriors in a pickle file for later use."""
-    save_chains(cherry_chain_h, saveplace)
+    save_chains(cherry_chain, saveplace)
     save_posteriors(cherry_post, saveplace)
     save_rv_data(all_data, saveplace)
     pass
