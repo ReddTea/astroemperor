@@ -1,5 +1,5 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import scipy as sp
 from PyAstronomy.pyasl import MarkleyKESolver
@@ -46,41 +46,6 @@ def mini_RV_model(params, time):
     modelo = A * (sp.cos(f + w) + ecc * sp.cos(w))
     return modelo
 
-
-def transit_lightCurve(lc_params, time, fsigns, free_params, ld, *theta_j):
-    # (t0 radius dist inc), P, time, fsigns
-    #print 'flux1\n\n'  # PMPMPM
-    flux = 0.0
-    for i in range(fsigns):
-        params = batman.TransitParams()
-        nfp = len(free_params)
-        f_params = (nfp + ld) * fsig
-        if theta_j:
-            params.per = theta_j[3*i]
-            params.w = theta_j[3*i + 1]
-            params.ecc = theta_j[3*i + 2]
-        else:
-            params.per = lc_params[(nfp+ld)*(i+1) - 2]
-            params.w = lc_params[(nfp+ld)*(i+1) - 1]
-            params.ecc = lc_params[(nfp+ld)*(i+1)]
-        #params.per = P                       #orbital period in days
-        params.t0 = lc_params[(nfp+ld)*i]                       #time of inferior conjunction
-        params.rp = lc_params[(nfp+ld*i) + 1]                   #planet radius (in units of stellar radii)
-        params.a = lc_params[(nfp+ld*i) + 2]                      #semi-major axis (in units of stellar radii)
-        params.inc = lc_params[(nfp+ld*i) + 3]                     #orbital inclination (in degrees)
-        #params.ecc = 0.                      #eccentricity
-
-        #params.w = 0.                        #longitude of periastron (in degrees)
-        u = []
-        for j in range(ld):
-            u.append(lc_params[nfp+j + (nfp+ld)*i])
-        params.u = u                #limb darkening coefficients [u1, u2]
-        params.limb_dark = "quadratic"       #limb darkening model
-
-        m = batman.TransitModel(params, time)    #initializes model
-        flux += m.light_curve(params)          #calculates light curve
-    #print flux, 'flux2\n\n'  # PMPMPM
-    return (flux)
 
 #lc_params, time, fsigns, free_params, ld, *theta_j
 def mini_transit(lc_params, time, fsigns, free_params, ld, *theta_j):
@@ -438,6 +403,7 @@ def neo_logl_rv(theta, paramis):
     lnl = sp.sum(residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
     return -0.5 * lnl
 
+
 def neo_logp_pm(theta, params):
     _theta, ndim, C = params
     c, lp = 0, 0.
@@ -446,8 +412,6 @@ def neo_logp_pm(theta, params):
         lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
     return lp
 
-
-glob_asd = 0
 def neo_logl_pm(theta, paramis):
     _t, AC, params = paramis
     time, flux, err = params[0], params[1], params[2]
@@ -460,50 +424,39 @@ def neo_logl_pm(theta, paramis):
     #logl_params = sp.array([self.time_pm, self.rv_pm, self.err_pm,
     #                        self.ins_pm, kplan, self.nins_pm])
     # 0 correct for fixed values
+    theta1 = theta.astype(float)
     for a in AC:
-        theta = sp.insert(theta, a, _t[a].val)
+        theta1 = sp.insert(theta1, a, _t[a].val)
 
     # 1 armar el modelo con batman, es decir, llamar neo_lc
+    theta_b = theta1[:-len(gp)]
+    theta_g = theta1[-len(gp):]
 
-    model = neo_lightcurve(theta, params)
+    params_b = time, kplanets, ld, batman_m, batman_p
+    model = neo_lightcurve(theta_b, params_b)
     # 2 calcular res
-    PM_residuals = flux - model  # why some people do the *1e6
+    PM_residuals = flux - model  # why some people do the *1e6  # DEL
+    #raise Exception('Debug')
+
     # 3 invocar likelihood usando george (puede ser otra func),
     # pero lo haré abajo pq why not
-
     # 4 armar kernel, hacer GP(kernel), can this be done outside?!
-    theta_gp = theta[-len(gp):]
+    #theta_gp = theta1[-len(gp):]
     #theta_gp[1] = 10 ** theta_gp[1]  # for k_r in Matern32Kernel
-    gp.set_parameter_vector(theta_gp)  # last <gp> params, check for fixed shit?
+    theta_g[-1] = 10.**theta_g[-1]
+    gp.set_parameter_vector(theta_g)  # last <gp> params, check for fixed shit?
+    #raise Exception('debug')
     # should be jitter with err
     #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
+    gp.compute(time, err)
     if gaussian_processor == 'george':
-        return -gp.lnlikelihood(PM_residuals, quiet=True)  # george
+        return gp.lnlikelihood(PM_residuals, quiet=True)  # george
     if gaussian_processor == 'celerite':
         try:
-            return -gp.log_likelihood(PM_residuals)  # celerite
+            return gp.log_likelihood(PM_residuals)  # celerite
         except:
             return -sp.inf
-    '''
-    try:
-        # check which is which in gp
-        gp.compute(t, sp.sqrt(err**2+theta_gp[0]**2))
-        global glob_asd
-        print('correct iter= ', glob_asd)
-        glob_asd +=1
-    except:
-        return -sp.inf
-    '''
-    pass
 
-
-
-    # try el gp.compute y ret gp.like(res)
-
-
-    # create noise model
-    # t1^2*exp(-0.5*r^2/t2)
-    # check vals
     #this should go outside
     '''
     kernel = t1 ** 2 * kernels.ExpSquaredKernel(t2 ** 2)
@@ -522,11 +475,10 @@ def neo_lightcurve(theta, params):
     #['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
     #         'Eccentricity', 'Longitude', 'LD coef']
     #_t, AC, params = params
-    time, flux, err = params[0], params[1], params[2]
-    ins, kplanets, nins = params[3], params[4], params[5]
-    ld, batman_m, batman_p = params[6], params[7], params[8]
+    time, kplanets = params[0], params[1]
+    ld, batman_m, batman_p = params[2], params[3], params[4]
 
-    flux = 0.0
+    flux = sp.zeros(len(time))
     #  thetas go in corrected
 
     for k in range(kplanets):
@@ -540,39 +492,18 @@ def neo_lightcurve(theta, params):
         batman_p[k].inc = theta[np + 4]
         batman_p[k].ecc = theta[np + 5]
         batman_p[k].w = theta[np + 6]
-        # batman_p[k].limb_dark = ld_mod  # this is done outside!
         batman_p[k].u = theta[np + 7:np + 7 + ld[k]]
-
-        ###
-        # should be outside, initialize when p0 is made
-        #params = batman.TransitParams()  # esto va afuera! solo 1 vez, usar parametros que sirvan
-        #m = batman.TransitModel(params, time)  # initializes model
-        ###
         flux += batman_m[k].light_curve(batman_p[k])  # calculates light curve
+    #raise Exception('dasd')  # DEL
     return flux
 
-def neo_model_pm(t, ld_mod, ldn):
-    '''
-    initializes batman
-    '''
-    n = {'t0': 0., 'per': 1., 'rp': 0.1, 'a': 15.,
-         'inc': 87., 'ecc':0., 'w':90.}
-    params = batman.TransitParams()
-    for x in n:
-        setattr(params, x, n[x])
-    params.limb_dark = ld_mod  # limb darkening model
-    ld_coefs = sp.ones(ldn)  # dummy coefficients
 
-    params.u = ld_coefs
-    model = batman.TransitModel(params, t)
-    return model, params
-
-K = {'Constant': 1. ** 2,
+K = {'Constant': 2. ** 2,
      'ExpSquaredKernel': kernels.ExpSquaredKernel(metric=1.**2),
      'ExpSine2Kernel': kernels.ExpSine2Kernel(gamma=1.0, log_period=1.0),
      'Matern32Kernel': kernels.Matern32Kernel(2.)}
 
-def neo_kernel(kernels):
+def neo_init_george(kernels):
     '''
     kernels should be a matrix
     rows +, columns *, ie
@@ -590,6 +521,8 @@ def neo_kernel(kernels):
             for func in kernels[i]:
                 k *= K[func]
             k_out += k
+    #gp = george.GP(k_out)
+    #should return gp but check for wn
     return k_out
 
 
