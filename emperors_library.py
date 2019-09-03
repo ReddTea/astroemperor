@@ -111,10 +111,8 @@ class DATA:
                 self.totcornum = sp.sum(rvdat.cornum)  # quantity if star activity indices
                 self.starflag = sp.array([sp.array([i for _ in range(len(rvdat.cornum[i]))]) for _ in range(len(rvdat.cornum))])  # backwards compatibility
                 self.rvfiles = stardat[0]
-
                 self.nins = len(self.rvfiles)  # number of instruments autodefined
                 self.ndat = len(self.time)  # number of datapoints
-
                 # PM
                 pmdat = emplib.DATA(stardat[1])
                 self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = pmdat.rv_sorted  # just the fname its pm rly
@@ -122,7 +120,6 @@ class DATA:
                 self.staract_pm = pmdat.activity  # time, star activity index and flag
                 self.totcornum_pm = pmdat.cornum  # ?
                 self.pmfiles = stardat[1]
-
                 self.nins_pm = len(self.pmfiles)
                 self.ndat_pm = len(self.time_pm)
                 self.fsig = 1
@@ -134,10 +131,8 @@ class DATA:
                 self.staract = rvdat.activity  # time, star activity index and flag
                 self.totcornum = rvdat.cornum  # quantity if star activity indices
                 self.rvfiles = stardat
-
                 self.nins = len(self.rvfiles)  # number of instruments autodefined
                 self.ndat = len(self.time)  # number of datapoints
-
                 # PM
                 self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
                 self.totcornum_pm = 0.
@@ -145,9 +140,7 @@ class DATA:
 
 
 def read_data_f(instruments):
-    '''
-    Data pre-processing
-    '''
+    """Pre-process data."""
     fnins = len(instruments)
     instruments = sp.array([sp.loadtxt('datafiles/' + x) for x in instruments])
 
@@ -494,7 +487,6 @@ def credibility_interval(post, alpha=.68):
         interval.
     alpha : float, optional
         Confidence level.
-
     Returns:
     --------
     med : float
