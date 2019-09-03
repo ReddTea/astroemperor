@@ -635,25 +635,16 @@ class EMPIRE:
         print('\n --------------------- BURN IN --------------------- \n')
 
         pbar = tqdm(total=self.burn_out)
-<<<<<<< HEAD
-
-=======
->>>>>>> development
         for p, lnprob, lnlike in self.sampler.sample(pos0, iterations=self.burn_out):
             pbar.update(1)
             pass
         pbar.close()
 
         p0, lnprob0, lnlike0 = p, lnprob, lnlike
-<<<<<<< HEAD
-        print("\nMean acceptance fraction: {0:.3f}".format(sp.mean(self.sampler.acceptance_fraction)))
-        assert sp.mean(self.sampler.acceptance_fraction) != 0, 'Mean acceptance fraction = 0 ! ! !'
-=======
         print("\nMean acceptance fraction: {0:.3f}".format(
             sp.mean(self.sampler.acceptance_fraction)))
         emplib.ensure(sp.mean(self.sampler.acceptance_fraction) !=
                       0, 'Mean acceptance fraction = 0 ! ! !', fault)
->>>>>>> development
         self.sampler.reset()
 
         print('\n ---------------------- CHAIN ---------------------- \n')
