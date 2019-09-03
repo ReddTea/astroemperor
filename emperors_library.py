@@ -140,9 +140,7 @@ class DATA:
 
 
 def read_data_f(instruments):
-    '''
-    Data pre-processing
-    '''
+    """Pre-process data."""
     fnins = len(instruments)
     instruments = sp.array([sp.loadtxt('datafiles/' + x) for x in instruments])
 
@@ -448,6 +446,7 @@ def read_rv_data(in_dir):
 
 def phasefold(time, rv, err, period):
     """Phasefold an rv timeseries with a given period.
+
     Parameters
     ----------
     time : array_like
@@ -458,6 +457,7 @@ def phasefold(time, rv, err, period):
         An array containing the radial-velocity uncertainties.
     period : float
         The period with which to phase fold.
+
     Returns
     -------
     time_phased : array_like
@@ -466,6 +466,7 @@ def phasefold(time, rv, err, period):
         The phased RVs.
     err_phased : array_like
         The phased RV uncertainties.
+
     """
     phases = (time / period) % 1
     sortIndi = sp.argsort(phases)  # sorts the points
@@ -478,6 +479,7 @@ def phasefold(time, rv, err, period):
 
 def credibility_interval(post, alpha=.68):
     """Calculate bayesian credibility interval.
+
     Parameters:
     -----------
     post : array_like
@@ -493,6 +495,7 @@ def credibility_interval(post, alpha=.68):
         Lower part of the credibility interval.
     up : float
         Upper part of the credibility interval.
+
     """
     lower_percentile = 100 * (1 - alpha) / 2
     upper_percentile = 100 * (1 + alpha) / 2
