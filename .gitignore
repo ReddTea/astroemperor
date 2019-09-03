@@ -1,5 +1,6 @@
 datalogs/
 datafiles/
+tests/
 # Editors
 .vscode/
 .idea/
