@@ -70,12 +70,8 @@ class DATA:
         self.cornum = sp.array([])
 
         for i in range(self.nins):  # stack all data
-<<<<<<< HEAD
-            dat0, dat1, cornum = self.insert_labels(self.all_data[i], i)  # rvs, activities
-=======
             dat0, dat1, cornum = self.insert_labels(
                 self.all_data[i], i)  # rvs, activities
->>>>>>> development
             print(dat1, cornum)
             if i == 0:
                 self.rv = dat0
@@ -115,10 +111,8 @@ class DATA:
                 self.totcornum = sp.sum(rvdat.cornum)  # quantity if star activity indices
                 self.starflag = sp.array([sp.array([i for _ in range(len(rvdat.cornum[i]))]) for _ in range(len(rvdat.cornum))])  # backwards compatibility
                 self.rvfiles = stardat[0]
-
                 self.nins = len(self.rvfiles)  # number of instruments autodefined
                 self.ndat = len(self.time)  # number of datapoints
-
                 # PM
                 pmdat = emplib.DATA(stardat[1])
                 self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = pmdat.rv_sorted  # just the fname its pm rly
@@ -126,7 +120,6 @@ class DATA:
                 self.staract_pm = pmdat.activity  # time, star activity index and flag
                 self.totcornum_pm = pmdat.cornum  # ?
                 self.pmfiles = stardat[1]
-
                 self.nins_pm = len(self.pmfiles)
                 self.ndat_pm = len(self.time_pm)
                 self.fsig = 1
@@ -138,10 +131,8 @@ class DATA:
                 self.staract = rvdat.activity  # time, star activity index and flag
                 self.totcornum = rvdat.cornum  # quantity if star activity indices
                 self.rvfiles = stardat
-
                 self.nins = len(self.rvfiles)  # number of instruments autodefined
                 self.ndat = len(self.time)  # number of datapoints
-
                 # PM
                 self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
                 self.totcornum_pm = 0.
@@ -202,27 +193,9 @@ def pt_pos(setup, *args):
         inslims, acc_lims, MOAV = args[3], args[4], args[5]
         totcornum, PACC = args[6], args[7]
 
-<<<<<<< HEAD
-def gaussian(x, sigma):
-    coef = -(x*x)/(2*sigma*sigma)
-    return 1/np.sqrt(2*np.pi*sigma*sigma) * np.exp(coef)
-
-
-def pt_pos(setup, *args):
-
-    if args:
-        kplanets, nins, boundaries = args[0], args[1], args[2]
-        inslims, acc_lims, MOAV = args[3], args[4], args[5]
-        totcornum, PACC = args[6], args[7]
-
-    ntemps, nwalkers, nsteps = setup
-    k_params = 5 * kplanets
-    i_params = nins*2*(MOAV+1)
-=======
     ntemps, nwalkers, nsteps = setup
     k_params = 5 * kplanets
     i_params = nins * 2 * (MOAV + 1)
->>>>>>> development
 
     ndim = 1 + k_params + i_params + totcornum + PACC
     pos = sp.zeros((nwalkers, ndim))
@@ -232,27 +205,17 @@ def pt_pos(setup, *args):
     for j in range(ndim):
         if j < k_params:
             k += 2
-<<<<<<< HEAD
-            if j%5==0:
-                fact = sp.absolute(boundaries[k] - boundaries[k+1]) / nwalkers
-=======
             if j % 5 == 0:
                 fact = sp.absolute(
                     boundaries[k] - boundaries[k + 1]) / nwalkers
->>>>>>> development
             else:
                 #fact = sp.absolute(boundaries[k]) / (self.nwalkers)
                 fact = (sp.absolute(
                     boundaries[k] - boundaries[k + 1]) * 2) / (5 * nwalkers)
             dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
             for i in range(nwalkers):
-<<<<<<< HEAD
-                if j%5==0:
-                    pos[i][j] = boundaries[k] + (dif[i] + fact/2.0)
-=======
                 if j % 5 == 0:
                     pos[i][j] = boundaries[k] + (dif[i] + fact / 2.0)
->>>>>>> development
                 else:
                     #pos[i][j] = boundaries[k] * 0.5 + (dif[i] + fact/2.0)
                     pos[i][j] = (boundaries[k + 1] + 3 *
@@ -276,14 +239,9 @@ def pt_pos(setup, *args):
             fact = sp.absolute(inslims[l] - inslims[l + 1]) / nwalkers
             dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
 
-<<<<<<< HEAD
-            if (j-k_params-1-PACC) % i_params == 0:  # ojo aqui
-                jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
-=======
             if (j - k_params - 1 - PACC) % i_params == 0:  # ojo aqui
                 jitt_ini = sp.sort(
                     sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
->>>>>>> development
                 dif = jitt_ini * sp.random.uniform(0.9, 0.999)
 
             for i in range(nwalkers):
@@ -303,14 +261,10 @@ def pt_pos(setup, *args):
     return pos
 
 
-<<<<<<< HEAD
-def pt_pos_4(setup, *args):
-=======
 def pt_pos_rvpm(setup, *args):
     '''
     MAKE A WAY TO DIFFERENTIATE BETWEEN RV AND RVPM
     '''
->>>>>>> development
 
     if args:
         kplanets, nins, boundaries = args[0], args[1], args[2]
@@ -402,83 +356,6 @@ def neo_p0(setup, *args):
 
     pos = sp.zeros((nwalkers, ndim))
 
-<<<<<<< HEAD
-    pos = sp.array([pos for _ in range(ntemps)])
-    return pos
-
-
-def pt_pos_rvpm(setup, *args):
-    '''
-    MAKE A WAY TO DIFFERENTIATE BETWEEN RV AND RVPM
-    '''
-
-    if args:
-        kplanets, nins, boundaries = args[0], args[1], args[2]
-        inslims, acc_lims, MOAV = args[3], args[4], args[5]
-        totcornum, PACC = args[6], args[7]
-    ntemps, nwalkers, nsteps = setup
-
-    k_params = 5 * kplanets
-    i_params = nins*2*(MOAV+1)
-    fsig, lenppm, nins_pm, boundaries_pm = args[-4:]  # PM ONLY
-    ndim = k_params + i_params + totcornum + PACC + 1
-    if kplanets > 0:
-        if args:
-            ndim += fsig*lenppm
-    pos = sp.zeros((nwalkers, ndim))
-    k, kk = -2, -2
-    l, ll = -2, -2
-
-    for j in range(ndim):
-        if j < k_params:  # planetary params
-            k += 2
-            if j%5==0:
-                fact = sp.absolute(boundaries[k] - boundaries[k+1]) / nwalkers
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-                pos[:, j] = boundaries[k] + (dif + fact/2.0)
-                act0 = pos
-            else:
-                fact = (sp.absolute(boundaries[k] - boundaries[k+1]) * 2) / (5 * nwalkers)
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-                pos[:, j] = (boundaries[k+1]+3*boundaries[k])/4 + (dif + fact/2.0)
-                act1 = pos
-        if j == k_params:  # acc
-            fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-            pos[:, j] = acc_lims[0] + (dif + fact/2.0)
-        if PACC:  # pacc
-            if j == k_params + PACC:  # parabolic accel
-                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-                pos[:, j] = acc_lims[0] + (dif + fact/2.0)
-        act2 = pos
-        # instruments
-        if k_params + PACC < j < k_params + i_params + 1 + PACC:
-            l += 2
-            fact = sp.absolute(inslims[l] - inslims[l+1]) / nwalkers
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-
-            if (j-k_params-1-PACC) % i_params == 0:  # ojo aqui
-                jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
-                dif = jitt_ini * sp.random.uniform(0.9, 0.999)
-
-            for i in range(nwalkers):
-                pos[i][j] = inslims[l] + (dif[i] + fact/2.0)
-        if totcornum:
-            if k_params + i_params + PACC < j < k_params + i_params + totcornum + PACC + 1:
-                fact = sp.absolute(acc_lims[0] - acc_lims[1]) / nwalkers
-
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.8, 0.999)
-                for i in range(nwalkers):
-                    pos[i][j] = acc_lims[0] + (dif[i] + fact/2.0)
-        if kplanets > 0 and k_params + i_params + totcornum + PACC < j:
-            if args:  # pm thingy
-                kk += 2
-                fact = sp.absolute(boundaries_pm[kk] - boundaries_pm[kk+1]) / nwalkers
-                dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.999)
-                pos[:, j] = (boundaries_pm[kk+1] + 3*boundaries_pm[kk])/4 + (dif + fact/2.)
-
-=======
     for j in range(ndim):
         boundaries = t[C[j]].lims
         fact = sp.absolute(boundaries[0] - boundaries[1]) / nwalkers
@@ -498,44 +375,10 @@ def pt_pos_rvpm(setup, *args):
         else:
             for i in range(nwalkers):
                 pos[i][j] = boundaries[0] + (dif[i] + fact / 2.0)
->>>>>>> development
-    pos = sp.array([pos for h in range(ntemps)])
-
-
-    return pos
-
-
-<<<<<<< HEAD
-def neo_p0(setup, *args):
-    ntemps, nwalkers, nsteps = setup
-    t = args[0]
-    ndim = args[1]
-    pos = sp.zeros((nwalkers, ndim))
-
-    for j in range(ndim):
-        boundaries = t[j].lims
-        rnd = sp.random.uniform(0.9, 0.999)
-        fact = sp.absolute(boundaries[0]-boundaries[1]) / nwalkers
-        dif = sp.arange(nwalkers) * fact * rnd
-        if t[j].prior=='uniform_spe' or t[j].prior=='joined':
-            for i in range(nwalkers):
-                pos[i][j] = (boundaries[1]+3*boundaries[0])/4 + (dif[i]*2./5. + fact/2.0)
-        elif t[j].name.split('_')[0]=='Jitter':
-            jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
-            dif = jitt_ini * rnd
-            for i in range(nwalkers):
-                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
-
-        else:
-            for i in range(nwalkers):
-                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
     pos = sp.array([pos for h in range(ntemps)])
     return pos
 
 
-
-#
-=======
 def ensure(condition, warning, MUSIC):
     try:
         assert condition
@@ -605,7 +448,6 @@ def read_rv_data(in_dir):
 
 def phasefold(time, rv, err, period):
     """Phasefold an rv timeseries with a given period.
-
     Parameters
     ----------
     time : array_like
@@ -616,7 +458,6 @@ def phasefold(time, rv, err, period):
         An array containing the radial-velocity uncertainties.
     period : float
         The period with which to phase fold.
-
     Returns
     -------
     time_phased : array_like
@@ -625,7 +466,6 @@ def phasefold(time, rv, err, period):
         The phased RVs.
     err_phased : array_like
         The phased RV uncertainties.
-
     """
     phases = (time / period) % 1
     sortIndi = sp.argsort(phases)  # sorts the points
@@ -638,7 +478,6 @@ def phasefold(time, rv, err, period):
 
 def credibility_interval(post, alpha=.68):
     """Calculate bayesian credibility interval.
-
     Parameters:
     -----------
     post : array_like
@@ -646,7 +485,6 @@ def credibility_interval(post, alpha=.68):
         interval.
     alpha : float, optional
         Confidence level.
-
     Returns:
     --------
     med : float
@@ -655,7 +493,6 @@ def credibility_interval(post, alpha=.68):
         Lower part of the credibility interval.
     up : float
         Upper part of the credibility interval.
-
     """
     lower_percentile = 100 * (1 - alpha) / 2
     upper_percentile = 100 * (1 + alpha) / 2
@@ -663,4 +500,3 @@ def credibility_interval(post, alpha=.68):
         post, [lower_percentile, 50, upper_percentile]
     )
     return med, low, up
->>>>>>> development

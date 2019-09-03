@@ -666,19 +666,14 @@ class EMPIRE:
         pass
         '''
         ln_post = self.sampler.lnprobability
-
         posteriors = sp.array([ln_post[i].reshape(-1) for i in range(self.ntemps)])
         chains = self.sampler.flatchain
-
         best_post = posteriors[0] == np.max(posteriors[0])
         #raise ImportError
-
         thetas_raw = sp.array([chains[i] for i in range(self.ntemps)])
         thetas_hen = sp.array([empmir.henshin(chains[i], kplan) for i in sp.arange(self.ntemps)])
-
         ajuste_hen = thetas_hen[0][best_post][0]
         ajuste_raw = thetas_raw[0][best_post][0]
-
         interesting_loc = sp.array([max(posteriors[temp]) - posteriors[temp] < self.bayes_factor for temp in sp.arange(self.ntemps)])
         interesting_thetas = sp.array([thetas_hen[temp][interesting_loc[temp]] for temp in sp.arange(self.ntemps)])
         thetas_hen = sp.array([thetas_hen[temp] for temp in sp.arange(self.ntemps)])
@@ -791,9 +786,7 @@ class EMPIRE:
             '''
             # INITIALIZE GENERAL PARAMS
             self._theta_gen_pm(acc_bnd, None)
-
             # INITIALIZE INSTRUMENT PARAMS
-
             for nin in range(self.nins_pm):
                 moav_bnd = sp.array([(-1.0, 1.0, 0.1, 10) for _ in range(self.MOAV_pm[nin])]).reshape(-1)
                 ins_bnd = sp.append(jitoff_bnd, moav_bnd).reshape(-1)
@@ -1201,7 +1194,6 @@ em.changes_list = {:['t0', 'prior', 'fixed'],
 em.changes_list = {0:['Period', 'lims', 4.0943445, 4.1271343],
                    1:['Period_2', 'lims', 3.38, 3.42]
                    }
-
 em.changes_list = {0:['Period', 'prior', 'fixed'],
                    1:['Period', 'val', 3.93],
                    2:['Inclination', 'prior', 'fixed'],
@@ -1223,8 +1215,6 @@ em.changes_list = {0:['Period', 'prior', 'fixed'],
 array(['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
        'Eccentricity', 'Longitude', 'coef1', 'coef2', 'Jitter',
        'kernel0_0', 'kernel0_1'], dtype='<U14')
-
 array(['213482777044.7721', '24.73712', '1167549.8787819578', '-inf',
        '89.912', '0.0', '0.0', '0.1', '0.3', '-11.316116337221487',
        '24.096249121805645', '32.28733028116761']
-'''
