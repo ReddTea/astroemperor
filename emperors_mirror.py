@@ -198,7 +198,6 @@ from george import kernels
 from george.modeling import Model
 '''
 class neo_model_PM(Model):
-
     ###
     names = ['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
              'Eccentricity', 'Longitude']
@@ -211,7 +210,6 @@ class neo_model_PM(Model):
              'Eccentricity', 'Longitude']
     names_ld = ['coef%i' %(i+1) for i in range(ldn)]
     parameter_names = tuple(names+names_ld)
-
     def get_value(self, t):
         pass
 '''
@@ -490,7 +488,6 @@ def neo_logl_pm(theta, paramis):
     jitt = george.modeling.ConstantModel(sp.log((1e-4)**2.))
     gp = george.GP(kernel, mean=0.0, fit_mean=False, white_noise=jitt,
                    fit_white_noise=True)
-
     gp.compute(time)
     #likelihood
     gp.set_parameter_vector(p)
@@ -588,34 +585,3 @@ def neo_term(terms):
                     t *= T[func]
             t_out += t
     return t_out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#

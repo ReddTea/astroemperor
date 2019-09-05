@@ -1,1379 +1,899 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+from __future__ import division, print_function
+
+import copy
+import os
 from decimal import Decimal  # histograms
 
-import corner
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import scipy as sp
-from PyAstronomy.pyasl import foldAt
 from scipy.stats import norm
 from tqdm import tqdm
 
+import corner
+import emperors_library as emplib
 import emperors_mirror as empmir
 
 
-def plot1(thetas, flattened, plug, plug2, temp, ticknum=10):
-    setup, kplanets, nins, totcornum, saveplace, MOAV, PACC = plug
-    HISTOGRAMS, CORNER, STARMASS, PNG, PDF, thin, draw_every_n = plug2
-          #CORNER_MASK, CORNER_K, CORNER_I
-    def gaussian(x, mu, sig):
-        return sp.exp(-sp.power((x - mu) / sig, 2.) / 2.)
-
-    def plot(thetas, flattened, temp, kplanets, CORNER=False, ticknum=ticknum):
-        ndim = 1 + 5 * kplanets + nins * 2 * (MOAV + 1) + totcornum + PACC
-        ntemps, nwalkers, nsteps = setup
-
-        titles = sp.array(["Period", "Amplitude", "Longitude", "Phase", "Eccentricity",
-                           'Acceleration', 'Jitter', 'Offset', 'MACoefficient', 'MATimescale', 'Stellar Activity'])
-        units = sp.array([" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", " $[rads]$", "", ' $[\\frac{m}{s^2}]$',
-                          ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' [Days]', ''])
-
-        p_titles = sp.array(['p_Amplitude', 'p_phase', 'p_ecc'])
-
-        leftovers = len(thetas) % nwalkers
-        if leftovers == 0:
-            pass
-        else:
-            thetas = thetas[:-leftovers]
-            flattened = flattened[:-(len(flattened) % nwalkers)]
-        quasisteps = len(thetas) // nwalkers
-
-        color = sp.arange(quasisteps)
-        colores = sp.array([color for i in range(nwalkers)]).reshape(-1)
-        i = 0
-        sorting = sp.arange(len(thetas))
-
-        subtitles, namen = sp.array([]), sp.array([])
-
-        for k in range(kplanets):
-            subtitles = sp.append(
-                subtitles, [titles[i] + ' ' + str(k + 1) + units[i] for i in range(5)])
-            namen = sp.append(
-                namen, [titles[i] + '_' + str(k) for i in range(5)])
-
-        subtitles = sp.append(subtitles, titles[5] + units[5])  # for acc
-        namen = sp.append(namen, titles[5])  # for acc
-        if PACC:
-            subtitles = sp.append(subtitles, 'Parab Accel $[\\frac{m}{s}]$')
-            namen = sp.append(namen, 'Parab Accel')
-        for i in range(nins):
-            subtitles = sp.append(
-                subtitles, [titles[ii] + ' ' + str(i + 1) + units[ii] for ii in sp.arange(2) + 6])
-            namen = sp.append(
-                namen, [titles[ii] + '_' + str(i + 1) for ii in sp.arange(2) + 6])
-            for j in range(MOAV):
-                subtitles = sp.append(subtitles, [
-                                      titles[ii] + ' ' + str(i + 1) + ' ' + str(j + 1) + units[ii] for ii in sp.arange(2) + 8])
-                namen = sp.append(namen, [
-                                  titles[ii] + '_' + str(i + 1) + '_' + str(j + 1) for ii in sp.arange(2) + 8])
-
-        for h in range(totcornum):
-            subtitles = sp.append(subtitles, titles[-1] + ' ' + str(h + 1))
-            namen = sp.append(namen, titles[-1] + '_' + str(h + 1))
-
-        print('\n PLOTTING CHAINS for temperature ' + str(temp) + '\n')
-        pbar_chain = tqdm(total=ndim)
-        #############
-        for i in range(ndim):  # chains
-            fig, ax = plt.subplots(figsize=(12, 7))
-            if subtitles[i][:3] == 'Per':
-                pass
-
-            ydif = (max(thetas[:, i]) - min(thetas[:, i])) / 10.
-            ax.set(ylim=(min(thetas[:, i]) - ydif, max(thetas[:, i]) + ydif))
-
-            im = ax.scatter(
-                sorting, thetas[:, i], c=colores, lw=0., cmap='viridis', alpha=0.8)
-            plt.xlabel("N", fontsize=24)
-            plt.ylabel(subtitles[i], fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax)
-            lab = 'Step Number'
-
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-
-            cb.set_label('Step Number')
-            if PNG:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".pdf")
-
-            pbar_chain.update(1)
-            plt.close('all')
-        pbar_chain.close()
-
-        print('\n PLOTTING POSTERIORS for temperature ' + str(temp) + '\n')
-        pbar_post = tqdm(total=ndim)
-        for i in range(ndim):  # posteriors
-            fig1, ax1 = plt.subplots(figsize=(12, 7))
-
-            xdif1, ydif1 = (max(thetas[:, i]) - min(thetas[:, i])) / \
-                10., (max(flattened) - min(flattened)) / 10.
-            ax1.set(xlim=((min(thetas[:, i]) - xdif1), (max(thetas[:, i]) + xdif1)),
-                    ylim=((min(flattened) - ydif1), (max(flattened) + ydif1)))
-
-            im = ax1.scatter(thetas[:, i], flattened, s=10,
-                             c=colores, lw=0., cmap='viridis', alpha=0.8)
-
-            xaxis = ax1.get_xaxis()
-            xaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            yaxis = ax1.get_yaxis()
-            yaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            # yaxis.set_minor_locator(ticker.LinearLocator(numticks=5))
-            '''
-            if subtitles[i][:3] == 'Per':
-                ax1.set_xscale('log')
-                xaxis.set_major_locator(ticker.LogLocator(numticks=ticknum))
-            '''
-            ax1.axvline(thetas[sp.argmax(flattened), i],
-                        color='r', linestyle='--', linewidth=2, alpha=0.70)
-            # ax1.invert_yaxis()
-
-            plt.xlabel(subtitles[i], fontsize=24)
-            plt.ylabel("Posterior", fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax1)
-            lab = 'Step Number'
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-            cb.set_label(lab)
-
-            if PNG:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".pdf")
-            plt.close('all')
-
-            pbar_post.update(1)
-        pbar_post.close()
-
-        if HISTOGRAMS:
-            if kplanets == 0:
-                print('Sorry! No histograms here yet! We are working on it ! ')
-                pass
-            print('\n PLOTTING HISTOGRAMS for temperature ' + str(temp) + '\n')
-            lab = ['Period [d]', 'Amplitude [m/s]', r'$\phi$ [rads]',
-                   r'$\omega$ [rads]', 'Eccentricity', 'a [AU]', r'Msin(i) [$M_{\oplus}$]']
-            params = len(lab)
-            pbar_hist = tqdm(total=params * kplanets)
-            num_bins = 12
-            for k in range(kplanets):
-                per_s = thetas.T[5 * k] * 24. * 3600.
-                if STARMASS:
-                    semi = ((per_s**2.0) / ((4.0 * sp.pi**2.0) / (6.67e-11 *
-                                                                  STARMASS * 1.99e30)))**(1. / 3) / 1.49598e11  # AU!!
-                    Mass = thetas.T[5 * k + 1] / ((28.4 / sp.sqrt(1. - thetas.T[5 * k + 4]**2.)) * (
-                        STARMASS**(-0.5)) * (semi**(-0.5))) * 317.8  # Me!!
-                else:
-                    params = len(lab) - 2
-                for ii in range(params):
-                    if ii < 5:
-                        Per = thetas.T[5 * k + ii]
-                    if ii == 5:
-                        Per = semi
-                    if ii == 6:
-                        Per = Mass
-
-                    # Mean and sigma of distribution!!
-                    mu, sigma = norm.fit(Per)
-                    # first histogram of the data
-                    n, bins, patches = plt.hist(Per, num_bins, density=True)
-                    plt.close("all")  # We don't need the plot just data!!
-
-                    # Get the maximum and the data around it!!
-                    maxi = Per[sp.where(flattened == sp.amax(flattened))][0]
-                    dif = sp.fabs(maxi - bins)
-                    his_max = bins[sp.where(dif == sp.amin(dif))]
-
-                    res = sp.where(n == 0)[0]  # Find the zeros!!
-                    if res.size:
-                        if len(res) > 2:
-                            for j in range(len(res)):
-                                if res[j + 2] - res[j] == 2:
-                                    sub = j
-                                    break
-                        else:
-                            sub = res[0]
-
-                        # Get the data subset!!
-                        if bins[sub] > his_max:
-                            post_sub = flattened[sp.where(Per <= bins[sub])]
-                            Per_sub = Per[sp.where(Per <= bins[sub])]
-                        else:
-                            post_sub = flattened[sp.where(Per >= bins[sub])]
-                            Per_sub = Per[sp.where(Per >= bins[sub])]
-
-                    else:
-                        Per_sub = Per
-                        post_sub = flattened
-
-                    plt.subplots(figsize=(12, 7))  # Define the window size!!
-                    # redo histogram of the subset of data
-                    n, bins, patches = plt.hist(
-                        Per_sub, num_bins, density=True, facecolor='blue',
-                        alpha=0.5
-                    )
-                    mu, sigma = norm.fit(Per_sub)  # add a 'best fit' line
-                    var = sigma**2.
-                    # Some Stats!!
-                    skew = '%.4E' % Decimal(sp.stats.skew(Per_sub))
-                    kurt = '%.4E' % Decimal(sp.stats.kurtosis(Per_sub))
-                    gmod = '%.4E' % Decimal(bins[sp.where(n == sp.amax(n))][0])
-                    med = '%.4E' % Decimal(sp.median(Per_sub))
-                    # print 'The skewness, kurtosis, mean, and median of the data are {} : {} : {} : {}'.format(skew,kurt,gmod,med)
-
-                    # Make a model x-axis!!
-                    span = bins[len(bins) - 1] - bins[0]
-                    bins_x = ((sp.arange(num_bins * 100.) /
-                               (num_bins * 100.)) * span) + bins[0]
-
-                    # Renormalised to the histogram maximum!!
-                    y = gaussian(bins_x, mu, sigma) * sp.amax(n)
-
-                    axes = plt.gca()
-                    #y = mlab.normpdf(bins, mu, sigma)
-                    plt.plot(bins_x, y, 'r-', linewidth=3)
-
-                    # Tweak spacing to prevent clipping of ylabel
-                    plt.subplots_adjust(left=0.15)
-
-                    # axes.set_xlim([])
-                    axes.set_ylim([0., sp.amax(n) + sp.amax(n) * 0.7])
-
-                    axes.set_xlabel(lab[ii], size=15)
-                    axes.set_ylabel('Frequency', size=15)
-                    axes.tick_params(labelsize=15)
-
-                    plt.autoscale(enable=True, axis='x', tight=True)
-
-                    # Get the axis positions!!
-                    ymin, ymax = axes.get_ylim()
-                    xmin, xmax = axes.get_xlim()
-
-                    # Add a key!!
-                    mu_o = '%.4E' % Decimal(mu)
-                    sigma_o = '%.4E' % Decimal(sigma)
-                    var_o = '%.4E' % Decimal(var)
-
-                    axes.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
-                              * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$", size=25)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_1 ={}$".format(mu_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.255, r"$\sigma^2 ={}$".format(var_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.330, r"$\mu_3 ={}$".format(skew), size=20)
-
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_4 ={}$".format(kurt), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.255, r"$Median ={}$".format(med), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.330, r"$Mode ={}$".format(gmod), size=20)
-
-                    # ,bbox_inches='tight')
-                    plt.savefig(saveplace + '/hist_test' + temp +
-                                '_' + str(k) + '_' + str(ii) + '.pdf')
-                    plt.close('all')
-                    pbar_hist.update(1)
-
-            '''
-                if i < 5*kplanets and i%7==5:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'SMA'+".pdf")
-                if i < 5*kplanets and i%7==6:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'Mass'+".pdf")
-                else:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+namen[i]+".pdf")
-            '''
-
-            pbar_hist.close()
-
-        if CORNER:
-            # ndim = 1 + 5 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
-            try:
-                print('Plotting Corner Plot... May take a few seconds')
-                fig = corner.corner(thetas, labels=subtitles)
-                fig.savefig(saveplace + "/triangle.pdf")
-            except:
-                print('Corner Plot Failed!!')
-                pass  # corner
-        try:
-            plt.close('all')
-        except:
-            pass
-        pass
-
-    ntemps, nwalkers, nsteps = setup
-
-    for i in range(ntemps):
-        check_length = len(thetas[i]) // nwalkers
-        if check_length // draw_every_n < 100:
-            draw_every_n = 1
-
-        if i == 0:
-            try:
-                plot(thetas[0][::draw_every_n], flattened[0]
-                     [::draw_every_n], '0', kplanets, CORNER=CORNER)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for the cold chain!')
-                pass
-        else:
-            try:
-                plot(thetas[i][::draw_every_n], flattened[i]
-                     [::draw_every_n], str(i), kplanets)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for temp ' + str(i) + ' ! !')
-                pass
-    pass
-
-
-def plot2(all_data, plug, fit, starflag, staract, ndat, SHOW=False):
-    setup, kplanets, nins, totcornum, saveplace, MOAV, PACC = plug
-
-    def phasefold(TIME, RV, ERR, PER):
-        phases = foldAt(TIME, PER, T0=0.0)
-        sortIndi = sp.argsort(phases)  # sorts the points
-        # gets the indices so we sort the RVs correspondingly(?)
-        Phases = phases[sortIndi]
-        rv_phased = RV[sortIndi]
-        err_phased = ERR[sortIndi]
-
-        return Phases, rv_phased, err_phased
-
-    def clear_noise(RV, theta_acc, theta_k, theta_i, theta_sa, staract, ndat):
-        '''
-        This should clean offset, add jitter to err
-        clear acc, red noise and stellar activity
-        '''
-        time, rv, err, ins = all_data
-
-        JITTER, OFFSET, MACOEF, MATS = sp.zeros(ndat), sp.zeros(ndat), sp.array(
-            [sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
-
-        for i in range(ndat):
-            jittpos = int(ins[i] * 2 * (MOAV + 1))
-            JITTER[i], OFFSET[i] = theta_i[jittpos], theta_i[jittpos + 1]
-            for j in range(MOAV):
-                MACOEF[j][i], MATS[j][i] = theta_i[jittpos + 2 *
-                                                   (j + 1)], theta_i[jittpos + 2 * (j + 1) + 1]
-
-        ERR = sp.sqrt(err ** 2 + JITTER ** 2)
-        tmin, tmax = sp.amin(time), sp.amax(time)
-
-        #RV0 = RV - OFFSET - ACC * (time - time[0])
-        if totcornum:
-            COR = sp.array([sp.array([sp.zeros(ndat) for k in range(
-                len(starflag[i]))]) for i in range(len(starflag))])
-            assert len(theta_sa) == totcornum, 'error in correlations'
-            AR = 0.0  # just to remember to add this
-            counter = -1
-
-            for i in range(nins):
-                for j in range(len(starflag[i])):
-                    counter += 1
-                    passer = -1
-                    for k in range(ndat):
-                        if starflag[i][j] == ins[k]:  #
-                            passer += 1
-                            COR[i][j][k] = theta_sa[counter] * \
-                                staract[i][j][passer]
-
-            FMC = 0
-            for i in range(len(COR)):
-                for j in range(len(COR[i])):
-                    FMC += COR[i][j]
-        else:
-            FMC = 0
-
-        if PACC:
-            ACC = theta_acc[0] * (time - time[0]) + \
-                theta_acc[1] * (time - time[0]) ** 2
-        else:
-            ACC = theta_acc[0] * (time - time[0])
-
-        MODEL = OFFSET + ACC + FMC
-
-        for k in sp.arange(kplanets):
-            MODEL += empmir.mini_RV_model(theta_k[5 * k:5 * (k + 1)], time)
-        residuals, MA = sp.zeros(ndat), sp.zeros(ndat)
-        for i in range(ndat):
-            residuals = RV - MODEL
-            for c in range(MOAV):
-                if i > c:
-                    MA[i] = MACOEF[c][i] * \
-                        sp.exp(-sp.fabs(time[i - 1] - time[i]
-                                        ) / MATS[c][i]) * residuals[i - 1]
-                    MODEL[i] += MA[i]
-                    residuals[i] -= MA[i]
-
-        RV0 = RV - OFFSET - ACC - FMC - MA
-
-        return RV0, ERR, residuals
-
-    time, rv, err, ins = all_data
-    time_cb = time.copy() - 2450000
-
-    ndim = 1 + 5 * kplanets + nins * 2 * (MOAV + 1) + totcornum + PACC
-
-    '''
-    JVines Change: changed the way emperor plots
-    '''
+class CourtPainter:
 
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
-
-    error_kwargs = {'lw': .75, 'zorder': 0}
-    # letter = ['a', 'b', 'c', 'd', 'e', 'f']  # 'a' is just a placeholder
-
-    theta_k = fit[:kplanets * 5]
-    theta_acc = fit[kplanets * 5:kplanets * 5 + PACC + 1]
-    theta_i = fit[kplanets * 5 + PACC + 1:kplanets *
-                  5 + nins * 2 * (MOAV + 1) + PACC + 1]
-    theta_sa = fit[kplanets * 5 + nins * 2 * (MOAV + 1) + PACC + 1:]
-
-    for k in range(kplanets):
-        rv0, err0, residuals = clear_noise(
-            rv, theta_acc, theta_k, theta_i, theta_sa, staract, ndat)
-        rvk, errk = rv0, err0
-        for kk in sp.arange(kplanets - 1) + 1:
-            rvk -= empmir.mini_RV_model(theta_k[5 * kk:5 * (kk + 1)], time)
-        t_p, rv_p, err_p = phasefold(time, rvk, errk, theta_k[0])
-        t_p, res_p, err_p = phasefold(time, residuals, errk, theta_k[0])
-
-        time_m = sp.linspace(min(time), max(time), int(1e4))
-        rv_m = empmir.mini_RV_model(theta_k[:5], time_m)
-
-        for mode in range(2):
-            fig = plt.figure(figsize=(20, 10))
-            gs = gridspec.GridSpec(3, 4)
-            ax = fig.add_subplot(gs[:2, :])
-            axr = fig.add_subplot(gs[-1, :])
-            cbar_ax = fig.add_axes([.85, .1098, .015, .771])
-            fig.subplots_adjust(right=.84)
-            fig.subplots_adjust(hspace=0)
-
-            minx = 2**31
-            maxx = -2**31
-            cmin, cmax = time_cb.min(), time_cb.max()
-
-            for i in range(nins):  # printea datos separados por instrumento
-                x, y, yerr = sp.array([]), sp.array([]), sp.array([])
-                xc = sp.array([])
-                yr = sp.array([])
-
-                for j in range(len(ins)):
-                    if ins[j] == i:
-                        x = sp.append(x, time[j])
-                        xc = sp.append(xc, time_cb[j])
-                        y = sp.append(y, rvk[j])
-                        yerr = sp.append(yerr, errk[j])
-                        yr = sp.append(yr, residuals[j])
-
-                '''
-                JVines Change: keep global minimum of x for the plots
-                '''
-
-                if minx > min(x):
-                    minx = min(x)
-                if maxx < max(x):
-                    maxx = max(x)
-
-                if mode == 1:  # phasefolded
-
-                    xp, yp, errp = phasefold(
-                        x, y, yerr, theta_k[0])  # phase fold
-                    ax.errorbar(  # phase fold
-                        xp, yp, errp, linestyle='', marker=None, alpha=0.75,
-                        ecolor='k', **error_kwargs
-                    )
-                    im = ax.scatter(
-                        xp, yp, marker=markers[i], edgecolors='k', s=50,
-                        c=xc, cmap='cool_r')
-                    im.set_clim(cmin, cmax)
-                    xpr, ypr, errpr = phasefold(x, yr, yerr, theta_k[0])
-                    axr.errorbar(
-                        xpr, ypr, errpr, marker=None, ecolor='k', linestyle='',
-                        **error_kwargs
-                    )
-                    imr = axr.scatter(
-                        xpr, ypr, marker=markers[i], edgecolors='k', s=50,
-                        c=xc, cmap='cool_r'
-                    )
-                    imr.set_clim(cmin, cmax)
-                    ax.set_xticks([])
-                    ax.set_xlim(-0.01, 1.01)
-                    axr.set_xlim(-0.01, 1.01)
-                    fig.colorbar(im, cax=cbar_ax).set_label(
-                        'JD - 2450000', rotation=270, labelpad=25, fontsize=22)
-
-                else:  # full
-                    ax.errorbar(
-                        x - minx, y, yerr, marker=None, linestyle='',
-                        alpha=0.75, ecolor='k', **error_kwargs
-                    )
-                    im = ax.scatter(
-                        x - minx, y, marker=markers[i], edgecolors='k', c=xc,
-                        cmap='cool_r', s=50)
-                    im.set_clim(cmin, cmax)
-                    axr.errorbar(
-                        x - minx, yr, yerr, marker=None, linestyle='',
-                        ecolor='k', **error_kwargs)
-                    imr = axr.scatter(
-                        x - minx, yr, marker=markers[i], edgecolors='k', c=xc,
-                        cmap='cool_r', s=50
-                    )
-                    imr.set_clim(cmin, cmax)
-                    ax.set_xticks([])
-                    xmn, xmx = ax.get_xlim()
-                    ax.set_xlim(xmn * .3, xmx * .979)
-                    axr.set_xlim(xmn * .3, xmx * .979)
-                    fig.colorbar(im, cax=cbar_ax).set_label(
-                        'JD - 2450000', rotation=270, labelpad=25, fontsize=22)
-
-            # best_fit de el modelo completo en linea
-            if mode == 1:  # phasefolded
-                time_m_p, rv_m_p, err_m_p = phasefold(
-                    time_m, rv_m, sp.zeros_like(time_m), theta_k[0])
-                ax.plot(time_m_p, rv_m_p, 'k', label='model')
-            else:  # full
-                ax.plot(time_m - minx, rv_m, '-k', label='model')
-            # ax.minorticks_on()
-            ax.set_ylabel(r'Radial Velocity (m s$^{-1}$)', fontsize=22)
-            axr.axhline(0, color='k', linewidth=2)
-            axr.get_yticklabels()[-1].set_visible(False)
-            axr.minorticks_on()
-            axr.set_ylabel('Residuals', fontsize=22)
-            if mode == 1:  # phasefolded
-                '''
-                JVines Change: use phase for phase fold and time for timeseries
-                '''
-                axr.set_xlabel('Phase', fontsize=22)
-                fig.savefig(saveplace + '/phasefold' +
-                            str(k) + '.pdf', bbox_inches='tight')
-            else:  # full
-                axr.set_xlabel('Time (Julian Days)', fontsize=22)
-                fig.savefig(saveplace + '/fullmodel' +
-                            str(k) + '.pdf', bbox_inches='tight')
-            if SHOW:
-                plt.show()
-
-        theta_k = sp.roll(theta_k, -5)  # 5 del principio al final
-    pass
-
-
-def plot1_PM(thetas, flattened, plug, plug2, temp, ticknum=10):
-    setup, kplanets, nins, totcornum, saveplace, MOAV, PACC = plug
-    HISTOGRAMS, CORNER, STARMASS, PNG, PDF, thin, draw_every_n = plug2
-
-    def gaussian(x, mu, sig):
-        return sp.exp(-sp.power((x - mu) / sig, 2.) / 2.)
-
-    def plot(thetas, flattened, temp, kplanets, CORNER=False, ticknum=ticknum):
-        ndim = 1 + 4 * kplanets + nins * 2 * (MOAV + 1) + totcornum + PACC
-        ntemps, nwalkers, nsteps = setup
-
-        titles = sp.array(["Period", "Amplitude", "Phase", "Eccentricity", 'Acceleration',
-                           'Jitter', 'Offset', 'MACoefficient', 'MATimescale', 'Stellar Activity'])
-        units = sp.array([" [Days]", " $[\\frac{m}{s}]$", " $[rads]$", "", ' $[\\frac{m}{s^2}]$',
-                          ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' [Days]', ''])
-
-        p_titles = sp.array(['p_Amplitude', 'p_phase', 'p_ecc'])
-
-        thetas = thetas[:-(len(thetas) % nwalkers)]
-        flattened = flattened[:-(len(flattened) % nwalkers)]
-        quasisteps = len(thetas) // nwalkers
-
-        color = sp.arange(quasisteps)
-        colores = sp.array([color for i in range(nwalkers)]).reshape(-1)
-        i = 0
-        sorting = sp.arange(len(thetas))
-
-        subtitles, namen = sp.array([]), sp.array([])
-
-        for k in range(kplanets):
-            subtitles = sp.append(
-                subtitles, [titles[i] + ' ' + str(k + 1) + units[i] for i in range(4)])
-            namen = sp.append(
-                namen, [titles[i] + '_' + str(k) for i in range(4)])
-
-        subtitles = sp.append(subtitles, titles[4] + units[4])  # for acc
-        namen = sp.append(namen, titles[4])  # for acc
-        if PACC:
-            subtitles = sp.append(subtitles, 'Parab Accel $[\\frac{m}{s}]$')
-            namen = sp.append(namen, 'Parab Accel')
-        for i in range(nins):
-            subtitles = sp.append(
-                subtitles, [titles[ii] + ' ' + str(i + 1) + units[ii] for ii in sp.arange(2) + 5])
-            namen = sp.append(
-                namen, [titles[ii] + '_' + str(i + 1) for ii in sp.arange(2) + 5])
-            for j in range(MOAV):
-                subtitles = sp.append(subtitles, [
-                                      titles[ii] + ' ' + str(i + 1) + ' ' + str(j + 1) + units[ii] for ii in sp.arange(2) + 7])
-                namen = sp.append(namen, [
-                                  titles[ii] + '_' + str(i + 1) + '_' + str(j + 1) for ii in sp.arange(2) + 7])
-
-        for h in range(totcornum):
-            subtitles = sp.append(subtitles, titles[-1] + ' ' + str(h + 1))
-            namen = sp.append(namen, titles[-1] + '_' + str(h + 1))
-
-        print('\n PLOTTING CHAINS for temperature ' + str(temp) + '\n')
-        pbar_chain = tqdm(total=ndim)
-        #############
-        for i in range(ndim):  # chains
-            fig, ax = plt.subplots(figsize=(12, 7))
-            if subtitles[i][:3] == 'Per':
-                pass
-
-            ydif = (max(thetas[:, i]) - min(thetas[:, i])) / 10.
-            ax.set(ylim=(min(thetas[:, i]) - ydif, max(thetas[:, i]) + ydif))
-
-            im = ax.scatter(
-                sorting, thetas[:, i], c=colores, lw=0., cmap='viridis', alpha=0.8)
-            plt.xlabel("N", fontsize=24)
-            plt.ylabel(subtitles[i], fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax)
-            lab = 'Step Number'
-
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-
-            cb.set_label('Step Number')
-            if PNG:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".pdf")
-
-            pbar_chain.update(1)
-            plt.close('all')
-        pbar_chain.close()
-
-        print('\n PLOTTING POSTERIORS for temperature ' + str(temp) + '\n')
-        pbar_post = tqdm(total=ndim)
-        for i in range(ndim):  # posteriors
-            fig1, ax1 = plt.subplots(figsize=(12, 7))
-
-            xdif1, ydif1 = (max(thetas[:, i]) - min(thetas[:, i])) / \
-                10., (max(flattened) - min(flattened)) / 10.
-            ax1.set(xlim=((min(thetas[:, i]) - xdif1), (max(thetas[:, i]) + xdif1)),
-                    ylim=((min(flattened) - ydif1), (max(flattened) + ydif1)))
-
-            im = ax1.scatter(thetas[:, i], flattened, s=10,
-                             c=colores, lw=0., cmap='viridis', alpha=0.8)
-
-            xaxis = ax1.get_xaxis()
-            xaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            yaxis = ax1.get_yaxis()
-            yaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            # yaxis.set_minor_locator(ticker.LinearLocator(numticks=5))
-            '''
-            if subtitles[i][:3] == 'Per':
-                ax1.set_xscale('log')
-                xaxis.set_major_locator(ticker.LogLocator(numticks=ticknum))
-            '''
-            ax1.axvline(thetas[sp.argmax(flattened), i],
-                        color='r', linestyle='--', linewidth=2, alpha=0.70)
-            # ax1.invert_yaxis()
-
-            plt.xlabel(subtitles[i], fontsize=24)
-            plt.ylabel("Posterior", fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax1)
-            lab = 'Step Number'
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-            cb.set_label(lab)
-
-            if PNG:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".pdf")
-            plt.close('all')
-
-            pbar_post.update(1)
-        pbar_post.close()
-
-        if HISTOGRAMS:
-            if kplanets == 0:
-                print('Sorry! No histograms here yet! We are working on it ! ')
-                pass
-            print('\n PLOTTING HISTOGRAMS for temperature ' + str(temp) + '\n')
-            lab = ['Period [d]', 'Amplitude [m/s]', r'$\phi$ [rads]',
-                   'Eccentricity', 'a [AU]', r'Msin(i) [$M_{\oplus}$]']
-            params = len(lab)
-            pbar_hist = tqdm(total=params * kplanets)
-            num_bins = 12
-            for k in range(kplanets):
-                per_s = thetas.T[4 * k] * 24. * 3600.
-                if STARMASS:
-                    semi = ((per_s**2.0) / ((4.0 * sp.pi**2.0) / (6.67e-11 *
-                                                                  STARMASS * 1.99e30)))**(1. / 3) / 1.49598e11  # AU!!
-                    Mass = thetas.T[4 * k] / ((28.4 / sp.sqrt(1. - thetas.T[5 * k + 3]**2.)) * (
-                        STARMASS**(-0.5)) * (semi**(-0.5))) * 317.8  # Me!!
-                else:
-                    params = len(lab) - 2
-                for ii in range(params):
-                    if ii < 4:
-                        Per = thetas.T[4 * k + ii]
-                    if ii == 4:
-                        Per = semi
-                    if ii == 6:
-                        Per = Mass
-
-                    # Mean and sigma of distribution!!
-                    mu, sigma = norm.fit(Per)
-                    # first histogram of the data
-                    n, bins, patches = plt.hist(Per, num_bins, normed=1)
-                    plt.close("all")  # We don't need the plot just data!!
-
-                    # Get the maximum and the data around it!!
-                    maxi = Per[sp.where(flattened == sp.amax(flattened))][0]
-                    dif = sp.fabs(maxi - bins)
-                    his_max = bins[sp.where(dif == sp.amin(dif))]
-
-                    res = sp.where(n == 0)[0]  # Find the zeros!!
-                    if res.size:
-                        if len(res) > 2:
-                            for j in range(len(res)):
-                                if res[j + 2] - res[j] == 2:
-                                    sub = j
-                                    break
-                        else:
-                            sub = res[0]
-
-                        # Get the data subset!!
-                        if bins[sub] > his_max:
-                            post_sub = flattened[sp.where(Per <= bins[sub])]
-                            Per_sub = Per[sp.where(Per <= bins[sub])]
-                        else:
-                            post_sub = flattened[sp.where(Per >= bins[sub])]
-                            Per_sub = Per[sp.where(Per >= bins[sub])]
-
-                    else:
-                        Per_sub = Per
-                        post_sub = flattened
-
-                    plt.subplots(figsize=(12, 7))  # Define the window size!!
-                    # redo histogram of the subset of data
-                    n, bins, patches = plt.hist(
-                        Per_sub, num_bins, normed=1, facecolor='blue', alpha=0.5)
-                    mu, sigma = norm.fit(Per_sub)  # add a 'best fit' line
-                    var = sigma**2.
-                    # Some Stats!!
-                    skew = '%.4E' % Decimal(sp.stats.skew(Per_sub))
-                    kurt = '%.4E' % Decimal(sp.stats.kurtosis(Per_sub))
-                    gmod = '%.4E' % Decimal(bins[sp.where(n == sp.amax(n))][0])
-                    med = '%.4E' % Decimal(sp.median(Per_sub))
-                    # print 'The skewness, kurtosis, mean, and median of the data are {} : {} : {} : {}'.format(skew,kurt,gmod,med)
-
-                    # Make a model x-axis!!
-                    span = bins[len(bins) - 1] - bins[0]
-                    bins_x = ((sp.arange(num_bins * 100.) /
-                               (num_bins * 100.)) * span) + bins[0]
-
-                    # Renormalised to the histogram maximum!!
-                    y = gaussian(bins_x, mu, sigma) * sp.amax(n)
-
-                    axes = plt.gca()
-                    #y = mlab.normpdf(bins, mu, sigma)
-                    plt.plot(bins_x, y, 'r-', linewidth=3)
-
-                    # Tweak spacing to prevent clipping of ylabel
-                    plt.subplots_adjust(left=0.15)
-
-                    # axes.set_xlim([])
-                    axes.set_ylim([0., sp.amax(n) + sp.amax(n) * 0.7])
-
-                    axes.set_xlabel(lab[ii], size=15)
-                    axes.set_ylabel('Frequency', size=15)
-                    axes.tick_params(labelsize=15)
-
-                    plt.autoscale(enable=True, axis='x', tight=True)
-
-                    # Get the axis positions!!
-                    ymin, ymax = axes.get_ylim()
-                    xmin, xmax = axes.get_xlim()
-
-                    # Add a key!!
-                    mu_o = '%.4E' % Decimal(mu)
-                    sigma_o = '%.4E' % Decimal(sigma)
-                    var_o = '%.4E' % Decimal(var)
-
-                    axes.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
-                              * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$", size=25)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_1 ={}$".format(mu_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.255, r"$\sigma^2 ={}$".format(var_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.330, r"$\mu_3 ={}$".format(skew), size=20)
-
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_4 ={}$".format(kurt), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.255, r"$Median ={}$".format(med), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.330, r"$Mode ={}$".format(gmod), size=20)
-
-                    # ,bbox_inches='tight')
-                    plt.savefig(saveplace + '/hist_test' + temp +
-                                '_' + str(k) + '_' + str(ii) + '.pdf')
-                    plt.close('all')
-                    pbar_hist.update(1)
-
-            '''
-                if i < 5*kplanets and i%7==5:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'SMA'+".pdf")
-                if i < 5*kplanets and i%7==6:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'Mass'+".pdf")
-                else:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+namen[i]+".pdf")
-            '''
-
-            pbar_hist.close()
-
-        if CORNER:
-            try:
-                print('Plotting Corner Plot... May take a few seconds')
-                fig = corner.corner(thetas, labels=subtitles)
-                fig.savefig(saveplace + "/triangle.pdf")
-            except:
-                print('Corner Plot Failed!!')
-                pass  # corner
-        try:
-            plt.close('all')
-        except:
-            pass
-        pass
-
-    ntemps, nwalkers, nsteps = setup
-
-    for i in range(ntemps):
-        check_length = len(thetas[i]) // nwalkers
-        if check_length // draw_every_n < 100:
-            draw_every_n = 1
-
-        if i == 0:
-            try:
-                plot(thetas[0][::draw_every_n], flattened[0]
-                     [::draw_every_n], '0', kplanets, CORNER=CORNER)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for the cold chain!')
-                pass
-        else:
-            try:
-                plot(thetas[i][::draw_every_n], flattened[i]
-                     [::draw_every_n], str(i), kplanets)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for temp ' + str(i) + ' ! !')
-                pass
-    pass
-
-
-def plot2_PM(all_data, plug, fit, starflag, staract, ndat, SHOW=False):
-
-    def phasefold(TIME, RV, ERR, PER):
-        phases = foldAt(TIME, PER, T0=0.0)
-        sortIndi = sp.argsort(phases)  # sorts the points
-        # gets the indices so we sort the RVs correspondingly(?)
-        Phases = phases[sortIndi]
-        rv_phased = RV[sortIndi]
-        time_phased = Phases * PER
-        err_phased = ERR[sortIndi]
-        return time_phased, rv_phased, err_phased
-
-    def clear_noise(RV, theta_acc, theta_k, theta_i, theta_sa, staract):
-        '''
-        This should clean offset, add jitter to err
-        clear acc, red noise and stellar activity
-        '''
-        time, rv, err, ins = all_data
-
-        JITTER, OFFSET, MACOEF, MATS = sp.zeros(ndat), sp.zeros(ndat), sp.array(
-            [sp.zeros(ndat) for i in range(MOAV)]), sp.array([sp.zeros(ndat) for i in range(MOAV)])
-
-        for i in range(ndat):
-            jittpos = int(ins[i] * 2 * (MOAV + 1))
-            JITTER[i], OFFSET[i] = theta_i[jittpos], theta_i[jittpos + 1]
-            for j in range(MOAV):
-                MACOEF[j][i], MATS[j][i] = theta_i[jittpos + 2 *
-                                                   (j + 1)], theta_i[jittpos + 2 * (j + 1) + 1]
-
-        ERR = sp.sqrt(err ** 2 + JITTER ** 2)
-        tmin, tmax = sp.amin(time), sp.amax(time)
-
-        #RV0 = RV - OFFSET - ACC * (time - time[0])
-        if totcornum:
-            COR = sp.array([sp.array([sp.zeros(ndat) for k in range(
-                len(starflag[i]))]) for i in range(len(starflag))])
-            assert len(theta_sa) == totcornum, 'error in correlations'
-            AR = 0.0  # just to remember to add this
-            counter = -1
-
-            for i in range(nins):
-                for j in range(len(starflag[i])):
-                    counter += 1
-                    passer = -1
-                    for k in range(ndat):
-                        if starflag[i][j] == ins[k]:  #
-                            passer += 1
-                            COR[i][j][k] = theta_sa[counter] * \
-                                staract[i][j][passer]
-
-            FMC = 0
-            for i in range(len(COR)):
-                for j in range(len(COR[i])):
-                    FMC += COR[i][j]
-        else:
-            FMC = 0
-
-        if PACC:
-            ACC = theta_acc[0] * (time - time[0]) + \
-                theta_acc[1] * (time - time[0]) ** 2
-        else:
-            ACC = theta_acc[0] * (time - time[0])
-
-        MODEL = OFFSET + ACC + FMC
-
-        for k in sp.arange(kplanets):
-            MODEL += empmir.mini_PM_model(theta_k[4 * k:4 * (k + 1)], time)
-        residuals, MA = sp.zeros(ndat), sp.zeros(ndat)
-        for i in range(ndat):
-            residuals = RV - MODEL
-            for c in range(MOAV):
-                if i > c:
-                    MA[i] = MACOEF[c][i] * \
-                        sp.exp(-sp.fabs(time[i - 1] - time[i]
-                                        ) / MATS[c][i]) * residuals[i - 1]
-                    MODEL[i] += MA[i]
-                    residuals[i] -= MA[i]
-
-        RV0 = RV - OFFSET - ACC - FMC - MA
-
-        return RV0, ERR, residuals
-    '''
-    JVines Change : Changed the way emperor plots
-    '''
-
-    time, rv, err, ins = all_data
-    ndim = 1 + 4 * kplanets + nins * 2 * (MOAV + 1) + totcornum + PACC
-    colors = [
-        'b', 'g', 'r', 'y', 'm', 'c', 'k', 'xkcd:indigo', 'xkcd:scarlet',
-        'xkcd:burnt orange', 'xkcd:apple green', 'xkcd:coral'
+    error_kwargs = {'lw': 1.75, 'zorder': 0}
+    chain_titles = sp.array(
+        [
+            'Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude',
+            'Acceleration', 'Jitter', 'Offset'
+        ]
+    )
+    chain_units = [
+        ' [Days]', r' $[\frac{m}{s}]$',  r' $[rad]$', '', r' $[rad]$',
+        r' $[\frac{m}{s^2}]$'
     ]
-    markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
 
-    error_kwargs = {'lw': .5, 'zorder': 0}
-    # letter = ['a', 'b', 'c', 'd', 'e', 'f']  # 'a' is just a placeholder
+    def __init__(self, setup, kplanets, working_dir, pdf, png):
+        self.ntemps, self.nwalkers, self.nsteps = setup
+        self.kplanets = kplanets
+        self.working_dir = working_dir
+        self.pdf = pdf
+        self.png = png
 
-    theta_k = fit[:kplanets * 4]
-    theta_acc = fit[kplanets * 4:kplanets * 4 + PACC + 1]
-    theta_i = fit[kplanets * 4 + PACC + 1:kplanets *
-                  4 + nins * 2 * (MOAV + 1) + PACC + 1]
-    theta_sa = fit[kplanets * 4 + nins * 2 * (MOAV + 1) + PACC + 1:]
+        if self.pdf:
+            print('\n\t\tWARNING: pdf output might be slow for long chains.')
 
-    for k in range(kplanets):
-        rv0, err0, residuals = clear_noise(
-            rv, theta_acc, theta_k, theta_i, theta_sa, staract)
-        rvk, errk = rv0, err0
-        for kk in sp.arange(kplanets - 1) + 1:
-            rvk -= empmir.mini_PM_model(theta_k[4 * kk:4 * (kk + 1)], time)
-        t_p, rv_p, err_p = phasefold(time, rvk, errk, theta_k[1])
-        t_p, res_p, err_p = phasefold(time, residuals, errk, theta_k[1])
+        # Read chains, posteriors and data for plotting.
+        self.chains = emplib.read_chains(working_dir + 'chains.pkl')
+        self.cold = self.chains[0]
+        self.posteriors = emplib.read_posteriors(
+            working_dir + 'posteriors.pkl')
+        self.all_rv = emplib.read_rv_data(working_dir + 'rv_data.pkl')
+        self.time, self.rv, self.err, self.ins = self.all_rv
 
-        time_m = sp.linspace(min(time), max(time), int(1e4))
-        rv_m = empmir.mini_PM_model(theta_k[:4], time_m)
+        self.nins = len(sp.unique(self.ins))
+        self.ndim = 1 + 5 * kplanets + self.nins * 2
 
-        for mode in range(2):
-            fig = plt.figure(figsize=(20, 10))
-            gs = gridspec.GridSpec(3, 4)
-            ax = fig.add_subplot(gs[:2, :])
-            axr = fig.add_subplot(gs[-1, :])
-            plt.subplots_adjust(hspace=0)
+        self.__clean_rvs()
+        # Setup plots.
+        self.__read_config()
+        self.time_cb = copy.deepcopy(self.time) - 2450000
 
-            for i in range(nins):  # printea datos separados por instrumento
-                x, y, yerr = sp.array([]), sp.array([]), sp.array([])
-                yr = sp.array([])
-                for j in range(len(ins)):
-                    if ins[j] == i:
-                        x = sp.append(x, time[j])
-                        y = sp.append(y, rvk[j])
-                        yerr = sp.append(yerr, errk[j])
-
-                        yr = sp.append(yr, residuals[j])
-                if mode == 1:  # phasefolded
-                    xp, yp, errp = phasefold(
-                        x, y, yerr, theta_k[0])  # phase fold
-                    ax.errorbar(xp, yp, errp, color=colors[i], label='Data' + str(
-                        i), linestyle='', marker='o', alpha=0.75)  # phase fold
-                    xpr, ypr, errpr = phasefold(x, yr, yerr, theta_k[0])
-                    axr.errorbar(xpr, ypr, errpr, color=colors[i], fmt='o')
-                    ax.set_xlim(min(xp), max(xp))
-                    axr.set_xlim(min(xpr), max(xpr))
-
-                else:  # full
-                    ax.errorbar(
-                        x, y, yerr, color=colors[i], label='Data' + str(i), linestyle='', marker='o', alpha=0.75)
-                    axr.errorbar(x, yr, yerr, color=colors[i], fmt='o')
-                    ax.set_xlim(min(x), max(x))
-                    axr.set_xlim(min(x), max(x))
-
-            # best_fit de el modelo completo en linea
-            if mode == 1:  # phasefolded
-                time_m_p, rv_m_p, err_m_p = phasefold(
-                    time_m, rv_m, sp.zeros_like(time_m), theta_k[0])
-                ax.plot(time_m_p, rv_m_p, 'k', label='model')
-            else:  # full
-                ax.plot(time_m, rv_m, '-k', label='model')
-            # ax.minorticks_on()
-            ax.set_ylabel(r'Radial Velocity (m s$^{-1}$)', fontsize=24)
-            axr.axhline(0, color='k', linewidth=2)
-            axr.get_yticklabels()[-1].set_visible(False)
-            axr.minorticks_on()
-            axr.set_ylabel('Residuals', fontsize=22)
-            axr.set_xlabel('Time (Julian Days)', fontsize=22)
-            if mode == 1:  # phasefolded
-                fig.savefig(saveplace + '/phasefold' + str(k) + '.pdf')
-            else:  # full
-                fig.savefig(saveplace + '/fullmodel' + str(k) + '.pdf')
-            if SHOW:
-                plt.show()
-
-        theta_k = sp.roll(theta_k, -4)  # 5 del principio al final
-    pass
-
-
-def neo_plot1(thetas, flattened, plug1, plug2, temp, ticknum=10):
-    setup, kplanets, nins, totcornum, saveplace, MOAV, PACC = plug
-    HISTOGRAMS, CORNER, STARMASS, PNG, PDF, thin, draw_every_n = plug2
-          #CORNER_MASK, CORNER_K, CORNER_I
-    def gaussian(x, mu, sig):
-        return sp.exp(-sp.power((x - mu) / sig, 2.) / 2.)
-
-    def plot(thetas, flattened, temp, kplanets, CORNER=False, ticknum=ticknum):
-        ndim = 1 + 5 * kplanets + nins * 2 * (MOAV + 1) + totcornum + PACC
-        ntemps, nwalkers, nsteps = setup
-
-        titles = sp.array(["Period", "Amplitude", "Longitude", "Phase", "Eccentricity",
-                           'Acceleration', 'Jitter', 'Offset', 'MACoefficient', 'MATimescale', 'Stellar Activity'])
-        units = sp.array([" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", " $[rads]$", "", ' $[\\frac{m}{s^2}]$',
-                          ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' [Days]', ''])
-
-        p_titles = sp.array(['p_Amplitude', 'p_phase', 'p_ecc'])
-
-        leftovers = len(thetas) % nwalkers
-        if leftovers == 0:
-            pass
-        else:
-            thetas = thetas[:-leftovers]
-            flattened = flattened[:-(len(flattened) % nwalkers)]
-        quasisteps = len(thetas) // nwalkers
-
-        color = sp.arange(quasisteps)
-        colores = sp.array([color for i in range(nwalkers)]).reshape(-1)
-        i = 0
-        sorting = sp.arange(len(thetas))
-
-        subtitles, namen = sp.array([]), sp.array([])
-
-        for k in range(kplanets):
-            subtitles = sp.append(
-                subtitles, [titles[i] + ' ' + str(k + 1) + units[i] for i in range(5)])
-            namen = sp.append(
-                namen, [titles[i] + '_' + str(k) for i in range(5)])
-
-        subtitles = sp.append(subtitles, titles[5] + units[5])  # for acc
-        namen = sp.append(namen, titles[5])  # for acc
-        if PACC:
-            subtitles = sp.append(subtitles, 'Parab Accel $[\\frac{m}{s}]$')
-            namen = sp.append(namen, 'Parab Accel')
-        for i in range(nins):
-            subtitles = sp.append(
-                subtitles, [titles[ii] + ' ' + str(i + 1) + units[ii] for ii in sp.arange(2) + 6])
-            namen = sp.append(
-                namen, [titles[ii] + '_' + str(i + 1) for ii in sp.arange(2) + 6])
-            for j in range(MOAV):
-                subtitles = sp.append(subtitles, [
-                                      titles[ii] + ' ' + str(i + 1) + ' ' + str(j + 1) + units[ii] for ii in sp.arange(2) + 8])
-                namen = sp.append(namen, [
-                                  titles[ii] + '_' + str(i + 1) + '_' + str(j + 1) for ii in sp.arange(2) + 8])
-
-        for h in range(totcornum):
-            subtitles = sp.append(subtitles, titles[-1] + ' ' + str(h + 1))
-            namen = sp.append(namen, titles[-1] + '_' + str(h + 1))
-
-        print('\n PLOTTING CHAINS for temperature ' + str(temp) + '\n')
-        pbar_chain = tqdm(total=ndim)
-        #############
-        for i in range(ndim):  # chains
-            fig, ax = plt.subplots(figsize=(12, 7))
-            if subtitles[i][:3] == 'Per':
-                pass
-
-            ydif = (max(thetas[:, i]) - min(thetas[:, i])) / 10.
-            ax.set(ylim=(min(thetas[:, i]) - ydif, max(thetas[:, i]) + ydif))
-
-            im = ax.scatter(
-                sorting, thetas[:, i], c=colores, lw=0., cmap='viridis', alpha=0.8)
-            plt.xlabel("N", fontsize=24)
-            plt.ylabel(subtitles[i], fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax)
-            lab = 'Step Number'
-
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-
-            cb.set_label('Step Number')
-            if PNG:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig.savefig(saveplace + "/chains" + temp + '_' +
-                            str(i + 1) + '_' + namen[i] + ".pdf")
-
-            pbar_chain.update(1)
-            plt.close('all')
-        pbar_chain.close()
-
-        print('\n PLOTTING POSTERIORS for temperature ' + str(temp) + '\n')
-        pbar_post = tqdm(total=ndim)
-        for i in range(ndim):  # posteriors
-            fig1, ax1 = plt.subplots(figsize=(12, 7))
-
-            xdif1, ydif1 = (max(thetas[:, i]) - min(thetas[:, i])) / \
-                10., (max(flattened) - min(flattened)) / 10.
-            ax1.set(xlim=((min(thetas[:, i]) - xdif1), (max(thetas[:, i]) + xdif1)),
-                    ylim=((min(flattened) - ydif1), (max(flattened) + ydif1)))
-
-            im = ax1.scatter(thetas[:, i], flattened, s=10,
-                             c=colores, lw=0., cmap='viridis', alpha=0.8)
-
-            xaxis = ax1.get_xaxis()
-            xaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            yaxis = ax1.get_yaxis()
-            yaxis.set_major_locator(ticker.LinearLocator(numticks=ticknum))
-            # yaxis.set_minor_locator(ticker.LinearLocator(numticks=5))
-            '''
-            if subtitles[i][:3] == 'Per':
-                ax1.set_xscale('log')
-                xaxis.set_major_locator(ticker.LogLocator(numticks=ticknum))
-            '''
-            ax1.axvline(thetas[sp.argmax(flattened), i],
-                        color='r', linestyle='--', linewidth=2, alpha=0.70)
-            # ax1.invert_yaxis()
-
-            plt.xlabel(subtitles[i], fontsize=24)
-            plt.ylabel("Posterior", fontsize=24)
-
-            cb = plt.colorbar(im, ax=ax1)
-            lab = 'Step Number'
-            if thin * draw_every_n != 1:
-                lab = 'Step Number * ' + str(thin * draw_every_n)
-            cb.set_label(lab)
-
-            if PNG:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".png")
-            if PDF:
-                fig1.savefig(saveplace + "/posteriors" + temp +
-                             '_' + str(i + 1) + '_' + namen[i] + ".pdf")
-            plt.close('all')
-
-            pbar_post.update(1)
-        pbar_post.close()
-
-        if HISTOGRAMS:
-            if kplanets == 0:
-                print('Sorry! No histograms here yet! We are working on it ! ')
-                pass
-            print('\n PLOTTING HISTOGRAMS for temperature ' + str(temp) + '\n')
-            lab = ['Period [d]', 'Amplitude [m/s]', r'$\phi$ [rads]',
-                   r'$\omega$ [rads]', 'Eccentricity', 'a [AU]', r'Msin(i) [$M_{\oplus}$]']
-            params = len(lab)
-            pbar_hist = tqdm(total=params * kplanets)
-            num_bins = 12
-            for k in range(kplanets):
-                per_s = thetas.T[5 * k] * 24. * 3600.
-                if STARMASS:
-                    semi = ((per_s**2.0) / ((4.0 * sp.pi**2.0) / (6.67e-11 *
-                                                                  STARMASS * 1.99e30)))**(1. / 3) / 1.49598e11  # AU!!
-                    Mass = thetas.T[5 * k + 1] / ((28.4 / sp.sqrt(1. - thetas.T[5 * k + 4]**2.)) * (
-                        STARMASS**(-0.5)) * (semi**(-0.5))) * 317.8  # Me!!
-                else:
-                    params = len(lab) - 2
-                for ii in range(params):
-                    if ii < 5:
-                        Per = thetas.T[5 * k + ii]
-                    if ii == 5:
-                        Per = semi
-                    if ii == 6:
-                        Per = Mass
-
-                    # Mean and sigma of distribution!!
-                    mu, sigma = norm.fit(Per)
-                    # first histogram of the data
-                    n, bins, patches = plt.hist(Per, num_bins, density=True)
-                    plt.close("all")  # We don't need the plot just data!!
-
-                    # Get the maximum and the data around it!!
-                    maxi = Per[sp.where(flattened == sp.amax(flattened))][0]
-                    dif = sp.fabs(maxi - bins)
-                    his_max = bins[sp.where(dif == sp.amin(dif))]
-
-                    res = sp.where(n == 0)[0]  # Find the zeros!!
-                    if res.size:
-                        if len(res) > 2:
-                            for j in range(len(res)):
-                                if res[j + 2] - res[j] == 2:
-                                    sub = j
-                                    break
-                        else:
-                            sub = res[0]
-
-                        # Get the data subset!!
-                        if bins[sub] > his_max:
-                            post_sub = flattened[sp.where(Per <= bins[sub])]
-                            Per_sub = Per[sp.where(Per <= bins[sub])]
-                        else:
-                            post_sub = flattened[sp.where(Per >= bins[sub])]
-                            Per_sub = Per[sp.where(Per >= bins[sub])]
-
-                    else:
-                        Per_sub = Per
-                        post_sub = flattened
-
-                    plt.subplots(figsize=(12, 7))  # Define the window size!!
-                    # redo histogram of the subset of data
-                    n, bins, patches = plt.hist(
-                        Per_sub, num_bins, density=True, facecolor='blue',
-                        alpha=0.5
-                    )
-                    mu, sigma = norm.fit(Per_sub)  # add a 'best fit' line
-                    var = sigma**2.
-                    # Some Stats!!
-                    skew = '%.4E' % Decimal(sp.stats.skew(Per_sub))
-                    kurt = '%.4E' % Decimal(sp.stats.kurtosis(Per_sub))
-                    gmod = '%.4E' % Decimal(bins[sp.where(n == sp.amax(n))][0])
-                    med = '%.4E' % Decimal(sp.median(Per_sub))
-                    # print 'The skewness, kurtosis, mean, and median of the data are {} : {} : {} : {}'.format(skew,kurt,gmod,med)
-
-                    # Make a model x-axis!!
-                    span = bins[len(bins) - 1] - bins[0]
-                    bins_x = ((sp.arange(num_bins * 100.) /
-                               (num_bins * 100.)) * span) + bins[0]
-
-                    # Renormalised to the histogram maximum!!
-                    y = gaussian(bins_x, mu, sigma) * sp.amax(n)
-
-                    axes = plt.gca()
-                    #y = mlab.normpdf(bins, mu, sigma)
-                    plt.plot(bins_x, y, 'r-', linewidth=3)
-
-                    # Tweak spacing to prevent clipping of ylabel
-                    plt.subplots_adjust(left=0.15)
-
-                    # axes.set_xlim([])
-                    axes.set_ylim([0., sp.amax(n) + sp.amax(n) * 0.7])
-
-                    axes.set_xlabel(lab[ii], size=15)
-                    axes.set_ylabel('Frequency', size=15)
-                    axes.tick_params(labelsize=15)
-
-                    plt.autoscale(enable=True, axis='x', tight=True)
-
-                    # Get the axis positions!!
-                    ymin, ymax = axes.get_ylim()
-                    xmin, xmax = axes.get_xlim()
-
-                    # Add a key!!
-                    mu_o = '%.4E' % Decimal(mu)
-                    sigma_o = '%.4E' % Decimal(sigma)
-                    var_o = '%.4E' % Decimal(var)
-
-                    axes.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
-                              * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$", size=25)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_1 ={}$".format(mu_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.255, r"$\sigma^2 ={}$".format(var_o), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
-                              * 0.330, r"$\mu_3 ={}$".format(skew), size=20)
-
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.180, r"$\mu_4 ={}$".format(kurt), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.255, r"$Median ={}$".format(med), size=20)
-                    axes.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
-                              * 0.330, r"$Mode ={}$".format(gmod), size=20)
-
-                    # ,bbox_inches='tight')
-                    plt.savefig(saveplace + '/hist_test' + temp +
-                                '_' + str(k) + '_' + str(ii) + '.pdf')
-                    plt.close('all')
-                    pbar_hist.update(1)
-
-            '''
-                if i < 5*kplanets and i%7==5:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'SMA'+".pdf")
-                if i < 5*kplanets and i%7==6:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+'Mass'+".pdf")
-                else:
-                    plt.savefig(saveplace+"/histogram"+temp+'_'+str(i+1)+'_'+namen[i]+".pdf")
-            '''
-
-            pbar_hist.close()
-
-        if CORNER:
-            # ndim = 1 + 5 * kplanets + nins*2*(MOAV+1) + totcornum + PACC
+        # Create directories.
+        dirs = ['chains', 'posteriors', 'histograms', 'corners']
+        print('\n\t\tCREATING SHOWROOMS.')
+        for d in dirs:
+            path = self.working_dir + d
             try:
-                print('Plotting Corner Plot... May take a few seconds')
-                fig = corner.corner(thetas, labels=subtitles)
-                fig.savefig(saveplace + "/triangle.pdf")
-            except:
-                print('Corner Plot Failed!!')
-                pass  # corner
-        try:
-            plt.close('all')
-        except:
-            pass
+                os.mkdir(path)
+            except OSError:
+                print("Creation of the showroom %s failed" % path)
+            else:
+                print("Successfully created the showroom %s " % path)
         pass
 
-    ntemps, nwalkers, nsteps = setup
+    def __get_params(self, kplanet):
+        """Retrieve model parameters."""
+        period = sp.median(self.cold[:, 5 * kplanet])
+        amplitude = sp.median(self.cold[:, 5 * kplanet + 1])
+        phase = sp.median(self.cold[:, 5 * kplanet + 2])
+        eccentricity = sp.median(self.cold[:, 5 * kplanet + 3])
+        longitude = sp.median(self.cold[:, 5 * kplanet + 4])
+        params = (period, amplitude, phase, eccentricity, longitude)
+        return params
 
-    for i in range(ntemps):
-        check_length = len(thetas[i]) // nwalkers
-        if check_length // draw_every_n < 100:
-            draw_every_n = 1
+    def __get_CI_params(self, kplanet, alpha):
+        """Retrieve model credibility interval for a given alpha."""
+        _, period_lo, period_up = emplib.credibility_interval(
+            self.cold[:, 5 * kplanet], alpha)
+        _, amplitude_lo, amplitude_up = emplib.credibility_interval(
+            self.cold[:, 5 * kplanet + 1], alpha)
+        _, phase_lo, phase_up = emplib.credibility_interval(
+            self.cold[:, 5 * kplanet + 2], alpha)
+        _, eccentricity_lo, eccentricity_up = emplib.credibility_interval(
+            self.cold[:, 5 * kplanet + 3], alpha)
+        _, longitude_lo, longitude_up = emplib.credibility_interval(
+            self.cold[:, 5 * kplanet + 4], alpha)
+        params_lo = (period_lo, amplitude_lo, phase_lo,
+                     eccentricity_lo, longitude_lo)
+        params_up = (period_up, amplitude_up, phase_up,
+                     eccentricity_up, longitude_up)
+        return params_lo, params_up
 
-        if i == 0:
-            try:
-                plot(thetas[0][::draw_every_n], flattened[0]
-                     [::draw_every_n], '0', kplanets, CORNER=CORNER)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for the cold chain!')
+    def __rv_residuals(self):
+        """Calculate model residuals."""
+        model = 0.
+        for k in range(self.kplanets):
+            params = self.__get_params(k)
+            model += empmir.mini_RV_model(params, self.time)
+        residuals = self.rv0 - model
+        return residuals
+
+    def __clean_rvs(self):
+        """Clean radial-velocities by adding the offset and jitter."""
+        instrumental = self.cold[:, -2 * self.nins:]
+        rv0 = copy.deepcopy(self.rv)
+        err0 = copy.deepcopy(self.err)
+        acc = sp.median(self.cold[:, -2 * self.nins - 1])
+        for i in range(self.nins):
+            jitter = sp.median(instrumental[:, i])
+            offset = sp.median(instrumental[:, i + 1])
+            ins = self.ins == i
+            # Assume linear acceleration for now.
+            rv0[ins] -= offset + acc
+            err0[ins] = sp.sqrt(err0[ins] ** 2 + jitter ** 2)
+        self.rv0 = rv0
+        self.err0 = err0
+        pass
+
+    def paint_fold(self):
+        """Create phasefold plot."""
+        print('\n\t\tPAINTING PHASE FOLDS.')
+        if not self.kplanets:
+            print('\n\t\tNo planets to paint.')
+        # Get globbal max and min for plots
+        minx, maxx = self.time.min(), self.time.max()
+        cmin, cmax = self.time_cb.min(), self.time_cb.max()
+
+        for k in tqdm(range(self.kplanets)):
+            params = self.__get_params(k)
+
+            fig = plt.figure(figsize=self.phase_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            ax = fig.add_subplot(gs[:2, :])
+            ax_r = fig.add_subplot(gs[-1, :])
+            cbar_ax = fig.add_axes([.85, .125, .015, .755])
+            fig.subplots_adjust(right=.84, hspace=0)
+
+            for i in range(self.nins):  # plot per instrument.
+                ins = self.ins == i
+                t_p, rv_p, err_p = emplib.phasefold(
+                    self.time[ins], self.rv0[ins], self.err0[ins], params[0]
+                )
+                _, res_p, _p = emplib.phasefold(
+                    self.time[ins], self.__rv_residuals()[ins], self.err0[ins],
+                    params[0]
+                )
+                # phasefold plot.
+                ax.errorbar(
+                    t_p, rv_p, yerr=err_p, linestyle='', marker=None,
+                    alpha=.75, ecolor=self.error_color, **self.error_kwargs
+                )
+                im = ax.scatter(
+                    t_p, rv_p, marker=self.markers[i], edgecolors='k',
+                    s=self.phase_size, c=self.time_cb[ins],
+                    cmap=self.phase_cmap
+                )
+                im.set_clim(cmin, cmax)
+                ax_r.errorbar(
+                    t_p, res_p, yerr=err_p, linestyle='', marker=None,
+                    ecolor=self.error_color, **self.error_kwargs
+                )
+                im_r = ax_r.scatter(
+                    t_p, res_p, marker=self.markers[i], edgecolors='k',
+                    s=self.phase_size, c=self.time_cb[ins],
+                    cmap=self.phase_cmap
+                )
+                im_r.set_clim(cmin, cmax)
+            fig.colorbar(
+                im, cax=cbar_ax).set_label(
+                'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
+                fontsize=self.label_fontsize, fontname=self.fontname
+            )
+
+            time_m = sp.linspace(self.time.min() - 10,
+                                 self.time.max() + 10, 10000)
+            rv_m = empmir.mini_RV_model(params, time_m)
+            time_m_p, rv_m_p, _ = emplib.phasefold(
+                time_m, rv_m, sp.zeros(10000), params[0])
+
+            # Plot best model.
+            ax.plot(time_m_p, rv_m_p, '-k', linewidth=2)
+            # Plot models CI.
+            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
+            for s in cred_intervals:
+                params_lo, params_up = self.__get_CI_params(k, s)
+                # Calculate new models.
+                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up = empmir.mini_RV_model(params_up, time_m)
+                _, rv_m_lo_p, _ = emplib.phasefold(
+                    time_m, rv_m_lo, sp.zeros(10000), params_lo[0])
+                _, rv_m_up_p, _ = emplib.phasefold(
+                    time_m, rv_m_up, sp.zeros(10000), params_up[0])
+                ax.fill_between(time_m_p, rv_m_lo_p, rv_m_up_p,
+                                color=self.CI_color, alpha=.25)
+
+            # A line to guide the eye.
+            ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+
+            # Labels and tick stuff.
+            ax.set_ylabel(
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_ylabel(
+                'Residuals', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_xlabel(
+                'Phase', fontsize=self.label_fontsize, fontname=self.fontname
+            )
+
+            ax_r.get_yticklabels()[-1].set_visible(False)
+            ax_r.minorticks_on()
+            ax.set_xticks([])
+            ax.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            ax_r.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            for tick in ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_xticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in cbar_ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            cbar_ax.tick_params(labelsize=self.tick_labelsize)
+
+            ax.set_xlim(-.01, 1.01)
+            ax_r.set_xlim(-.01, 1.01)
+            if self.pdf:
+                fig.savefig(self.working_dir + 'phase_fold_' +
+                            str(k + 1) + '.pdf', bbox_inches='tight')
+            if self.png:
+                fig.savefig(self.working_dir + 'phase_fold_' +
+                            str(k + 1) + '.png', bbox_inches='tight')
+
+        plt.close('all')
+
+    def paint_timeseries(self):
+        """Create timeseries plot."""
+        print('\n\t\tPAINTING TIMESERIES.')
+        if not self.kplanets:
+            print('\n\t\tNo planets to paint.')
+        # Get globbal max and min for plots
+        minx, maxx = self.time.min(), self.time.max()
+        cmin, cmax = self.time_cb.min(), self.time_cb.max()
+
+        for k in tqdm(range(self.kplanets)):
+            params = self.__get_params(k)
+
+            fig = plt.figure(figsize=self.full_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            ax = fig.add_subplot(gs[:2, :])
+            ax_r = fig.add_subplot(gs[-1, :])
+            cbar_ax = fig.add_axes([.85, .125, .015, .755])
+            fig.subplots_adjust(right=.84, hspace=0)
+
+            for i in range(self.nins):
+                ins = self.ins == i
+
+                ax.errorbar(
+                    self.time[ins] - 2450000, self.rv0[ins],
+                    yerr=self.err0[ins], linestyle='', marker=None,
+                    ecolor=self.error_color, **self.error_kwargs
+                )
+                im = ax.scatter(
+                    self.time[ins] - 2450000, self.rv0[ins],
+                    marker=self.markers[i], edgecolors='k', s=self.full_size,
+                    c=self.time_cb[ins], cmap=self.full_cmap
+                )
+                im.set_clim(cmin, cmax)
+
+                # Get residuals.
+                res = self.__rv_residuals()[ins]
+
+                ax_r.errorbar(
+                    self.time[ins] - 2450000, res, yerr=self.err0[ins],
+                    linestyle='', marker=None, ecolor=self.error_color,
+                    **self.error_kwargs
+                )
+                im_r = ax_r.scatter(
+                    self.time[ins] - 2450000, res, marker=self.markers[i],
+                    edgecolors='k', s=self.full_size, c=self.time_cb[ins],
+                    cmap=self.full_cmap
+                )
+
+                im_r.set_clim(cmin, cmax)
+            fig.colorbar(
+                im, cax=cbar_ax).set_label(
+                'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
+                fontsize=self.label_fontsize, fontname=self.fontname
+            )
+            time_m = sp.linspace(self.time.min() - 10,
+                                 self.time.max() + 10, 10000)
+            time_m -= 2450000
+            rv_m = empmir.mini_RV_model(params, time_m)
+
+            # Plot best model.
+            ax.plot(time_m, rv_m, '-k', linewidth=2)
+
+            # Plot models CI.
+            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
+            for s in cred_intervals:
+                params_lo, params_up = self.__get_CI_params(k, s)
+                params_lo = (params[0], params_lo[1],
+                             params_lo[2], params_lo[3], params_lo[4])
+                params_up = (params[0], params_up[1],
+                             params_up[2], params_up[3], params_up[4])
+                # Calculate new models.
+                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up = empmir.mini_RV_model(params_up, time_m)
+
+                ax.fill_between(
+                    time_m, rv_m_lo, rv_m_up, color=self.CI_color, alpha=.25
+                )
+
+            # A line to guide the eye.
+            ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+
+            # Labels and tick stuff.
+            ax.set_ylabel(
+                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_ylabel(
+                'Residuals', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+            ax_r.set_xlabel(
+                'Time (JD - 2450000)', fontsize=self.label_fontsize,
+                fontname=self.fontname
+            )
+
+            ax_r.get_yticklabels()[-1].set_visible(False)
+            ax_r.minorticks_on()
+            ax.set_xticks([])
+            ax.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            ax_r.tick_params(
+                axis='both', which='major',
+                labelsize=self.tick_labelsize
+            )
+            for tick in ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in ax_r.get_xticklabels():
+                tick.set_fontname(self.fontname)
+            for tick in cbar_ax.get_yticklabels():
+                tick.set_fontname(self.fontname)
+            cbar_ax.tick_params(labelsize=self.tick_labelsize)
+
+            offset = (time_m.max() - time_m.min()) * .01
+            ax.set_xlim(time_m.min() - offset, time_m.max() + offset)
+            ax_r.set_xlim(time_m.min() - offset, time_m.max() + offset)
+            if self.pdf:
+                fig.savefig(self.working_dir + 'timeseries_' +
+                            str(k + 1) + '.pdf', bbox_inches='tight')
+            if self.png:
+                fig.savefig(self.working_dir + 'timeseries_' +
+                            str(k + 1) + '.png', bbox_inches='tight')
+        plt.close('all')
+
+    def paint_chains(self):
+        """Create traceplots or chain plots for each temperature."""
+        print('\n\t\tPAINTING CHAINS.')
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+            chain = self.chains[t]
+
+            leftovers = len(chain) % self.nwalkers
+            if leftovers == 0:
                 pass
-        else:
-            try:
-                plot(thetas[i][::draw_every_n], flattened[i]
-                     [::draw_every_n], str(i), kplanets)
-            except:
-                print(
-                    'Sample size insufficient to draw the posterior plots for temp ' + str(i) + ' ! !')
+            else:
+                chain = chain[:-leftovers]
+            quasisteps = len(chain) // self.nwalkers
+            color = sp.arange(quasisteps)
+            colors = sp.array(
+                [color for i in range(self.nwalkers)]).reshape(-1)
+
+            # Auxiliary variables to coordinate labels and filenames.
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.chain_figsize)
+
+                im = ax.scatter(
+                    sp.arange(chain.shape[0]), chain[:, i],
+                    c=colors, lw=0, cmap=self.chain_cmap, s=self.chain_size
+                )
+
+                ax.set_xlabel('N', fontsize=self.label_fontsize)
+                ax.tick_params(
+                    axis='both', which='major',
+                    labelsize=self.tick_labelsize
+                )
+
+                cb = plt.colorbar(im, ax=ax)
+                cb.set_label('Step Number', fontsize=self.label_fontsize,
+                             rotation=270, labelpad=self.cbar_labelpad)
+                cb.ax.tick_params(labelsize=self.tick_labelsize)
+
+                # plot only accel and instrumental chains.
+                if not self.kplanets:
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_ylabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_ylabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+                else:
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_ylabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_ylabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_ylabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'chains/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
+        plt.close('all')
+
+    def paint_posteriors(self):
+        """Create posterior plots."""
+        print('\n\t\tPAINTING POSTERIORS.')
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+            chain = self.chains[t]
+            post = self.posteriors[t]
+
+            leftovers = len(chain) % self.nwalkers
+            if leftovers == 0:
                 pass
-    pass
+            else:
+                chain = chain[:-leftovers]
+                post = post[:-(len(post) % self.nwalkers)]
+            quasisteps = len(chain) // self.nwalkers
+            color = sp.arange(quasisteps)
+            colors = sp.array(
+                [color for i in range(self.nwalkers)]).reshape(-1)
+
+            # Auxiliary variables to coordinate labels and filenames.
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.post_figsize)
+
+                im = ax.scatter(
+                    chain[:, i], post, s=self.post_size, c=colors, lw=0,
+                    cmap=self.post_cmap, alpha=self.post_alpha
+                )
+
+                ax.axvline(
+                    chain[sp.argmax(post), i], color=self.post_v_color,
+                    linestyle=self.post_v_linestyle, alpha=self.post_v_alpha,
+                    zorder=10
+                )
+
+                ax.tick_params(
+                    axis='both', which='major',
+                    labelsize=self.tick_labelsize
+                )
+                ax.tick_params(axis='x', rotation=45)
+                ax.set_ylabel('Posterior', fontsize=self.label_fontsize)
+                cb = plt.colorbar(im, ax=ax)
+                cb.set_label('Step Number', fontsize=self.label_fontsize,
+                             rotation=270, labelpad=self.cbar_labelpad)
+                cb.ax.tick_params(labelsize=self.tick_labelsize)
+
+                xaxis = ax.get_xaxis()
+                xaxis.set_major_locator(
+                    ticker.LinearLocator(numticks=self.post_ticknum)
+                )
+                yaxis = ax.get_yaxis()
+                yaxis.set_major_locator(
+                    ticker.LinearLocator(numticks=self.post_ticknum)
+                )
+
+                # plot only accel and instrumental chains.
+                if not self.kplanets:
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_xlabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_xlabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+                else:
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_xlabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_xlabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_xlabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'posteriors/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'posteriors/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'posteriors/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'posteriors/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
+        plt.close('all')
+
+    def paint_histograms(self):
+        """Create histograms."""
+        print('\n\t\tPAINTING HISTOGRAMS.')
+        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+            chain = self.chains[t]
+            post = self.posteriors[t]
+
+            # Auxiliary variables to coordinate labels and filenames.
+            tcount = 0
+            pcount = 1
+            acc = True
+            ins = 0
+            ins_count = 1
+            for i in tqdm(range(self.ndim), desc='Brush type'):
+                fig, ax = plt.subplots(figsize=self.post_figsize)
+
+                ax.set_ylabel('Frequency', fontsize=self.label_fontsize)
+
+                dist = chain[:, i]
+
+                peak = dist[sp.argmax(post)]
+                n, bins = sp.histogram(dist, self.num_bins, density=1)
+                dif = sp.fabs(peak - bins)
+                his_peak = bins[sp.argmin(dif)]
+
+                res = sp.where(n == 0)[0]
+
+                if res.size:
+                    if len(res) > 2:
+                        for j in range(len(res)):
+                            if res[j + 2] - res[j] == 2:
+                                sub = j
+                                break
+                    else:
+                        sub = res[0]
+
+                    if bins[sub] > his_peak:
+                        idx = sp.where(dist <= bins[sub])
+                        post_sub = post[idx]
+                        dist_sub = dist[idx]
+                    else:
+                        idx = sp.where(dist >= bins[sub])
+                        post_sub = post[idx]
+                        dist_sub = dist[idx]
+                else:
+                    dist_sub = dist
+                    post_sub = post
+
+                n, bins, patches = ax.hist(
+                    dist_sub, self.num_bins, density=1,
+                    facecolor=self.hist_facecolor, alpha=self.hist_alpha
+                )
+
+                mu, sigma = norm.fit(dist_sub)
+                var = sigma ** 2
+
+                # Statistics.
+                skew = '{:.4e}'.format(Decimal(sp.stats.skew(dist_sub)))
+                kurt = '{:.4e}'.format(Decimal(sp.stats.kurtosis(dist_sub)))
+                gmod = '{:.4e}'.format(Decimal(bins[sp.argmax(n)]))
+                med = '{:.4e}'.format(Decimal(sp.median(dist_sub)))
+
+                span = bins[len(bins) - 1] - bins[0]
+                bins_x = ((sp.arange(self.num_bins * 100) /
+                           (self.num_bins * 100)) * span) + bins[0]
+
+                # Make a renormalised gaussian plot.
+                y = emplib.hist_gaussian(bins_x, mu, sigma) * n.max()
+
+                ax.plot(bins_x, y, 'r-', linewidth=3)
+
+                fig.subplots_adjust(left=.15)
+
+                ax.set_ylim([0, n.max() * 1.7])
+
+                ax.autoscale(enable=True, axis='x', tight=True)
+
+                # Add stats to plot as text.
+
+                ymin, ymax = ax.get_ylim()
+                xmin, xmax = ax.get_xlim()
+
+                mu_o = '{:.4e}'.format(Decimal(mu))
+                sigma_o = '{:.4e}'.format(Decimal(sigma))
+                var_o = '{:.4e}'.format(Decimal(var))
+
+                ax.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
+                        * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$",
+                        size=25)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.180, r"$\mu_1 ={}$".format(mu_o), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.255, r"$\sigma^2 ={}$".format(var_o), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.8, ymax - (ymax - ymin)
+                        * 0.330, r"$\mu_3 ={}$".format(skew), size=20)
+
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.180, r"$\mu_4 ={}$".format(kurt), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.255, r"$Median ={}$".format(med), size=20)
+                ax.text(xmax - (xmax - xmin) * 0.5, ymax - (ymax - ymin)
+                        * 0.330, r"$Mode ={}$".format(gmod), size=20)
+
+                if not self.kplanets:
+
+                    if i == 0:
+                        title = self.chain_titles[5]
+                        ax.set_xlabel(
+                            title + self.chain_units[-1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter = 0
+                    else:
+                        title = self.chain_titles[6 + counter % 2]
+                        ax.set_xlabel(
+                            title + self.chain_units[1],
+                            fontsize=self.label_fontsize
+                        )
+                        counter += 1
+                else:
+
+                    if pcount <= self.kplanets:
+                        title = self.chain_titles[tcount % 5]
+                        ax.set_xlabel(title + self.chain_units[tcount % 5],
+                                      fontsize=self.label_fontsize)
+                        tcount += 1
+                    else:
+                        if acc:
+                            title = self.chain_titles[5]
+                            ax.set_xlabel(
+                                title + self.chain_units[-1],
+                                fontsize=self.label_fontsize
+                            )
+                            acc = False
+                            counter = 0
+                        else:
+                            title = self.chain_titles[6 + counter % 2]
+                            ax.set_xlabel(
+                                title + self.chain_units[1],
+                                fontsize=self.label_fontsize
+                            )
+                            counter += 1
+
+                if pcount <= self.kplanets:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'histograms/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'histograms/' + title +
+                                    '_K' + str(pcount) + '_T' + str(t)
+                                    + '.png')
+                else:
+                    if self.pdf:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.pdf')
+                    if self.png:
+                        plt.savefig(self.working_dir + 'histograms/' + title
+                                    + '_INS' + str(ins) + '_T' + str(t)
+                                    + '.png')
+                    ins_count += 1
+                    ins += 1 if ins_count % 2 == 0 else 0
+                pcount += 1 if tcount % 5 == 0 else 0
+        plt.close('all')
+
+    def paint_corners(self):
+        """Create corner plots. Cold chain only."""
+        print('\n\t\tPAINTING CORNERS.')
+        titles = ['P', 'K', r'$\phi$', 'e', r'$\omega$']
+        if not self.kplanets:
+            print('No cornerplots for K0.')
+            return
+        for k in tqdm(range(self.kplanets), desc='Brush number'):
+            labels = [t + ' ' + str(k + 1) + '\n' + u
+                      for t, u in zip(
+                      self.chain_titles[:-1 - self.nins],
+                      self.chain_units[:-1]
+                      )]
+            fig = corner.corner(
+                self.cold[:, k * 5:(k + 1) * 5],
+                plot_contours=True,
+                fill_contours=False,
+                plot_datapoints=True,
+                no_fill_contours=True,
+                max_n_ticks=3
+            )
+            params = self.__get_params(k)
+            params_lo, params_up = self.__get_CI_params(k, .68)
+
+            axes = sp.array(fig.axes).reshape((5, 5))
+
+            for i in range(5):
+                ax = axes[i, i]
+                ax.axvline(params[i], color=self.corner_med_c,
+                           linestyle=self.corner_med_style)
+                ax.axvline(params_lo[i], color=self.corner_v_c,
+                           linestyle=self.corner_v_style)
+                ax.axvline(params_up[i], color=self.corner_v_c,
+                           linestyle=self.corner_v_style)
+                t = titles[i] + '={:.2f}'.format(params[i]) + \
+                    r'$^{+' + '{:.2f}'.format(params_up[i] - params[i]) + \
+                    r'}_{-' + '{:.2f}'.format(params[i] - params_lo[i]) + r'}$'
+
+                ax.set_title(t, fontsize=self.corner_fontsize,
+                             fontname=self.fontname)
+
+            for yi in range(5):
+                for xi in range(yi):
+                    ax = axes[yi, xi]
+                    if xi == 0:
+                        for tick in ax.yaxis.get_major_ticks():
+                            tick.label.set_fontsize(self.corner_tick_fontsize)
+                            tick.label.set_fontname(self.fontname)
+                            ax.set_ylabel(
+                                labels[yi],
+                                labelpad=self.corner_labelpad,
+                                fontsize=self.corner_fontsize,
+                                fontname=self.fontname
+                            )
+                    if yi == 4:
+                        for tick in ax.xaxis.get_major_ticks():
+                            tick.label.set_fontsize(self.corner_tick_fontsize)
+                            tick.label.set_fontname(self.fontname)
+                            ax.set_xlabel(
+                                labels[xi],
+                                labelpad=self.corner_labelpad,
+                                fontsize=self.corner_fontsize,
+                                fontname=self.fontname
+                            )
+                    ax.axvline(params[xi], color=self.corner_med_c,
+                               linestyle=self.corner_med_style)
+                    ax.axhline(params[yi], color=self.corner_med_c,
+                               linestyle=self.corner_med_style)
+                    ax.plot(params[xi], params[yi], self.corner_marker)
+                axes[-1, -1].set_xlabel(
+                    labels[-1],
+                    labelpad=self.corner_labelpad,
+                    fontsize=self.corner_fontsize,
+                    fontname=self.fontname
+                )
+                for tick in axes[-1, -1].xaxis.get_major_ticks():
+                    tick.label.set_fontsize(self.corner_tick_fontsize)
+                    tick.label.set_fontname(self.fontname)
+            if self.pdf:
+                plt.savefig(self.working_dir + 'corners/' +
+                            'corner_K' + str(k + 1) + '.pdf')
+            if self.png:
+                plt.savefig(self.working_dir + 'corners/' +
+                            'corner_K' + str(k + 1) + '.png')
+        plt.close('all')
+
+    def __read_config(self):
+        """Read configuration file for plotting."""
+        # TODO: implement.
+        self.phase_figsize = (20, 10)
+        self.full_figsize = (20, 10)
+        self.chain_figsize = (12, 7)
+        self.post_figsize = (12, 7)
+        self.hist_figsize = (12, 7)
+        self.phase_cmap = 'cool_r'
+        self.full_cmap = 'cool_r'
+        self.phase_size = 100
+        self.full_size = 100
+        self.chain_size = 20
+        self.chain_cmap = 'viridis'
+        self.post_size = 20
+        self.post_ticknum = 10
+        self.post_alpha = .8
+        self.post_cmap = 'viridis'
+        self.post_v_color = 'red'
+        self.post_v_linestyle = '--'
+        self.post_v_linewidth = 2
+        self.post_v_alpha = .7
+        self.label_fontsize = 22
+        self.num_bins = 12
+        self.hist_facecolor = 'blue'
+        self.hist_alpha = .5
+        self.CI_color = 'mediumseagreen'
+        self.error_color = 'k'
+        self.fontname = 'serif'
+        self.corner_med_c = 'firebrick'
+        self.corner_v_c = 'lightcoral'
+        self.corner_v_style = '-.'
+        self.corner_med_style = '--'
+        self.tick_labelsize = 20
+        self.cbar_labelpad = 30
+        self.corner_fontsize = 20
+        self.corner_tick_fontsize = 15
+        self.corner_labelpad = 15
+        self.corner_marker = 'sr'
+        pass
