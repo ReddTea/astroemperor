@@ -2,7 +2,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # EMPEROR Exoplanet Mcmc Parallel tEmpering Radial velOcity fitteR
-# version 0.572.-47/31,64
+# version 0.572.-47/31,64 Pluto, Ceres
 
 # DEPENDENCIES
 from __future__ import division
@@ -30,12 +30,6 @@ if True:
     import emperors_library as emplib
     import emperors_mirror as empmir
 
-    try:  # put somewhere else # DEL
-        import george
-    except ImportError:
-        raise ImportError('You don t have the package george installed.\
-                           Try pip install george.')
-
     try:
         from tqdm import tqdm
     except ImportError:
@@ -44,7 +38,7 @@ if True:
     try:
         from termcolor import colored
     except:
-        print('You are missing the most cool package in Python!\
+        print('You are missing cool-ors in your life!\
                Try pip install termcolor')
     try:
         from pygame import mixer
@@ -67,15 +61,19 @@ if True:
         fault = False
         print('You are missing the most cool package in Python!\
                Try pip install pygame or set MUSIC=False')
-else:
-    print('You are missing some libraries :/')
 
 # DUMMY FUNCTIONS
 def logp(theta, func_logp, args):
+    '''
+    Dummy function for emcee. Shouldn't be touched.
+    '''
     return func_logp(theta, args)
 
 
 def logl(theta, func_logl, args):
+    '''
+    Dummy function for emcee. Shouldn't be touched.
+    '''
     return func_logl(theta, args)
 
 
@@ -98,6 +96,27 @@ def neo_init_batman(t, ld_mod, ldn):
 
 
 class spec_list:
+    """
+    A simple list for spec objects with inbuilt functions for ease of use.
+
+    Attributes
+    ----------
+    list_ : list
+        This is the list object containing the spec objects.
+    ndim_ : int
+        Returns the real dimentionality of the problem (doesn't count either
+        fixed parameters nor joined twice).
+    gral_priors : List of functions.
+        List containing all the extra priors that are not directly attached to
+        a parameter.
+    C : List
+        Coordinator. It's a simple list with the positions of the parameters to
+        fit.
+    A : List
+        Anticoordinator. It's a simple list with the positions of the fixed
+        parameters. It's the complement of the coordinator, hencec the name.
+
+    """
     def __init__(self):
         self.list_ = sp.array([])
         self.ndim_ = 0
@@ -110,8 +129,15 @@ class spec_list:
         return len(self.list_)
 
     def _update_list_(self):
-        # updates ndim
-        # updates coordinator and anticoordinator
+        """Updates the ndim_, C and A attributes.
+
+        -------
+        function
+            Really, it just updates.
+
+        """
+        self.A = []
+        self.C = []
         ndim = self.len()
         priors = self.list('prior')
         for i in range(self.len()):
@@ -223,8 +249,10 @@ class EMPIRE:
 
             # About the search parameters
             self.ACC = 1  # Acceleration order
+            self.MOAV_STAR = 0
+
             self.WN = True  # jitter fitting (dont touch)
-            self.MOAV = sp.array([1, 1])  # MOAV order for each instrument
+            self.MOAV = sp.array([0, 0])  # MOAV order for each instrument
 
             # PM
             self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
@@ -301,7 +329,7 @@ class EMPIRE:
         self.CORNER = True
         self.HISTOGRAMS = True
         self.breakFLAG = False
-
+        self.NoWarnings = True
 
 
         # EXTERMINATE  # DEL
@@ -339,7 +367,7 @@ class EMPIRE:
         pass
 
     def _theta_ins(self, limits, conditions, nin, MOAV):
-        names = ['Jitter', 'Offset', 'MACoefficient', 'MATimescale']
+        names = ['Jitter', 'Offset', 'MACoefficient_ins', 'MATimescale_ins']
         if nin > 0:
             names = [str(name)+'_'+str(nin+1) for name in names]
         units = [' $[\\frac{m}{s}]$', ' $[\\frac{m}{s}]$', ' [Days]', '']
@@ -369,16 +397,22 @@ class EMPIRE:
         pass
 
     def _theta_gen(self, limits, conditions):
-        priors = 'uniform'
         new = []
+        names = ['Acceleration', 'MACoefficient_star', 'MATimescale_star']
         for i in range(self.ACC):
-            name = 'Acceleration'
             if self.ACC == 1:
                 aux = ''
             else:
                 aux = '_%i' % i+1
             units = [' $[\\frac{m}{s%i}]$' % (i+1)]
-            t = spec(name+aux, units, priors, [limits[0], limits[1]], -sp.inf, 'general')
+            t = spec(names[0]+aux, units, 'uniform', limits[0], -sp.inf, 'general')
+            new = sp.append(new, t)
+
+        #limits = limits[1:]
+        for j in range(2*self.MOAV_STAR):
+            name_ = names[1+j%2]+'_'+str(j//2+1)  # in which moav of this ins
+            unit_ = ['[Days]', '']
+            t = spec(name_, unit_[j%2], 'uniform', limits[j%2+1], -sp.inf, 'general')
             new = sp.append(new, t)
         self.theta.list_ = sp.append(new, self.theta.list_)
         pass
@@ -605,7 +639,8 @@ class EMPIRE:
         if self.RV:
             logl_params_aux = sp.array([self.time, self.rv, self.err, self.ins,
                                     self.staract, self.starflag, kplan, self.nins,
-                                    self.MOAV, self.totcornum, self.ACC, self.anticoor])  # anticoor here too? DEL
+                                    self.MOAV, self.MOAV_STAR, self.totcornum,
+                                    self.ACC, self.anticoor])  # anticoor here too? DEL
 
             logl_params = [self.theta.list_, self.anticoor, logl_params_aux]
 
@@ -634,6 +669,7 @@ class EMPIRE:
         pbar = tqdm(total=self.burn_out)
         for p, lnprob, lnlike in self.sampler.sample(pos0, iterations=self.burn_out):
             pbar.update(1)
+            #raise Exception('debugeeee')
             pass
         pbar.close()
         #raise Exception('debug')
@@ -680,6 +716,10 @@ class EMPIRE:
 
         if self.MUSIC:
             imperial.play()
+
+        if self.NoWarnings:
+            import warnings
+            warnings.filterwarnings("ignore")
 
         #Here should be how to run! Where does it start? Full auto?
 
@@ -744,12 +784,13 @@ class EMPIRE:
 
         if self.RV:
         # INITIALIZE GENERAL PARAMS
-            self._theta_gen(acc_lims, None)
+            gen_lims = sp.array([[-1., 1.], [-0.2, 0.2], [0.1, 6.]])
+            self._theta_gen(gen_lims, None)
 
             # INITIALIZE INSTRUMENT PARAMS
 
             for nin in range(self.nins):
-                moav_lim = sp.array([(-1.0, 1.0, 0.1, 10) for _ in range(self.MOAV[nin])]).reshape(-1)
+                moav_lim = sp.array([(-0.2, 0.2, 0.1, 6.) for _ in range(self.MOAV[nin])]).reshape(-1)
                 ins_lims = sp.append(jitoff_lim, moav_lim).reshape(-1)
                 self._theta_ins(ins_lims, None, nin, self.MOAV[nin])
 
@@ -759,7 +800,11 @@ class EMPIRE:
             # INITIALIZE GEORGE
             #for n in range(len(self.george_kernels)):
             if self.gaussian_processor == 'george':
-                # import george here? # DEL
+                try:  # put somewhere else # DEL
+                    import george
+                except ImportError:
+                    raise ImportError('You don t have the package george installed.\
+                                       Try pip install george.')
                 # this is a general gp, not per instrument, so jitter is for staract
                 self.george_k = empmir.neo_init_george(self.george_kernels)
 
@@ -796,6 +841,9 @@ class EMPIRE:
                 self._theta_celerite_pm(ins_bnd, None, 0)
 
         # raise Exception('DEBUG')  # DEL
+        ##################################################
+        ##################################################
+        ##################################################
         while kplan <= to_k:
             if kplan > 0:
                 if self.RV:
@@ -839,20 +887,13 @@ class EMPIRE:
             # show the initialized params and priors
             for t in self.theta.list_:
                 print(t.name, t.prior, t.val, t.lims)
-            print('____')
+            print('____________')
 
             # raise Exception('DEBUG')  # DEL
 
-            '''
-            for i in range(len(self.theta.list_)):
-                if self.theta.list_[i].prior == 'fixed':
-                    self.anticoor.append(i)
-                else:
-                    self.coordinator.append(i)
-
-            '''
             self.theta._update_list_()
             ### COORDINATOR
+
             self.coordinator = self.theta.C
             self.anticoor = self.theta.A
             #raise Exception('debug')
@@ -861,15 +902,10 @@ class EMPIRE:
             self.pos0 = emplib.neo_p0(self.setup, self.theta.list_, self.theta.ndim_, self.coordinator)
 
         # 4 run chain
-
-            p=self.pos0[0][1]
-
             # raise Exception('DEBUG')  # DEL
             if self.RV:
                 from emperors_mirror import neo_logp_rv, neo_logl_rv
-                logl_params = sp.array([self.time, self.rv, self.err, self.ins,
-                                        self.staract, self.starflag, kplan, self.nins,
-                                        self.MOAV, self.totcornum, self.ACC])
+
             if self.PM:
                 from emperors_mirror import neo_logp_pm, neo_logl_pm
                 logl_params = sp.array([self.time_pm, self.rv_pm, self.err_pm,
@@ -880,25 +916,47 @@ class EMPIRE:
             # rv and pm testing, reroll p0 if not
             self.autodestruction = 0
             self.adc = 0
+            logl_params_aux = sp.array([self.time, self.rv, self.err, self.ins,
+                                    self.staract, self.starflag, kplan, self.nins,
+                                    self.MOAV, self.MOAV_STAR, self.totcornum,
+                                    self.ACC, self.theta.A])  # anticoor here too? DEL
+
+            logl_params = [self.theta.list_, self.theta.A, logl_params_aux]
+
+            self.bad_bunnies = []
             if self.RV:
                 for i in range(self.nwalkers):
+                    #import warnings
+                    #warnings.filterwarnings("error")
                     self.a = neo_logp_rv(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
+                    self.b = neo_logl_rv(self.pos0[0][i], logl_params)
+                    #raise Exception('debuggeeeeeee')
                     if self.a == -sp.inf:
                         self.adc += 1
-                    self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
-                    self.adc = 0
-                print('autodestruction', self.autodestruction)
+                        #self.bad_bunnies.append(i)
+                        print('a')
+                    elif self.b ==-sp.inf:
+                        self.adc += 1
+                        self.bad_bunnies.append(i)
+                        print('b')
 
+                self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
+                self.adc = 0
+                print('Initial Position acceptance rate', self.autodestruction)
+                #raise Exception('deb')
                 while self.autodestruction <= 0.98:
                     print('Reinitializing walkers')
-                    print('autodestruction', self.autodestruction)
                     self.pos0 = emplib.neo_p0(self.setup, self.theta.list_, self.theta.ndim_, self.coordinator)
                     for i in range(self.nwalkers):
                         self.a = neo_logp_rv(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
-                        if self.a == -sp.inf:
+                        self.b = neo_logl_rv(self.pos0[0][i], logl_params)
+                        if self.a == -sp.inf or self.b ==-sp.inf:
                             self.adc += 1
                     self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
+                    print('Initial Position acceptance rate', self.autodestruction)
                     self.adc = 0
+
+
             if self.PM:
                 for i in range(self.nwalkers):
                     self.c = neo_logp_pm(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
@@ -1024,13 +1082,14 @@ class EMPIRE:
             self.constrain = [30.15, 69.85]
             self.constrain = [38.15, 61.85]
             if kplan > 0:
+                '''
                 for i in range(self.theta.ndim_):
                     if (self.theta.list_[self.coordinator[i]].prior != 'fixed' and
                         self.theta.list_[self.coordinator[i]].type == 'keplerian'):
                         self.theta.list_[self.coordinator[i]].lims = sp.percentile(self.cherry_chain[0][:, i], self.constrain)
                         #self.theta.list_[self.coordinator[i]].args = [ajuste[i], sigmas[i]]
                         pass
-
+                '''
 
             #'''
             kplan += 1
@@ -1040,6 +1099,7 @@ class EMPIRE:
         if self.MUSIC:  # end music
             technological_terror.play()
         pass  # end CONQUER
+
 #
 
 stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
@@ -1047,7 +1107,7 @@ stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([2, 50, 100])
+setup = sp.array([1, 50, 200])
 em = EMPIRE(stardat, setup)
 #em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1058,8 +1118,8 @@ em.betas = None #array([1.0])  # beta factor for each temperature, None for auto
 #em.RAW = True
 em.ACC = 1
 em.MOAV = sp.array([0,0])  # not needed
-
-
+#em.MOAV_STAR = 1
+#arara
 
 #em.batman_ld = ['quadratic']
 #em.gaussian_processor = 'george'
@@ -1079,7 +1139,7 @@ em.changes_list = {0:['Period', 'prior', 'fixed'],
                    3:['Period_2', 'val', sp.log(30.34)]
                    }
 
-em.conquer(1, 1)
+em.conquer(1, 2)
 
 
 if False:
