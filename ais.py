@@ -1,4 +1,4 @@
-# @auto-fold regex /^\s*if/ /^\s*else/ /^\s*elif/ /^\s*def/
+# @auto-fold regex /^\s*if/ /^\s*else/ /^\s*elif/ /^\s*def/ /^\s*class spec/
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # EMPEROR Exoplanet Mcmc Parallel tEmpering Radial velOcity fitteR
@@ -15,6 +15,8 @@ if True:
     from scipy.stats import norm
     import matplotlib.pyplot as plt
     import matplotlib.mlab as mlab
+    from functools import reduce as ft_red
+    from operator import iconcat as op_ic
 
     import batman
 
@@ -52,7 +54,7 @@ if True:
         technical = mixer.Sound('mediafiles/technical.wav')
         fault = mixer.Sound('mediafiles/your_fault.wav')
 
-    except Exception as e:
+    except:
         imperial = False
         thybiding = False
         technological_terror = False
@@ -153,9 +155,20 @@ class spec_list:
         pass
 
     def change_val(self, commands):
-        '''
-        To change values only knowing the name!
-        '''
+        """Changes an attribute of a spec object matching the input name.
+
+        Parameters
+        ----------
+        commands : list
+            Should be a list containing the object name, the attribute to
+            change and the value you want.
+
+        Returns
+        -------
+        boolean
+            Returns a boolean, to check if the action was done or not.
+
+        """
         object_id, action = commands[:2]
         whato = commands[2:]
         if len(whato) == 1:  # dictionary quickfix
@@ -167,6 +180,16 @@ class spec_list:
         return False
 
     def apply_changes_list(self, changes_list):
+        """Input is a list with the 'command' format for the change_val
+        function. If the change is applied, it deletes that command from the
+        input list.
+
+        Parameters
+        ----------
+        changes_list : list
+            List containing the commands to apply to the spec_list.
+
+        """
         used = []
         for j in changes_list.keys():
             if self.change_val(changes_list[j]):
@@ -178,92 +201,165 @@ class spec_list:
         pass
 
     def list(self, *call):
+        """In-built function to call a list containing the same attribute for
+        each spec object.
+
+        Parameters
+        ----------
+        *call : type
+            The attribute or attributes that you want to retrieve, in a list.
+
+        Returns
+        -------
+        list
+            List with the attributes for each spec object.
+            If more than one attribute is requested in call, it returns a
+            list of lists as the describes before. Well, arrays really.
+
+        """
         if len(call) == 1:
             return sp.array([getattr(self.list_[i], call[0]) for i in range(len(self.list_))])
         else:
             return sp.array([sp.array([getattr(self.list_[i], c) for i in range(len(self.list_))]) for c in call])
+
+
 class spec:
+    """
+    Spec object contains metadata corresponding to a parameter to fit with
+    emcee.
+
+    Parameters
+    ----------
+    name : string
+        Unique identifier for your parameter.
+    units : string
+        Units that you want displayed in your plots. They DONT change anything
+        else.
+    prior : string
+        String that calls a function with the same name in emperors_mirror.py.
+        Alternatively it is a marker for fixed parameters.
+    lims : list
+        List containing the lower and upper boundary for the parameter.
+    val : float
+        Value for a fixed parameter. Default for the others is -inf.
+    type : string
+        A 'general' information from where this parameter is. As 'keplerian' or
+        'gaussian process'
+    args : any
+        Any additional argument that is needed. Has no real use for now.
+
+    Attributes
+    ----------
+    Just the same as stated above.
+    """
     def __init__(self, name, units, prior, lims, val, type, args=[]):
         self.name = name
         self.units = units
-        self.prior = prior  # d[str(prior)]
+        self.prior = prior
         self.lims = lims
         self.val = -sp.inf
         self.args = args
         self.type = type
-    def __prior(self, x, *args):
-        return self.__prior(x, args)
 
     def identify(self):
+        """Out goes the string containing the name and units. Used for the
+        displays on terminal.
+
+        Returns
+        -------
+        string
+            Name and units of the spec.
+
+        """
         return self.name + '    ' + self.units
 
     def tag(self):
+        """Short summary.
+
+        Returns
+        -------
+        type
+            Description of returned object.
+
+        """
         return self.name.split('_')[0]
     pass
 
 
 class EMPIRE:
     def __init__(self, stardat, setup, file_type='rv_file'):
+        """Contains all the data, functions and setup necesary for the run
+        of the MCMC chain.
+
+        Parameters
+        ----------
+        stardat : list
+            Contains the paths to the data files.
+        setup : list
+            Goes as [ntemps, nwalkers, nsteps].
+        file_type : str
+            Fyle type, should be 'rv_file' or 'pm_file'.
+
+        """
         emplib.ensure(len(stardat) >= 1,
                       'stardat has to contain at least 1 file ! !', fault)
         emplib.ensure(len(setup) == 3,
                       'setup has to be [ntemps, nwalkers, nsteps]', fault)
 
         #  Setup
-        self.cores = multiprocessing.cpu_count()
-        self.setup = setup
-        self.ntemps, self.nwalkers, self.nsteps = setup
-        self.betas = None
+        self.cores = multiprocessing.cpu_count()  # number of available threads
+        self.setup = setup  # contains the ntemp, nwalkers and nsteps
+        self.ntemps, self.nwalkers, self.nsteps = setup  # unpacks
+        self.betas = None  # default temperatures if no input is given
 
-        self.changes_list = {}
-        self.coordinator = sp.array([])
-        self.anticoor = sp.array([])
+        self.changes_list = {}  # list containing user-made parameter changes
+        self.coordinator = sp.array([])  # coordinator, check class spec_list
+        self.anticoor = sp.array([])  # anticoordinator, idem
 
-        self.burn_out = self.nsteps // 2
-        self.RV = False
-        self.PM = False
+        self.burn_out = self.nsteps // 2  # default lenght for burnin phase
+        self.RV = False  # marker for the data
+        self.PM = False  # marker for the data
 
-        self.START = chrono.time()
+        self.START = chrono.time()  # total time counter
         self.VINES = False  # jaja
-        # initialize flat model, this should go elsewhere
-        # name  # units     # prior     # lims  # args
-        self.theta = spec_list()
-        self.ld = {
-            'uniform': 0,
-            'linear': 1,
-            'quadratic': 2,
-            'square-root': 2,
-            'logarithmic': 2,
-            'exponential': 2,
-            'power2': 2,
-            'nonlinear': 2
-        }
 
-        #  Reading data
+        self.theta = spec_list()  # parameters metadata, initializes spec_list
+
+        self.ld = {'uniform': 0,
+                    'linear': 1,
+                    'quadratic': 2,
+                    'square-root': 2,
+                    'logarithmic': 2,
+                    'exponential': 2,
+                    'power2': 2,
+                    'nonlinear': 2
+                    }  # dictionary with limb darkening dimentionality
+
+        ###  READING DATA  ###
 
         if False:  # this will contain rv+pm
             pass
 
-        elif file_type == 'rv_file':
+        elif file_type == 'rv_file':  # for RV data
             self.rvfiles = stardat
             rvdat = emplib.read_data(stardat)
             # time, radial velocities, error and instrument flag
-            self.time, self.rv, self.err, self.ins = rvdat[0]
             self.all_data = rvdat[0]
-            # time, star activity index and flag
+            self.time, self.rv, self.err, self.ins = self.all_data
+            # star activity index and flag
             self.staract, self.starflag = rvdat[1], rvdat[2]
-            self.totcornum = rvdat[3]  # quantity if star activity indices
+            self.totcornum = rvdat[3]  # quantity if star activity is given
 
-            self.nins = len(self.rvfiles)  # number of instruments autodefined
+            self.nins = len(self.rvfiles)  # number of instruments
             self.ndat = len(self.time)  # number of datapoints
-            self.RV = True
+            self.RV = True  # setup data type marker
 
             # About the search parameters
-            self.ACC = 1  # Acceleration order
-            self.MOAV_STAR = 0
+            self.ACC = 1  # Acceleration polynomial order, default is 1, a line
+            self.MOAV_STAR = 0  # Moving Average for the star activity
 
-            self.WN = True  # jitter fitting (dont touch)
-            self.MOAV = sp.array([0, 0])  # MOAV order for each instrument
+            self.WN = True  # white noise, jitter fitting (dont touch)
+            self.MOAV = sp.array([0 for _ in range(self.nins)])  # MOAV order for each instrument
 
             # PM
             self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = 0., 0., 0., 0.
@@ -317,31 +413,31 @@ class EMPIRE:
 
             self.starname = self.pmfiles[0].split('_')[0]
         else:
-            raise Exception('You sure you wrote the filetype correctly mate?')
+            emplib.ensure(False, 'Did you write the filetype correctly?', fault)
         #  Statistical Tools
         # inside chain comparison (smaller = stricter)
         self.bayes_factor = sp.log(150)
-        self.model_comparison = 5  # between differet k configurations
-        self.BIC = 5
-        self.AIC = 5
+        self.model_comparison = 5  # between different k configurations
+        self.BIC = 5  # Bayes Information Criteria factor
+        self.AIC = 5  # Akaike Information Criteria factor
 
         #  Menudencies
-        self.thin = 1
-        self.STARMASS = False
-        self.HILL = False
-        self.CHECK = False
-        self.RAW = False
-        self.MUSIC = True
+        self.thin = 1  # thins the chain taking one every self.thin samples
+        self.STARMASS = False  # if this is included, calculates extra stuff
+        self.HILL = False  # Use Hill Stability Criteria as a prior too
+        self.CHECK = False  # prints stuff, for developers use
+        self.RAW = False  # saves the chain without the in-model cutoff
+        self.MUSIC = True  # hehe
 
         # Plotting stuff
-        self.INPLOT = True
-        self.draw_every_n = 1
-        self.PNG = True
-        self.PDF = False
-        self.CORNER = True
-        self.HISTOGRAMS = True
-        self.breakFLAG = False
-        self.NoWarnings = True
+        self.INPLOT = True  # plots during the run
+        self.draw_every_n = 1  # draws only 1 every draw_every_n samples
+        self.PNG = True  # saved plots format. Short time, so and so quality
+        self.PDF = False  #  saved plots format. Long time, high quality
+        self.CORNER = True  # does a corner plot.
+        self.HISTOGRAMS = True  # plots histograms
+        self.breakFLAG = False  # not really sure
+        self.NoWarnings = True  # Ignores all warnings
 
 
         # EXTERMINATE  # DEL
@@ -413,8 +509,17 @@ class EMPIRE:
         self.theta.list_ = sp.append(self.theta.list_, new)
         pass
 
-    def _theta_star(self, limits, conditions, instruments):
+    def _theta_star(self, limits, conditions):
         name = 'Stellar Activity'
+        new = sp.array([])
+        sa_ins = ft_red(op_ic, self.starflag, [])+1
+        units = ''
+        prior = 'uniform'
+
+        for sa in range(self.totcornum):
+            na = name + ' %i' %sa
+            t = spec(na, units, prior, limits[sa], -sp.inf, 'stellar')
+            self.theta.list_ = sp.append(self.theta.list_, t)
         pass
 
     def _theta_gen(self, limits, conditions):
@@ -620,7 +725,7 @@ class EMPIRE:
         # ndat = len(self.time)  # DEL
         ndim = self.theta.ndim_
 
-        def starinfo():
+        def starinfo():  # in this format so developers can wrap
             colors = ['red', 'green', 'blue', 'yellow',
                       'grey', 'magenta', 'cyan', 'white']
             c = sp.random.randint(0, 7)
@@ -665,10 +770,11 @@ class EMPIRE:
         starinfo()
         # '''
         #from emperors_library import logp_rv
-        print(str(self.PM), ndim, 'self.pm y ndim')  # PMPMPM
+        #print(str(self.PM), ndim, 'self.pm y ndim')  # PMPMPM  # DEL
 
         logp_params = [self.theta.list_, self.theta.ndim_, self.coordinator]
 
+        ###  SETUPS THE SAMPLER  ###
         if self.RV:
             logl_params_aux = sp.array([self.time, self.rv, self.err, self.ins,
                                     self.staract, self.starflag, kplan, self.nins,
@@ -706,7 +812,6 @@ class EMPIRE:
         pbar = tqdm(total=self.burn_out)
         for p, lnprob, lnlike in self.sampler.sample(pos0, iterations=self.burn_out):
             pbar.update(1)
-            #raise Exception('debugeeee')
             pass
         pbar.close()
         #raise Exception('debug')
@@ -834,6 +939,10 @@ class EMPIRE:
                 ins_lims = sp.append(jitoff_lim, moav_lim).reshape(-1)
                 self._theta_ins(ins_lims, None, nin, self.MOAV[nin])
 
+
+            sa_lims = sp.array([[-sp.amax()]])
+            self._theta_star(sa_lims, None)
+
         if self.PM:
             # INITIALIZE GENERAL PARAMS
             # INITIALIZE INSTRUMENT PARAMS
@@ -881,9 +990,7 @@ class EMPIRE:
                 ins_bnd = sp.array([-10, 10])
                 self._theta_celerite_pm(ins_bnd, None, 0)
 
-        # raise Exception('DEBUG')  # DEL
-        ##################################################
-        ##################################################
+
         ##################################################
         while kplan <= to_k:
             if kplan > 0:
@@ -893,18 +1000,14 @@ class EMPIRE:
                     pass
                 if self.PM:
                     # INITIALIZE PHOTOMETRIC PARAMS
-                    #ld_d = {'uniform':0, 'linear':1, 'quadratic':2, 'nonlinear':4}
                     self.batman_ldn.append(self.ld[self.batman_ld[kplan - 1]])
                     self._theta_photo(free_lims_pm, None, kplan,
                                       self.batman_ldn[kplan - 1])
                     # INITIALIZE BATMAN
-                    # ncb = sp.ones(self.ld[self.batman_ld[kplan-1]])  # dummy coefficients
                     self.batman_m[kplan - 1], self.batman_p[kplan - 1] = empmir.neo_model_pm(
                         self.time_pm, self.batman_ld[kplan - 1], self.batman_ldn[kplan - 1])
-                    # raise Exception('DEBUG')  # DEL
                     pass
 
-                #raise Exception('DEBUG')  # DEL
         # FINAL MODEL STEP, apply commands
             # '''
 
@@ -932,21 +1035,16 @@ class EMPIRE:
                 print(t.name, t.prior, t.val, t.lims)
             print('____________')
 
-            # raise Exception('DEBUG')  # DEL
-
             self.theta._update_list_()
             ### COORDINATOR
-
             self.coordinator = self.theta.C
             self.anticoor = self.theta.A
-            #raise Exception('debug')
 
         # 3 generate values for said model, different step as this should allow configuration
             self.pos0 = emplib.neo_p0(
                 self.setup, self.theta.list_, self.theta.ndim_, self.coordinator)
 
         # 4 run chain
-            # raise Exception('DEBUG')  # DEL
             if self.RV:
                 from emperors_mirror import neo_logp_rv, neo_logl_rv
 
@@ -970,14 +1068,11 @@ class EMPIRE:
             self.bad_bunnies = []
             if self.RV:
                 for i in range(self.nwalkers):
-                    #import warnings
-                    #warnings.filterwarnings("error")
                     self.a = neo_logp_rv(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
                     self.b = neo_logl_rv(self.pos0[0][i], logl_params)
-                    #raise Exception('debuggeeeeeee')
                     if self.a == -sp.inf:
                         self.adc += 1
-                        #self.bad_bunnies.append(i)
+                        self.bad_bunnies.append(i)
                         print('a')
                     elif self.b ==-sp.inf:
                         self.adc += 1
@@ -987,7 +1082,6 @@ class EMPIRE:
                 self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
                 self.adc = 0
                 print('Initial Position acceptance rate', self.autodestruction)
-                #raise Exception('deb')
                 while self.autodestruction <= 0.98:
                     print('Reinitializing walkers')
                     self.pos0 = emplib.neo_p0(self.setup, self.theta.list_, self.theta.ndim_, self.coordinator)
@@ -1034,8 +1128,7 @@ class EMPIRE:
             sigmas, sigmas_raw = sp.zeros(
                 self.theta.ndim_), sp.zeros(self.theta.ndim_)
             self.MCMC(self.pos0, kplan, sigmas_raw, logl, logp)
-            # '''
-            # raise Exception('DEBUG')  # DEL
+
         # 5 get stats (and model posterior)
 
             # posterior and chain handling
@@ -1159,16 +1252,18 @@ class EMPIRE:
 
         if self.MUSIC:  # end music
             technological_terror.play()
-        pass  # end CONQUER
+        pass
 
 #
 
-stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
+#stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
+stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
+
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([1, 50, 200])
+setup = sp.array([2, 50, 200])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1179,7 +1274,7 @@ em.betas = None
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
 em.ACC = 1
-em.MOAV = sp.array([0,0])  # not needed
+#em.MOAV = sp.array([1,1,1])  # not needed
 #em.MOAV_STAR = 1
 #arara
 

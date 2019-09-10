@@ -335,7 +335,7 @@ def neo_logp_rv(theta, params):
 
 def neo_logl_rv(theta, paramis):
     # PARAMS DEFINITIONS
-    # loack and load 'em
+    # lock and load 'em
     _t, AC, params = paramis
 
     time, rv, err = params[0], params[1], params[2]
@@ -374,9 +374,9 @@ def neo_logl_rv(theta, paramis):
     jitter, offset = sp.zeros(ndat), sp.ones(ndat)*sp.inf
     macoef, timescale = sp.array([sp.zeros(ndat) for i in range(sp.amax(MOAV))]), sp.array([sp.zeros(ndat) for i in range(sp.amax(MOAV))])
 
-    # quitar el for de esta wea... array plox
+    # quitar el for de esta wea... array plox, ademas no es necesario recorrer ndat
     for i in range(ndat):
-        jitpos = int(model_params + acc_params + (ins[i] + sp.sum(MOAV[:int(ins[i])])) * 2)
+        jitpos = int(model_params + gen_params + (ins[i] + sp.sum(MOAV[:int(ins[i])])) * 2)
         jitter[i], offset[i] = theta[jitpos], theta[jitpos + 1]  #
         for jj in range(MOAV[int(ins[i])]):
             macoef[jj][i] = theta[jitpos + 2*(jj+1)]
@@ -385,11 +385,10 @@ def neo_logl_rv(theta, paramis):
     residuals -= offset
 
     # staract (instrumental)
-    if totcornum:
-        #print 'SE ACTIBOY'
-        COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
-        SA = theta[model_params+acc_params+ins_params:]
 
+    if totcornum:
+        COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
+        SA = theta[model_params+gen_params+ins_params:]
         assert len(SA) == totcornum, 'error in correlations'
         AR = 0.0  # just to remember to add this
         counter = -1
@@ -416,14 +415,15 @@ def neo_logl_rv(theta, paramis):
     #MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC
 
     # Instrumental MOAV
-    for i in range(ndat):
-        for c in range(MOAV[int(ins[i])]):
-            if i > c:
-                MA = macoef[c][i] * sp.exp(-sp.fabs(time[i-1-c] - time[i]) / timescale[c][i]) * residuals[i-1-c]
-                residuals[i] -= MA
+    for I in range(nins):
+        t_I = time[ins==I]
+        for i in range(len(t_I)):
+            for c in range(MOAV[I]):
+                if i > c:
+                    MA = macoef[c][i] * sp.exp(-sp.fabs(t_I[i-1-c] - t_I[i]) / timescale[c][i]) * residuals[i-1-c]
+                    residuals[i] -= MA
     #'''
     #if kplanets>0:
-            raise Exception('debug')
     inv_sigma2 = 1.0 / (err**2 + jitter**2)
     lnl = sp.sum(residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
     return -0.5 * lnl

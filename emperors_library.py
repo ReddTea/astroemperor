@@ -15,7 +15,7 @@ def read_data(instruments):
 
     def data(data, ins_no):
         Time, Radial_Velocity, Err = data.T[:3]  # el error de la rv
-        # Radial_Velocity -= sp.mean(Radial_Velocity)  # DEL for pm testing
+        Radial_Velocity -= sp.mean(Radial_Velocity)  # DEL for pm testing
         # marca el instrumento al q pertenece
         Flag = sp.ones(len(Time)) * ins_no
         Staract = data.T[3:]
@@ -31,28 +31,38 @@ def read_data(instruments):
     for k in range(len(instruments)):  # appends all the data in megarg
         t, rv, er, flag, star = data(instruments[k], k)
         fd = sp.hstack((fd, [t, rv, er, flag]))  # ojo this, list not array
-
+    tryin = sortstuff(fd)
     # fd[0] = fd[0] - min(fd[0])  # min t
+
     alldat = sp.array([])
+    '''
     staract = []
     for i in range(nins):
         hold = data(instruments[i], i)[4]
         staract.append(hold)
-    # staract = sp.array([data(instruments[i], i)[4] for i in range(nins)])
-    # print 'alr'
-    #    except:
-    #        staract = sp.array([sp.array([]) for i in range(nins)])
-    #        print 'nr'
+    '''
+    staract = sp.array([])
+    starflag = sp.array([])
+    for i in range(nins):
+        hold = data(instruments[i], i)[4]
+        if hold.any():
+            staract = sp.append(staract, hold)
+            starflag = sp.append(starflag, sp.ones(len(hold)) * i)
+
+    '''
     starflag = sp.array([sp.array([i for k in range(len(staract[i]))])
                          for i in range(len(staract))])
-    tryin = sortstuff(fd)
+    starflag = []
+    '''
+
     for i in range(len(starflag)):
         for j in range(len(starflag[i])):
             staract[i][j] -= sp.mean(staract[i][j])
-    totcornum = 0
-    for correlations in starflag:
-        if len(correlations) > 0:
-            totcornum += len(correlations)
+
+    totcornum = len(starflag)
+    #for correlations in starflag:
+    #    if len(correlations) > 0:
+    #        totcornum += len(correlations)
     # print fd[0]  # THISLINE
     # print sp.argsort(fd[0])  # THISLINE
     return tryin, staract, starflag, totcornum
