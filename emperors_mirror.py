@@ -196,23 +196,6 @@ def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, 
 import george
 from george import kernels
 from george.modeling import Model
-'''
-class neo_model_PM(Model):
-    ###
-    names = ['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
-             'Eccentricity', 'Longitude']
-    names_ld = ['coef1', 'coef2', 'coef3', 'coef4']
-    if kplanets >= 2:
-        names = [str(name)+'_'+str(kplanets) for name in names]
-        names_ld = [str(name_ld)+'_'+str(kplanets) for name_ld in names_ld]
-    ###
-    names = ['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
-             'Eccentricity', 'Longitude']
-    names_ld = ['coef%i' %(i+1) for i in range(ldn)]
-    parameter_names = tuple(names+names_ld)
-    def get_value(self, t):
-        pass
-'''
 
 
 def logl_rvpm(theta, params):
@@ -363,7 +346,7 @@ def neo_logl_rv(theta, paramis):
     a2 = theta[model_params:model_params+ACC]  # acc
     a3 = theta[model_params+ACC:model_params+gen_params]  # starmoav
     a4 = theta[model_params+gen_params:model_params+gen_params+ins_params]  # instr moav
-
+    a5 = theta[model_params+gen_params+ins_params:]
     # keplerian
     residuals = rv - RV_model(a1, time, kplanets)
 
@@ -386,30 +369,32 @@ def neo_logl_rv(theta, paramis):
 
     # staract (instrumental)
 
-    if totcornum:
-        COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
-        SA = theta[model_params+gen_params+ins_params:]
-        assert len(SA) == totcornum, 'error in correlations'
-        AR = 0.0  # just to remember to add this
-        counter = -1
+    #if totcornum:
+    for sa in range(totcornum):
+        residuals[ins==starflag[sa]] -= a5[sa] * staract[sa]
+        #COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
+        #SA = theta[model_params+gen_params+ins_params:]
+        #assert len(SA) == totcornum, 'error in correlations'
+        #AR = 0.0  # just to remember to add this
+        #counter = -1
 
-        for i in range(nins):
-            for j in range(len(starflag[i])):
-                counter += 1
-                passer = -1
-                for k in range(ndat):
-                    if starflag[i][j] == ins[k]:  #
-                        passer += 1
-                        COR[i][j][k] = SA[counter] * staract[i][j][passer]
+        #for i in range(nins):
+        #    for j in range(len(starflag[i])):
+        #        counter += 1
+        #        passer = -1
+        #        for k in range(ndat):
+        #            if starflag[i][j] == ins[k]:  #
+        #                passer += 1
+        #                COR[i][j][k] = SA[counter] * staract[i][j][passer]
 
-        FMC = 0
-        for i in range(len(COR)):
-            for j in range(len(COR[i])):
-                FMC += COR[i][j]
-    else:
+        #FMC = 0
+        #for i in range(len(COR)):
+        #    for j in range(len(COR[i])):
+        #        FMC += COR[i][j]
+    #else:
         #print 'NO SE AKTIBOY'
-        FMC = 0
-    residuals -= FMC
+    #    FMC = 0
+    #residuals -= FMC
 
     residuals = gen_model(a3, time, MOAV_STAR, residuals)
     #MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC

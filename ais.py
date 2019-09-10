@@ -3,6 +3,12 @@
 # -*- coding: utf-8 -*-
 # EMPEROR Exoplanet Mcmc Parallel tEmpering Radial velOcity fitteR
 # version 0.572.-47/31,64 Pluto, Ceres
+'''
+Na fone Eyfelevoy bashni
+S Ayfona selfi zayeboshim
+A nakhuya zh yeshche nam nash voyazh?
+'''
+
 
 # DEPENDENCIES
 from __future__ import division
@@ -67,7 +73,6 @@ if True:
 
 # DUMMY FUNCTIONS
 
-
 def logp(theta, func_logp, args):
     '''
     Dummy function for emcee. Shouldn't be touched.
@@ -85,6 +90,7 @@ def logl(theta, func_logl, args):
 def neo_init_batman(t, ld_mod, ldn):
     '''
     initializes batman
+    delete this after deleting the if true at the end
     '''
     n = {'t0': min(t), 'per': 1., 'rp': 0.1, 'a': 15.,
          'inc': 87., 'ecc':0., 'w':90.}
@@ -260,6 +266,8 @@ class spec:
         self.val = -sp.inf
         self.args = args
         self.type = type
+
+        self.sigmas = {}
 
     def identify(self):
         """Out goes the string containing the name and units. Used for the
@@ -512,7 +520,7 @@ class EMPIRE:
     def _theta_star(self, limits, conditions):
         name = 'Stellar Activity'
         new = sp.array([])
-        sa_ins = ft_red(op_ic, self.starflag, [])+1
+        sa_ins = self.starflag+1
         units = ''
         prior = 'uniform'
 
@@ -940,7 +948,7 @@ class EMPIRE:
                 self._theta_ins(ins_lims, None, nin, self.MOAV[nin])
 
 
-            sa_lims = sp.array([[-sp.amax()]])
+            sa_lims = sp.array([[-sp.amax(self.staract[x]), sp.amax(self.staract[x])] for x in range(self.totcornum)])
             self._theta_star(sa_lims, None)
 
         if self.PM:
@@ -1234,18 +1242,16 @@ class EMPIRE:
         # 7 remodel prior, go back to step 2
 
             self.constrain = [15.9, 84.1]
-            self.constrain = [30.15, 69.85]
-            self.constrain = [38.15, 61.85]
+            #self.constrain = [38.15, 61.85]
             if kplan > 0:
-                '''
                 for i in range(self.theta.ndim_):
                     if (self.theta.list_[self.coordinator[i]].prior != 'fixed'
                             and self.theta.list_[self.coordinator[i]].type == 'keplerian'):
                         self.theta.list_[self.coordinator[i]].lims = sp.percentile(
                             self.cherry_chain[0][:, i], self.constrain)
+                        #self.theta.list_[self.coordinator[i]].prior = 'normal'
                         #self.theta.list_[self.coordinator[i]].args = [ajuste[i], sigmas[i]]
                         pass
-                '''
 
             #'''
             kplan += 1
@@ -1256,14 +1262,14 @@ class EMPIRE:
 
 #
 
-#stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
-stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
+stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
+#stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
 
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([2, 50, 200])
+setup = sp.array([2, 150, 2000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1274,7 +1280,7 @@ em.betas = None
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True
 em.ACC = 1
-#em.MOAV = sp.array([1,1,1])  # not needed
+em.MOAV = sp.array([1,1])  # not needed
 #em.MOAV_STAR = 1
 #arara
 
