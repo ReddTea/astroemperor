@@ -45,10 +45,17 @@ if True:
         raise ImportError("You don't have the package tqdm installed.\
                            Try pip install tqdm.")
     try:
+        from tabulate import tabulate
+    except ImportError:
+        raise ImportError("You don't have the package tabulate installed.\
+                           Try pip install tabulate.")
+    try:
         from termcolor import colored
     except:
         print('You are missing cool-ors in your life!\
-               Try pip install termcolor')
+               Try pip install termcolor'
+
+               )
     try:
         from pygame import mixer
         mixer.init()
@@ -199,11 +206,12 @@ class spec_list:
         used = []
         for j in changes_list.keys():
             if self.change_val(changes_list[j]):
-                print('Following condition has been applied: ',
+                print('\nFollowing condition has been applied: ',
                       changes_list[j])
                 used.append(j)
         for j in used[::-1]:
             del changes_list[j]
+        print('\n')
         pass
 
     def list(self, *call):
@@ -267,7 +275,9 @@ class spec:
         self.args = args
         self.type = type
 
+        self.cv = None
         self.sigmas = {}
+        self.other = []
 
     def identify(self):
         """Out goes the string containing the name and units. Used for the
@@ -465,10 +475,10 @@ class EMPIRE:
             names = [str(name) + '_' + str(kplanets) for name in names]
         units = [" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", "", " $[rads]$"]
         priors = ['uniform', 'uniform_spe_a',
-                  'uniform_spe_b', 'uniform_spe_c', 'uniform_spe_d']
+                  'uniform_spe_b', 'uniform_spe_a', 'uniform_spe_b']
         new = sp.array([])
         for i in range(5):
-            if (priors[i] == 'uniform_spe_a' or priors[i] == 'uniform_spe_c'):
+            if priors[i] == 'uniform_spe_a':
                 if names[i][:3] == 'Amp':
                     t = spec(names[i], units[i], priors[i], [
                              limits[2 * i], limits[2 * i + 1]], -sp.inf, 'keplerian', args=[0.0001, conditions[0]])
@@ -873,7 +883,7 @@ class EMPIRE:
             import warnings
             warnings.filterwarnings("ignore")
 
-        #Here should be how to run! Where does it start? Full auto?
+        # Here should be how to run! Where does it start? Full auto?
 
         from also import Accumulator
         prepo1 = Accumulator()
@@ -883,7 +893,7 @@ class EMPIRE:
             # for instruments in rv
             acc_lims = sp.array([-1., 1.])
             jitt_limiter = sp.amax(abs(self.rv))
-            jitt_lim = 3 * jitt_limiter
+            jitt_lim = 2 * jitt_limiter  # or 3?
             offs_lim = jitt_limiter
             jitoff_lim = sp.array([0.0001, jitt_lim, -offs_lim, offs_lim])
 
@@ -1023,25 +1033,40 @@ class EMPIRE:
 
             if self.RV:
                 for j in range(len(self.theta.list_)):
+                    # change prior and lims for amplitude and eccentricity
+                    # if phase or w are fixed
+                    self.cv = sp.array([[1, 1] for _ in range(kplan)])
                     if (self.theta.list_[j].prior == 'uniform_spe_a' and
-                        self.theta.list_[j+1].prior == 'fixed'):  # phase fixed, so amplitude
-                        self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                     'prior', 'uniform']
-                        l1, l2 = self.theta.list_[j].args
-                        self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                     'lims', 0., l1, l2]
+                        self.theta.list_[j+1].prior == 'fixed'):
+                        self.theta.list_[j].prior = 'uniform'
+                        if self.theta.list_[j].tag == 'Amplitude':
+                            self.cv[k][0] = 0
+                            self.theta.list_[j].lims = [0.1, jitt_lim]
+                        elif self.theta.list_[j].tag == 'Eccentricity':
+                            self.cv[k][1] = 0
+                            self.theta.list_[j].lims = [0., 1]
+                        self.theta.list_[j].lims = []
 
                     if (self.theta.list_[j].prior == 'uniform_spe_b' and
                         self.theta.list_[j-1].prior == 'fixed'):  # amplitude fixed, so phase
-                        self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                     'prior', 'uniform']
-                        self.changes_list[len(self.changes_list)] = [str(self.theta.list_[j].name),
-                                                                     'lims', 0., 2*sp.pi]
+                        self.theta.list_[j].prior = 'uniform'
+                        self.theta.list_[j].lims = [0., 2*sp.pi]
+                        if self.theta.list_[j].tag == 'Phase':
+                            self.cv[k][0] = 0
+                        else:
+                            self.cv[k][1] = 0
 
             # show the initialized params and priors
+            tab_all = []
+            tab_h = ['Name', 'Prior', 'Limits', 'Value']
             for t in self.theta.list_:
-                print(t.name, t.prior, t.val, t.lims)
-            print('____________')
+                tab_one = []
+                tab_one.append(t.name)
+                tab_one.append(t.prior)
+                tab_one.append(sp.around(t.lims, 5))
+                tab_one.append(t.val)
+                tab_all.append(tab_one)
+            print(tabulate(tab_all, headers=tab_h))
 
             self.theta._update_list_()
             ### COORDINATOR
@@ -1054,7 +1079,8 @@ class EMPIRE:
 
         # 4 run chain
             if self.RV:
-                from emperors_mirror import neo_logp_rv, neo_logl_rv
+                from emperors_mirror import neo_logp_rv as neo_logp
+                from emperors_mirror import neo_logl_rv as neo_logl
 
             if self.PM:
                 from emperors_mirror import neo_logp_pm, neo_logl_pm
@@ -1063,7 +1089,7 @@ class EMPIRE:
                                         self.batman_ldn, self.batman_m, self.batman_p,
                                         self.emperors_gp, self.gaussian_processor])
 
-            # rv and pm testing, reroll p0 if not
+            # rv and pm testing, reroll p0 if not, should be in 3 rlly...
             self.autodestruction = 0
             self.adc = 0
             logl_params_aux = sp.array([self.time, self.rv, self.err, self.ins,
@@ -1074,34 +1100,37 @@ class EMPIRE:
             logl_params = [self.theta.list_, self.theta.A, logl_params_aux]
 
             self.bad_bunnies = []
+            self.mad_hatter = 0
             if self.RV:
                 for i in range(self.nwalkers):
-                    self.a = neo_logp_rv(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
-                    self.b = neo_logl_rv(self.pos0[0][i], logl_params)
+                    self.a = neo_logp(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
+                    self.b = neo_logl(self.pos0[0][i], logl_params)
                     if self.a == -sp.inf:
                         self.adc += 1
                         self.bad_bunnies.append(i)
-                        print('a')
+                        print('a')  # experimental feature # DEL
                     elif self.b ==-sp.inf:
                         self.adc += 1
                         self.bad_bunnies.append(i)
-                        print('b')
+                        print('b')  # experimental feature # DEL
 
                 self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
                 self.adc = 0
-                print('Initial Position acceptance rate', self.autodestruction)
+                print('\nInitial Position acceptance rate', self.autodestruction)
                 while self.autodestruction <= 0.98:
                     print('Reinitializing walkers')
+                    self.mad_hatter += 1
                     self.pos0 = emplib.neo_p0(self.setup, self.theta.list_, self.theta.ndim_, self.coordinator)
                     for i in range(self.nwalkers):
-                        self.a = neo_logp_rv(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
-                        self.b = neo_logl_rv(self.pos0[0][i], logl_params)
+                        self.a = neo_logp(self.pos0[0][i], [self.theta.list_, self.theta.ndim_, self.coordinator])
+                        self.b = neo_logl(self.pos0[0][i], logl_params)
                         if self.a == -sp.inf or self.b ==-sp.inf:
                             self.adc += 1
                     self.autodestruction = (self.nwalkers - self.adc) / self.nwalkers
-                    print('Initial Position acceptance rate', self.autodestruction)
+                    print('\nInitial Position acceptance rate', self.autodestruction)
                     self.adc = 0
-
+                    if self.mad_hatter == 2:
+                        raise Exception('asdasd')
 
             if self.PM:
                 for i in range(self.nwalkers):
@@ -1137,52 +1166,44 @@ class EMPIRE:
                 self.theta.ndim_), sp.zeros(self.theta.ndim_)
             self.MCMC(self.pos0, kplan, sigmas_raw, logl, logp)
 
+        ###################################
         # 5 get stats (and model posterior)
+        ###################################
 
             # posterior and chain handling
 
             chains = self.sampler.flatchain
-            #chains_h = sp.array([empmir.henshin(chains[i], kplan) for i in sp.arange(self.ntemps)])
-
             self.posteriors = sp.array(
                 [self.sampler.lnprobability[i].reshape(-1) for i in range(self.ntemps)])
             self.post_max = sp.amax(self.posteriors[0])
-
             self.ajuste = chains[0][sp.argmax(self.posteriors[0])]
-            #self.ajuste_h = chains_h[0][sp.argmax(self.posteriors[0])]
-
-            # updates values in self.theta.list_ with best of emcee run
-            for i in range(self.theta.ndim_):
-                self.theta.list_[self.coordinator[i]].val = self.ajuste[i]
-                print(self.theta.list_[self.coordinator[i]].name, self.theta.list_[
-                      self.coordinator[i]].val)
+            self.like_max = neo_logl(self.ajuste, logl_params)
 
             # TOP OF THE POSTERIOR
             cherry_locat = sp.array([max(self.posteriors[temp]) - self.posteriors[temp] < self.bayes_factor for temp in sp.arange(self.ntemps)])
 
             self.cherry_chain = sp.array([chains[temp][cherry_locat[temp]] for temp in sp.arange(self.ntemps)])
-            #self.cherry_chain_h = sp.array([chains_h[temp][cherry_locat[temp]] for temp in sp.arange(self.ntemps)])
-
             self.cherry_post = sp.array([self.posteriors[temp][cherry_locat[temp]] for temp in range(self.ntemps)])
-
-
-            # sigmas are taken from cold chain
             self.sigmas = sp.array([sp.std(self.cherry_chain[0][:, i]) for i in range(self.theta.ndim_)])
-            #self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
+
+            if True:  # henshin!!!!!!
+                import copy
+                self.cherry_chain_h = empmir.henshin_hou(copy.deepcopy(self.cherry_chain), kplan, self.cv)
+                self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
+                self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
 
             self.sample_sizes = sp.array(
                 [len(self.cherry_chain[i]) for i in range(self.ntemps)])
 
-            # ojo esto
-            if self.RV and self.VINES:
-                '''
-                henshin actual asume los change of variable (cov) de hou
-                para todos los parametros... si fixeas cosas no respondo
-                '''
-                #self.cherry_chain_h = sp.array([self.cherry_chain[temp] for temp in sp.arange(self.ntemps)])  # no se pq doble pero no lo voy a mirar
-                #self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
-                pass
-            #raise Exception('debug')
+
+            # updates values in self.theta.list_ with best of emcee run
+            for i in range(self.theta.ndim_):
+                self.theta.list_[self.coordinator[i]].val = self.ajuste_h[i]
+
+            # dis goes at the end
+            print(tabulate(self.theta.list('name', 'val', 'prior').T, headers=['Name', 'Value', 'Prior']))
+
+
 
             #residuals = empmir.RV_residuals(ajuste, self.rv, self.time,
                          #self.ins, self.staract, self.starflag, kplan,
@@ -1193,13 +1214,16 @@ class EMPIRE:
 
         # 6 compare, exit or next
             # BIC & AIC
+            print('\n\n\n------------- S T A T S -------------\n\n\n')
             if self.RV:
                 self.NEW_BIC = sp.log(self.ndat) * \
-                    self.theta.ndim_ - 2 * self.post_max
+                    self.theta.ndim_ - 2 * self.like_max
                 self.OLD_BIC = sp.log(self.ndat) * \
                     self.theta.ndim_ - 2 * self.oldlogpost
                 self.NEW_AIC = 2 * self.theta.ndim_ - 2 * self.post_max
                 self.OLD_AIC = 2 * - 2 * self.oldlogpost
+
+                self.NEW_DIC =
             if self.PM:
                 self.NEW_BIC = sp.log(self.ndat_pm) * \
                     self.theta.ndim_ - 2 * self.post_max
@@ -1218,19 +1242,31 @@ class EMPIRE:
             if self.INPLOT:
                 pass
 
+            print('Max logpost vs. Past max logpost', self.post_max,
+                  self.oldlogpost, self.post_max - self.oldlogpost)
+            h = ['Criteria', 'This Run', 'Previous Run', 'Difference', 'Requirement', 'Condition']
+
+            bic_c = self.OLD_BIC - self.NEW_BIC
+            aic_c = self.OLD_AIC - self.NEW_AIC
+            post_c = self.post_max - self.oldlogpost
+
+
+            bic = ['BIC', self.NEW_BIC, self.OLD_BIC, bic_c, self.BIC, bool(bic_c > self.BIC)]
+            aic = ['AIC', self.NEW_AIC, self.OLD_AIC, aic_c, self.AIC, bool(aic_c > self.AIC)]
+            pos = ['Posterior', self.post_max, self.oldlogpost, post_c, self.model_comparison, bool(post_c>self.model_comparison)]
+
+            print(tabulate([bic, aic, pos], headers = h))
+#            print('Old BIC vs New BIC', self.OLD_BIC,
+#                  self.NEW_BIC, self.OLD_BIC - self.NEW_BIC)
+#            print('Old AIC vs New AIC', self.OLD_AIC,
+#                  self.NEW_AIC, self.OLD_AIC - self.NEW_AIC)
+
             if self.OLD_BIC - self.NEW_BIC < self.BIC:
                 print(
                     '\nBayes Information Criteria of %.2f requirement not met ! !' % self.BIC)
             if self.OLD_AIC - self.NEW_AIC < self.AIC:
                 print(
                     '\nAkaike Information Criteria of %.2f requirement not met ! !' % self.AIC)
-
-            print('Max logpost vs. Past max logpost', self.post_max,
-                  self.oldlogpost, self.post_max - self.oldlogpost)
-            print('Old BIC vs New BIC', self.OLD_BIC,
-                  self.NEW_BIC, self.OLD_BIC - self.NEW_BIC)
-            print('Old AIC vs New AIC', self.OLD_AIC,
-                  self.NEW_AIC, self.OLD_AIC - self.NEW_AIC)
 
             if self.post_max - self.oldlogpost < self.model_comparison:
                 print('\nBayes Factor of %.2f requirement not met ! !' %
@@ -1243,6 +1279,7 @@ class EMPIRE:
 
             self.constrain = [15.9, 84.1]
             #self.constrain = [38.15, 61.85]
+            '''
             if kplan > 0:
                 for i in range(self.theta.ndim_):
                     if (self.theta.list_[self.coordinator[i]].prior != 'fixed'
@@ -1253,7 +1290,7 @@ class EMPIRE:
                         #self.theta.list_[self.coordinator[i]].args = [ajuste[i], sigmas[i]]
                         pass
 
-            #'''
+            '''
             kplan += 1
 
         if self.MUSIC:  # end music
@@ -1269,7 +1306,7 @@ stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([2, 150, 2000])
+setup = sp.array([2, 100, 1000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1302,7 +1339,7 @@ em.changes_list = {0:['Period', 'prior', 'fixed'],
                    3:['Period_2', 'val', sp.log(30.34)]
                    }
 
-em.conquer(1, 2)
+em.conquer(0, 1)
 
 
 if False:

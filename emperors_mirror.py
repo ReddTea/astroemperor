@@ -132,6 +132,28 @@ def henshin(thetas, kplanets):
         thetas[:, i*5 + 4] = wk
     return thetas
 
+def henshin_hou(thetas, kplanets, tags):
+    for t in range(len(thetas)):
+        for i in range(kplanets):
+            Pk = thetas[t][:, i*5]
+            if tags[i][0] == 1:
+                Ask = thetas[t][:, i*5 + 1]
+                Ack = thetas[t][:, i*5 + 2]
+                Ak = Ask ** 2 + Ack ** 2
+                Phasek = sp.where(Ask>=0, sp.arccos(Ack / (Ak ** 0.5)), 2*sp.pi - sp.arccos(Ack / (Ak ** 0.5)))
+                thetas[t][:, i*5 + 1] = Ak
+                thetas[t][:, i*5 + 2] = Phasek
+            if tags[i][1] == 1:
+                Sk = thetas[t][:, i*5 + 3]
+                Ck = thetas[t][:, i*5 + 4]
+                ecck  = Sk ** 2 + Ck ** 2
+                wk = sp.where(Sk>=0, sp.arccos(Ck / (ecck ** 0.5)), 2*sp.pi - sp.arccos(Ck / (ecck ** 0.5)))
+                thetas[t][:, i*5 + 3] = ecck
+                thetas[t][:, i*5 + 4] = wk
+
+            thetas[t][:, i*5] = sp.exp(Pk)
+    return thetas
+
 
 def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, totcornum, ACC):
     ndat = len(time)
@@ -292,24 +314,14 @@ def neo_logp_rv(theta, params):
     c, lp = 0, 0.
 
     for j in range(ndim):
-        #print(_theta[j+c].name)
-        #print(D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args))
         lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-        #if lp0 == -sp.inf:
-        #    print(_theta[C[j]].name)
-        #lp += lp0
-        if (_theta[C[j]].prior == 'uniform_spe_c' and
-            _theta[C[j+1]].prior != 'fixed'):
-            lp += D['normal'](theta[j]**2+theta[j+1]**2, [0, 1], [0., 0.1**2])
-        #    if lp1 == -sp.inf:
-        #        print('lp1')
-            #lp += lp1
-        if (_theta[C[j]].prior == 'uniform_spe_a' and
-            _theta[C[j+1]].prior != 'fixed'):
-            lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
-        #    if lp2 == -sp.inf:
-        #        print('lp')
-            #lp += lp2
+
+        if _theta[C[j]].prior == 'uniform_spe_a':
+            if _theta[C[j]].tag() == 'Eccentricity':
+                lp += D['normal'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2])
+            elif _theta[C[j]].tag() == 'Amplitude':
+                lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
+
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
     #MP = sp.zeros(kplanets)  # this goes in hill
@@ -372,29 +384,6 @@ def neo_logl_rv(theta, paramis):
     #if totcornum:
     for sa in range(totcornum):
         residuals[ins==starflag[sa]] -= a5[sa] * staract[sa]
-        #COR = sp.array([sp.array([sp.zeros(ndat) for k in range(len(starflag[i]))]) for i in range(len(starflag))])
-        #SA = theta[model_params+gen_params+ins_params:]
-        #assert len(SA) == totcornum, 'error in correlations'
-        #AR = 0.0  # just to remember to add this
-        #counter = -1
-
-        #for i in range(nins):
-        #    for j in range(len(starflag[i])):
-        #        counter += 1
-        #        passer = -1
-        #        for k in range(ndat):
-        #            if starflag[i][j] == ins[k]:  #
-        #                passer += 1
-        #                COR[i][j][k] = SA[counter] * staract[i][j][passer]
-
-        #FMC = 0
-        #for i in range(len(COR)):
-        #    for j in range(len(COR[i])):
-        #        FMC += COR[i][j]
-    #else:
-        #print 'NO SE AKTIBOY'
-    #    FMC = 0
-    #residuals -= FMC
 
     residuals = gen_model(a3, time, MOAV_STAR, residuals)
     #MODEL = RV_model(a1, time, kplanets) + offset + ACC + FMC
