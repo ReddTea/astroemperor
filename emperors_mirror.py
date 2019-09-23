@@ -361,7 +361,7 @@ def neo_logl_rv(theta, paramis):
     a5 = theta[model_params+gen_params+ins_params:]
     # keplerian
     residuals = rv - RV_model(a1, time, kplanets)
-    #
+    
     # general
     residuals -= acc_model(a2, time, ACC)
 
