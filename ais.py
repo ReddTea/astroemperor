@@ -340,6 +340,7 @@ class EMPIRE:
 
         self.START = chrono.time()  # total time counter
         self.VINES = False  # jaja
+        self.ushallnotpass = True
 
         self.theta = spec_list()  # parameters metadata, initializes spec_list
 
@@ -1066,6 +1067,7 @@ class EMPIRE:
                 tab_one.append(sp.around(t.lims, 5))
                 tab_one.append(t.val)
                 tab_all.append(tab_one)
+            print('\n\n------------ Initial Setup ------------\n\n')
             print(tabulate(tab_all, headers=tab_h))
 
             self.theta._update_list_()
@@ -1178,7 +1180,7 @@ class EMPIRE:
             self.post_max = sp.amax(self.posteriors[0])
             self.ajuste = chains[0][sp.argmax(self.posteriors[0])]
             self.like_max = neo_logl(self.ajuste, logl_params)
-
+            self.prior_max = neo_logp(self.ajuste, [self.theta.list_, self.theta.ndim_, self.coordinator])
             # TOP OF THE POSTERIOR
             cherry_locat = sp.array([max(self.posteriors[temp]) - self.posteriors[temp] < self.bayes_factor for temp in sp.arange(self.ntemps)])
 
@@ -1201,6 +1203,7 @@ class EMPIRE:
                 self.theta.list_[self.coordinator[i]].val = self.ajuste_h[i]
 
             # dis goes at the end
+            print('\n\n--------------- Best Fit ---------------\n\n')
             print(tabulate(self.theta.list('name', 'val', 'prior').T, headers=['Name', 'Value', 'Prior']))
 
 
@@ -1223,7 +1226,7 @@ class EMPIRE:
                 self.NEW_AIC = 2 * self.theta.ndim_ - 2 * self.post_max
                 self.OLD_AIC = 2 * - 2 * self.oldlogpost
 
-                self.NEW_DIC =
+                #self.NEW_DIC =
             if self.PM:
                 self.NEW_BIC = sp.log(self.ndat_pm) * \
                     self.theta.ndim_ - 2 * self.post_max
@@ -1234,7 +1237,7 @@ class EMPIRE:
 
             if self.VINES:  # saves chains, posteriors and log
                 saveplace = self.mklogfile(kplan)
-                self.instigator(self.cherry_chain, self.cherry_post, saveplace)
+                emplib.instigator(self.cherry_chain, self.cherry_post, saveplace)
 
             if self.MUSIC:
                 thybiding.play()
@@ -1242,8 +1245,6 @@ class EMPIRE:
             if self.INPLOT:
                 pass
 
-            print('Max logpost vs. Past max logpost', self.post_max,
-                  self.oldlogpost, self.post_max - self.oldlogpost)
             h = ['Criteria', 'This Run', 'Previous Run', 'Difference', 'Requirement', 'Condition']
 
             bic_c = self.OLD_BIC - self.NEW_BIC
@@ -1256,41 +1257,29 @@ class EMPIRE:
             pos = ['Posterior', self.post_max, self.oldlogpost, post_c, self.model_comparison, bool(post_c>self.model_comparison)]
 
             print(tabulate([bic, aic, pos], headers = h))
-#            print('Old BIC vs New BIC', self.OLD_BIC,
-#                  self.NEW_BIC, self.OLD_BIC - self.NEW_BIC)
-#            print('Old AIC vs New AIC', self.OLD_AIC,
-#                  self.NEW_AIC, self.OLD_AIC - self.NEW_AIC)
 
-            if self.OLD_BIC - self.NEW_BIC < self.BIC:
-                print(
-                    '\nBayes Information Criteria of %.2f requirement not met ! !' % self.BIC)
-            if self.OLD_AIC - self.NEW_AIC < self.AIC:
-                print(
-                    '\nAkaike Information Criteria of %.2f requirement not met ! !' % self.AIC)
-
-            if self.post_max - self.oldlogpost < self.model_comparison:
+            if post_c < self.model_comparison:
                 print('\nBayes Factor of %.2f requirement not met ! !' %
                       self.model_comparison)
                 # break
-
             self.oldlogpost = self.post_max
 
         # 7 remodel prior, go back to step 2
 
             self.constrain = [15.9, 84.1]
             #self.constrain = [38.15, 61.85]
-            '''
-            if kplan > 0:
-                for i in range(self.theta.ndim_):
-                    if (self.theta.list_[self.coordinator[i]].prior != 'fixed'
-                            and self.theta.list_[self.coordinator[i]].type == 'keplerian'):
-                        self.theta.list_[self.coordinator[i]].lims = sp.percentile(
-                            self.cherry_chain[0][:, i], self.constrain)
-                        #self.theta.list_[self.coordinator[i]].prior = 'normal'
-                        #self.theta.list_[self.coordinator[i]].args = [ajuste[i], sigmas[i]]
-                        pass
+            if self.ushallnotpass:
+                if kplan > 0:
+                    for i in range(self.theta.ndim_):
+                        if (self.theta.list_[self.coordinator[i]].prior != 'fixed'
+                                and self.theta.list_[self.coordinator[i]].type == 'keplerian'):
+                            self.theta.list_[self.coordinator[i]].lims = sp.percentile(
+                                self.cherry_chain[0][:, i], self.constrain)
+                            self.theta.list_[self.coordinator[i]].prior = 'normal'
+                            self.theta.list_[self.coordinator[i]].args = [self.ajuste[i], self.sigmas[i]]
+                            pass
 
-            '''
+
             kplan += 1
 
         if self.MUSIC:  # end music
@@ -1299,14 +1288,17 @@ class EMPIRE:
 
 #
 
-stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
+
+stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
+#stardat = sp.array(['LTT9779_coralie.fvels', 'LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
 
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([2, 100, 1000])
+setup = sp.array([5, 300, 15000])
+setup = sp.array([2, 50, 150])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1332,14 +1324,14 @@ em.MOAV = sp.array([1,1])  # not needed
 #em.celerite_jitter = False
 
 em.MUSIC = False
-
+'''
 em.changes_list = {0:['Period', 'prior', 'fixed'],
                    1:['Period', 'val', sp.log(60.94)],
                    2:['Period_2', 'prior', 'fixed'],
                    3:['Period_2', 'val', sp.log(30.34)]
                    }
-
-em.conquer(0, 1)
+'''
+em.conquer(1, 2)
 
 
 if False:
