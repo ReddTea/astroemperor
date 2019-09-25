@@ -40,7 +40,9 @@ def RV_model(THETA, time, kplanets):
 def acc_model(theta, time, ACC):
     if ACC > 0:  # recheck this at some point # DEL
         y = sp.polyval(sp.r_[0, theta[:ACC]], (time-sp.amin(time)))
-    return y
+        return y
+    else:
+        return 0.
 
 
 def gen_model(theta, time, MOAV, residuals):
@@ -132,7 +134,9 @@ def henshin(thetas, kplanets):
         thetas[:, i*5 + 4] = wk
     return thetas
 
-def henshin_hou(thetas, kplanets, tags):
+def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
+    for i in range(len(anticoor)):
+        thetas = sp.insert(thetas, anticoor[i], sp.ones(len(thetas[0]))*fixed_values[i], axis=2)
     for t in range(len(thetas)):
         for i in range(kplanets):
             Pk = thetas[t][:, i*5]
@@ -314,7 +318,11 @@ def neo_logp_rv(theta, params):
     c, lp = 0, 0.
 
     for j in range(ndim):
-        lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
+        add_this = D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
+    #    if add_this == -sp.inf:
+    #        print('prior failed', _theta[C[j]].name)
+
+        lp += add_this
 
         if _theta[C[j]].prior == 'uniform_spe_a':
             if _theta[C[j]].tag() == 'Eccentricity':
@@ -361,7 +369,7 @@ def neo_logl_rv(theta, paramis):
     a5 = theta[model_params+gen_params+ins_params:]
     # keplerian
     residuals = rv - RV_model(a1, time, kplanets)
-    
+
     # general
     residuals -= acc_model(a2, time, ACC)
 
@@ -400,6 +408,9 @@ def neo_logl_rv(theta, paramis):
     #if kplanets>0:
     inv_sigma2 = 1.0 / (err**2 + jitter**2)
     lnl = sp.sum(residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
+    if True:
+        if lnl == sp.inf:
+            print('like failed')
     return -0.5 * lnl
 
 

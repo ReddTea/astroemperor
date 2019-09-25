@@ -17,7 +17,12 @@ from tqdm import tqdm
 import corner
 import emperors_library as emplib
 import emperors_mirror as empmir
-
+'''
+needs: Only cold chains
+rv residuals plot
+se cae con acc=0
+primer punto de color negro en chains y posts?
+'''
 
 class CourtPainter:
 

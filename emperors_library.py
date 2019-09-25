@@ -156,35 +156,35 @@ def neo_p0(setup, *args):
     ndim = args[1]
     C = args[2]
 
-    pos = sp.zeros((nwalkers, ndim))
+    pos = sp.zeros((ntemps, nwalkers, ndim))
+    for temp in range(ntemps):
+        for j in range(ndim):
+            boundaries = t[C[j]].lims
+            fact = sp.absolute(boundaries[0] - boundaries[1]) / nwalkers
+            rnd = sp.random.uniform(0.9, 0.9999)
+            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.9999)
 
-    for j in range(ndim):
-        boundaries = t[C[j]].lims
-        fact = sp.absolute(boundaries[0] - boundaries[1]) / nwalkers
-        rnd = sp.random.uniform(0.9, 0.9999)
-        dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.9999)
-
-        if (t[C[j]].prior=='uniform_spe_a' or t[C[j]].prior=='uniform_spe_b'):
-            for i in range(nwalkers):
-                pos[i][j] = (boundaries[1] + 3 * boundaries[0]) / \
-                    4 + (dif[i] * 2. / 5. + fact / 2.0)
-        elif t[C[j]].tag() == 'Jitter':
-            jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
-            dif = jitt_ini * sp.random.uniform(0.9, 0.9999)
-            for i in range(nwalkers):
-                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
-                pos[i][j] *= 0.1
-        elif t[C[j]].tag()=='MACoefficient':
-            for i in range(nwalkers):
-                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
-                #pos[i][j] *= 1
-#                #print('bobos', boundaries[0], boundaries[1], pos[i][j])
-        else:
-            for i in range(nwalkers):
-                pos[i][j] = boundaries[0] + (dif[i] + fact/2.0)
+            if (t[C[j]].prior=='uniform_spe_a' or t[C[j]].prior=='uniform_spe_b'):
+                for i in range(nwalkers):
+                    pos[temp][i][j] = (boundaries[1] + 3 * boundaries[0]) / \
+                        4 + (dif[i] * 2. / 5. + fact / 2.0)
+            elif t[C[j]].tag() == 'Jitter':
+                jitt_ini = sp.sort(sp.fabs(sp.random.normal(0, 1, nwalkers))) * 0.1
+                dif = jitt_ini * sp.random.uniform(0.9, 0.9999)
+                for i in range(nwalkers):
+                    pos[temp][i][j] = boundaries[0] + (dif[i] + fact/2.0)
+                    pos[temp][i][j] *= 0.1
+            elif t[C[j]].tag()=='MACoefficient':  # redudant DEL this
+                for i in range(nwalkers):
+                    pos[temp][i][j] = boundaries[0] + (dif[i] + fact/2.0)
+                    #pos[i][j] *= 1
+    #                #print('bobos', boundaries[0], boundaries[1], pos[i][j])
+            else:
+                for i in range(nwalkers):
+                    pos[temp][i][j] = boundaries[0] + (dif[i] + fact/2.0)
     #pos[:, 8] = pos[:, 8] ** 0.5
     #pos[:, 12] = pos[:, 12] ** 0.5
-    pos = sp.array([pos for h in range(ntemps)])
+    #pos = sp.array([pos for h in range(ntemps)])
     return pos
 
 
