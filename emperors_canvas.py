@@ -387,7 +387,7 @@ class CourtPainter:
                             str(k + 1) + '.png', bbox_inches='tight')
         plt.close('all')
 
-    def paint_chains(self):
+    def paint_chains(self, cold_only=False):
         """Create traceplots or chain plots for each temperature."""
         print('\n\t\tPAINTING CHAINS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
@@ -494,8 +494,10 @@ class CourtPainter:
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
                 plt.close('all')
+                if cold_only:
+                    break
 
-    def paint_posteriors(self):
+    def paint_posteriors(self, cold_only=False):
         """Create posterior plots."""
         print('\n\t\tPAINTING POSTERIORS.')
         for t in tqdm(range(self.ntemps), desc='Brush temperature'):
@@ -620,6 +622,8 @@ class CourtPainter:
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
                 plt.close('all')
+                if cold_only:
+                    break
 
     def paint_histograms(self):
         """Create histograms."""
@@ -786,6 +790,8 @@ class CourtPainter:
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
                 plt.close('all')
+                if cold_only:
+                    break
 
     def paint_corners(self):
         """Create corner plots. Cold chain only."""
