@@ -406,13 +406,6 @@ class CourtPainter:
             colors = sp.array(
                 [color for i in range(self.nwalkers)]).reshape(-1)
 
-            # Auxiliary variables to coordinate labels and filenames.
-            tcount = 0
-            pcount = 1
-            acc = True
-            ins = 0
-            ins_count = 1
-
             pb = tqdm(enumerate(self.theta.C),
                       desc='Brush type', total=self.ndim_)
             for i, c in pb:
