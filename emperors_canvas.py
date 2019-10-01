@@ -669,18 +669,18 @@ class CourtPainter:
 
                 if par.type == 'keplerian':
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'histograms/' + par.name +
-                                    '_T' + str(t) + '.pdf')
+                        plt.savefig(self.working_dir + 'histograms/' + par.name
+                                    + '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'histograms/' + par.name +
-                                    '_T' + str(t) + '.png')
+                        plt.savefig(self.working_dir + 'histograms/' + par.name
+                                    + '_T' + str(t) + '.png')
                 else:
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'histograms/' + par.name +
-                                    '_T' + str(t) + '.pdf')
+                        plt.savefig(self.working_dir + 'histograms/' + par.name
+                                    + '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'histograms/' + par.name +
-                                    '_T' + str(t) + '.png')
+                        plt.savefig(self.working_dir + 'histograms/' + par.name
+                                    + '_T' + str(t) + '.png')
                 plt.close('all')
 
     def paint_corners(self):
