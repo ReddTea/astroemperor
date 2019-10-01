@@ -60,10 +60,10 @@ class CourtPainter:
         self.time, self.rv, self.err, self.ins = self.all_rv
         self.setup = emplib.read(working_dir + 'setup.pkl')
         self.ntemps, self.nwalkers, self.nsteps = self.setup
-        self.theta_ = emplib.read(working_dir + 'theta.pkl')
+        self.theta = emplib.read(working_dir + 'theta.pkl')
 
         self.nins = len(sp.unique(self.ins))
-        self.ndim = 1 + 5 * kplanets + self.nins * 2
+        self.ndim = self.theta.ndim_
 
         self.__clean_rvs()
         # Setup plots.
@@ -392,7 +392,8 @@ class CourtPainter:
     def paint_chains(self, cold_only=False):
         """Create traceplots or chain plots for each temperature."""
         print('\n\t\tPAINTING CHAINS.')
-        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+        ntemps = 1 if cold_only else self.ntemps
+        for t in tqdm(range(ntemps), desc='Brush temperature'):
             chain = self.chains[t]
 
             leftovers = len(chain) % self.nwalkers
@@ -412,7 +413,9 @@ class CourtPainter:
             ins = 0
             ins_count = 1
 
-            for i in tqdm(range(self.ndim), desc='Brush type'):
+            pb = tqdm(enumerate(self.theta.C),
+                      desc='Brush type', total=self.ndim_)
+            for i, c in pb:
                 fig, ax = plt.subplots(figsize=self.chain_figsize)
                 plt.subplots_adjust(left=0.125, bottom=0.1,
                                     right=1.015, top=0.95)
@@ -433,76 +436,39 @@ class CourtPainter:
                              rotation=270, labelpad=self.cbar_labelpad)
                 cb.ax.tick_params(labelsize=self.tick_labelsize)
 
-                # plot only accel and instrumental chains.
-                if not self.kplanets:
+                par = self.theta.list_[c]
 
-                    if i == 0:
-                        title = self.chain_titles[5]
-                        ax.set_ylabel(
-                            title + self.chain_units[-1],
-                            fontsize=self.label_fontsize
-                        )
-                        counter = 0
-                    else:
-                        title = self.chain_titles[6 + counter % 2]
-                        ax.set_ylabel(
-                            title + self.chain_units[1],
-                            fontsize=self.label_fontsize
-                        )
-                        counter += 1
-                else:
+                title = par.name.split('_')[0]
+                try:
+                    title += par.units
+                except TypeError:
+                    title += par.units[0]
+                ax.set_ylabel(
+                    title,
+                    fontsize=self.label_fontsize
+                )
 
-                    if pcount <= self.kplanets:
-                        title = self.chain_titles[tcount % 5]
-                        ax.set_ylabel(title + self.chain_units[tcount % 5],
-                                      fontsize=self.label_fontsize)
-                        tcount += 1
-                    else:
-                        if acc:
-                            title = self.chain_titles[5]
-                            ax.set_ylabel(
-                                title + self.chain_units[-1],
-                                fontsize=self.label_fontsize
-                            )
-                            acc = False
-                            counter = 0
-                        else:
-                            title = self.chain_titles[6 + counter % 2]
-                            ax.set_ylabel(
-                                title + self.chain_units[1],
-                                fontsize=self.label_fontsize
-                            )
-                            counter += 1
-
-                if pcount <= self.kplanets:
+                if par.type == 'keplerian':
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'chains/' + title +
-                                    '_K' + str(pcount) + '_T' + str(t)
-                                    + '.pdf')
+                        plt.savefig(self.working_dir + 'chains/' + par.name +
+                                    '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'chains/' + title +
-                                    '_K' + str(pcount) + '_T' + str(t)
-                                    + '.png')
+                        plt.savefig(self.working_dir + 'chains/' + par.name +
+                                    '_T' + str(t) + '.png')
                 else:
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'chains/' + title
-                                    + '_INS' + str(ins) + '_T' + str(t)
-                                    + '.pdf')
+                        plt.savefig(self.working_dir + 'chains/' + par.name +
+                                    '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'chains/' + title
-                                    + '_INS' + str(ins) + '_T' + str(t)
-                                    + '.png')
-                    ins_count += 1
-                    ins += 1 if ins_count % 2 == 0 else 0
-                pcount += 1 if tcount % 5 == 0 else 0
+                        plt.savefig(self.working_dir + 'chains/' + par.name +
+                                    '_T' + str(t) + '.png')
                 plt.close('all')
-                if cold_only:
-                    break
 
     def paint_posteriors(self, cold_only=False):
         """Create posterior plots."""
         print('\n\t\tPAINTING POSTERIORS.')
-        for t in tqdm(range(self.ntemps), desc='Brush temperature'):
+        ntemps = 1 if cold_only else self.ntemps
+        for t in tqdm(range(ntemps), desc='Brush temperature'):
             chain = self.chains[t]
             post = self.posteriors[t]
 
@@ -624,8 +590,6 @@ class CourtPainter:
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
                 plt.close('all')
-                if cold_only:
-                    break
 
     def paint_histograms(self):
         """Create histograms."""
