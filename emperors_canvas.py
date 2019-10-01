@@ -17,12 +17,15 @@ from tqdm import tqdm
 import corner
 import emperors_library as emplib
 import emperors_mirror as empmir
+
+
 '''
 needs: Only cold chains
 rv residuals plot
 se cae con acc=0
 primer punto de color negro en chains y posts?
 '''
+
 
 class CourtPainter:
 
@@ -488,7 +491,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        plt.close('all')
+                plt.close('all')
 
     def paint_posteriors(self):
         """Create posterior plots."""
@@ -517,6 +520,9 @@ class CourtPainter:
 
             for i in tqdm(range(self.ndim), desc='Brush type'):
                 fig, ax = plt.subplots(figsize=self.post_figsize)
+                # plt.tight_layout()
+                plt.subplots_adjust(left=0.14, bottom=0.22,
+                                    right=1.015, top=0.95)
 
                 im = ax.scatter(
                     chain[:, i], post, s=self.post_size, c=colors, lw=0,
@@ -611,7 +617,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        plt.close('all')
+                plt.close('all')
 
     def paint_histograms(self):
         """Create histograms."""
@@ -777,7 +783,7 @@ class CourtPainter:
                     ins_count += 1
                     ins += 1 if ins_count % 2 == 0 else 0
                 pcount += 1 if tcount % 5 == 0 else 0
-        plt.close('all')
+                plt.close('all')
 
     def paint_corners(self):
         """Create corner plots. Cold chain only."""
