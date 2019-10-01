@@ -407,7 +407,7 @@ class CourtPainter:
                 [color for i in range(self.nwalkers)]).reshape(-1)
 
             pb = tqdm(enumerate(self.theta.C),
-                      desc='Brush type', total=self.ndim_)
+                      desc='Brush type', total=self.ndim)
             for i, c in pb:
                 fig, ax = plt.subplots(figsize=self.chain_figsize)
                 plt.subplots_adjust(left=0.125, bottom=0.1,
