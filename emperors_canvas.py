@@ -483,9 +483,10 @@ class CourtPainter:
             ins = 0
             ins_count = 1
 
-            for i in tqdm(range(self.ndim), desc='Brush type'):
+            pb = tqdm(enumerate(self.theta.C),
+                      desc='Brush type', total=self.ndim)
+            for i, c in pb:
                 fig, ax = plt.subplots(figsize=self.post_figsize)
-                # plt.tight_layout()
                 plt.subplots_adjust(left=0.14, bottom=0.22,
                                     right=1.015, top=0.95)
 
@@ -520,68 +521,32 @@ class CourtPainter:
                     ticker.LinearLocator(numticks=self.post_ticknum)
                 )
 
-                # plot only accel and instrumental chains.
-                if not self.kplanets:
+                par = self.theta.list_[c]
 
-                    if i == 0:
-                        title = self.chain_titles[5]
-                        ax.set_xlabel(
-                            title + self.chain_units[-1],
-                            fontsize=self.label_fontsize
-                        )
-                        counter = 0
-                    else:
-                        title = self.chain_titles[6 + counter % 2]
-                        ax.set_xlabel(
-                            title + self.chain_units[1],
-                            fontsize=self.label_fontsize
-                        )
-                        counter += 1
-                else:
+                title = par.name.split('_')[0]
+                try:
+                    title += par.units
+                except TypeError:
+                    title += par.units[0]
+                ax.set_xlabel(
+                    title,
+                    fontsize=self.label_fontsize
+                )
 
-                    if pcount <= self.kplanets:
-                        title = self.chain_titles[tcount % 5]
-                        ax.set_xlabel(title + self.chain_units[tcount % 5],
-                                      fontsize=self.label_fontsize)
-                        tcount += 1
-                    else:
-                        if acc:
-                            title = self.chain_titles[5]
-                            ax.set_xlabel(
-                                title + self.chain_units[-1],
-                                fontsize=self.label_fontsize
-                            )
-                            acc = False
-                            counter = 0
-                        else:
-                            title = self.chain_titles[6 + counter % 2]
-                            ax.set_xlabel(
-                                title + self.chain_units[1],
-                                fontsize=self.label_fontsize
-                            )
-                            counter += 1
-
-                if pcount <= self.kplanets:
+                if par.type == 'keplerian':
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'posteriors/' + title +
-                                    '_K' + str(pcount) + '_T' + str(t)
-                                    + '.pdf')
+                        plt.savefig(self.working_dir + 'posteriors/' + par.name
+                                    + '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'posteriors/' + title +
-                                    '_K' + str(pcount) + '_T' + str(t)
-                                    + '.png')
+                        plt.savefig(self.working_dir + 'posteriors/' + par.name
+                                    + '_T' + str(t) + '.png')
                 else:
                     if self.pdf:
-                        plt.savefig(self.working_dir + 'posteriors/' + title
-                                    + '_INS' + str(ins) + '_T' + str(t)
-                                    + '.pdf')
+                        plt.savefig(self.working_dir + 'posteriors/' + par.name
+                                    + '_T' + str(t) + '.pdf')
                     if self.png:
-                        plt.savefig(self.working_dir + 'posteriors/' + title
-                                    + '_INS' + str(ins) + '_T' + str(t)
-                                    + '.png')
-                    ins_count += 1
-                    ins += 1 if ins_count % 2 == 0 else 0
-                pcount += 1 if tcount % 5 == 0 else 0
+                        plt.savefig(self.working_dir + 'posteriors/' + par.name
+                                    + '_T' + str(t) + '.png')
                 plt.close('all')
 
     def paint_histograms(self):
