@@ -412,6 +412,8 @@ class CourtPainter:
 
             for i in tqdm(range(self.ndim), desc='Brush type'):
                 fig, ax = plt.subplots(figsize=self.chain_figsize)
+                plt.subplots_adjust(left=0.125, bottom=0.1,
+                                    right=1.015, top=0.95)
 
                 im = ax.scatter(
                     sp.arange(chain.shape[0]), chain[:, i],
