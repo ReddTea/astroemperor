@@ -42,8 +42,8 @@ class CourtPainter:
         r' $[\frac{m}{s^2}]$'
     ]
 
-    def __init__(self, setup, kplanets, working_dir, pdf, png):
-        self.ntemps, self.nwalkers, self.nsteps = setup
+    def __init__(self, kplanets, working_dir, pdf, png):
+        # Globals
         self.kplanets = kplanets
         self.working_dir = working_dir
         self.pdf = pdf
@@ -53,12 +53,14 @@ class CourtPainter:
             print('\n\t\tWARNING: pdf output might be slow for long chains.')
 
         # Read chains, posteriors and data for plotting.
-        self.chains = emplib.read_chains(working_dir + 'chains.pkl')
+        self.chains = emplib.read(working_dir + 'chains.pkl')
         self.cold = self.chains[0]
-        self.posteriors = emplib.read_posteriors(
-            working_dir + 'posteriors.pkl')
-        self.all_rv = emplib.read_rv_data(working_dir + 'rv_data.pkl')
+        self.posteriors = emplib.read(working_dir + 'posteriors.pkl')
+        self.all_rv = emplib.read(working_dir + 'rv_data.pkl')
         self.time, self.rv, self.err, self.ins = self.all_rv
+        self.setup = emplib.read(working_dir + 'setup.pkl')
+        self.ntemps, self.nwalkers, self.nsteps = self.setup
+        self.theta_ = emplib.read(working_dir + 'theta.pkl')
 
         self.nins = len(sp.unique(self.ins))
         self.ndim = 1 + 5 * kplanets + self.nins * 2

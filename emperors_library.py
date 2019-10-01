@@ -198,61 +198,33 @@ def ensure(condition, warning, MUSIC):
     pass
 
 
-def instigator(cherry_chain, cherry_post, all_data, saveplace):
+def instigator(setup, theta, cherry_chain, cherry_post, all_data, saveplace):
     """Save chains and posteriors in a pickle file for later use."""
-    save_chains(cherry_chain, saveplace)
-    save_posteriors(cherry_post, saveplace)
-    save_rv_data(all_data, saveplace)
+    save(setup, saveplace, 'setup')
+    save(theta, saveplace, 'theta')
+    save(cherry_chain, saveplace, 'chains')
+    save(cherry_post, saveplace, 'posteriors')
+    save(all_data, saveplace, 'rv_data')
     pass
 
 
-def save_chains(chains, out_dir):
-    """Pickle the chains."""
-    pickle_out = open(out_dir + '/chains.pkl', 'wb')
-    pickle.dump(chains, pickle_out)
+def save(obj, out_dir, type):
+    """Pickle the given object.
+
+    It pickles either the setup (3x1 arr), theta object, cherry_chain,
+    cherry_post or all rv data into a pkl file for later use.
+    """
+    pickle_out = open(out_dir + '/' + type + '.pkl', 'wb')
+    pickle.dump(obj, pickle_out)
     pickle_out.close()
-    pass
 
 
-def save_posteriors(posteriors, out_dir):
-    """Pickle the posteriors."""
-    pickle_out = open(out_dir + '/posteriors.pkl', 'wb')
-    pickle.dump(posteriors, pickle_out)
-    pickle_out.close()
-    pass
-
-
-def save_rv_data(all_data, out_dir):
-    """Save radial-velocity data."""
-    # TODO: save bisector.
-    pickle_out = open(out_dir + '/rv_data.pkl', 'wb')
-    pickle.dump(all_data, pickle_out)
-    pickle_out.close()
-    pass
-
-
-def read_chains(in_dir):
-    """Read chains file."""
+def read(in_dir):
+    """Read pickled files."""
     pickle_in = open(in_dir, 'rb')
-    chains = pickle.load(pickle_in)
+    obj = pickle.load(pickle_in)
     pickle_in.close()
-    return chains
-
-
-def read_posteriors(in_dir):
-    """Read posteriors file."""
-    pickle_in = open(in_dir, 'rb')
-    posteriors = pickle.load(pickle_in)
-    pickle_in.close()
-    return posteriors
-
-
-def read_rv_data(in_dir):
-    """Read radial-velocity pickle file."""
-    pickle_in = open(in_dir, 'rb')
-    all_rv_data = pickle.load(pickle_in)
-    pickle_in.close()
-    return all_rv_data
+    return obj
 
 
 def phasefold(time, rv, err, period):
