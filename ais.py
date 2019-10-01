@@ -112,9 +112,9 @@ def neo_init_batman(t, ld_mod, ldn):
     return model, params
 
 
-
 class spec_list:
-    """
+    """Class wrapping spec utilities in a list format.
+
     A simple list for spec objects with inbuilt functions for ease of use.
 
     Attributes
@@ -135,6 +135,7 @@ class spec_list:
         parameters. It's the complement of the coordinator, hencec the name.
 
     """
+
     def __init__(self):
         self.list_ = sp.array([])
         self.ndim_ = 0
@@ -143,11 +144,24 @@ class spec_list:
         self.C = []  # coordinator
         self.A = []  # anticoordinator
 
-    def len(self):
+    def __repr__(self):
+        """Human readable representation."""
+        rep = [str(o) for o in self.list_]
+        return str(rep)
+
+    def __str__(self):
+        rep = [str(o) for o in self.list_]
+        return str(rep)
+
+    def __len__(self):
+        """Overload len() method.
+
+        To get length of speclist now do: len(speclist)
+        """
         return len(self.list_)
 
     def _update_list_(self):
-        """Updates the ndim_, C and A attributes.
+        """Update the ndim_, C and A attributes.
 
         -------
         function
@@ -156,10 +170,10 @@ class spec_list:
         """
         self.A = []
         self.C = []
-        ndim = self.len()
+        ndim = len(self)
         priors = self.list('prior')
-        for i in range(self.len()):
-            if priors[i] == 'fixed' or priors[i]=='joined':
+        for i in range(len(self)):
+            if priors[i] == 'fixed' or priors[i] == 'joined':
                 ndim -= 1
                 self.A.append(i)
             else:
@@ -168,7 +182,7 @@ class spec_list:
         pass
 
     def change_val(self, commands):
-        """Changes an attribute of a spec object matching the input name.
+        """Change an attribute of a spec object matching the input name.
 
         Parameters
         ----------
@@ -193,7 +207,9 @@ class spec_list:
         return False
 
     def apply_changes_list(self, changes_list):
-        """Input is a list with the 'command' format for the change_val
+        """Apply a list of changes.
+
+        Input is a list with the 'command' format for the change_val
         function. If the change is applied, it deletes that command from the
         input list.
 
@@ -238,11 +254,12 @@ class spec_list:
 
 
 class spec:
-    """
+    """Metadata for each parameter.
+
     Spec object contains metadata corresponding to a parameter to fit with
     emcee.
 
-    Parameters
+    Attributes
     ----------
     name : string
         Unique identifier for your parameter.
@@ -262,10 +279,8 @@ class spec:
     args : any
         Any additional argument that is needed. Has no real use for now.
 
-    Attributes
-    ----------
-    Just the same as stated above.
     """
+
     def __init__(self, name, units, prior, lims, val, type, args=[]):
         self.name = name
         self.units = units
@@ -279,17 +294,17 @@ class spec:
         self.sigmas = {}
         self.other = []
 
-    def identify(self):
-        """Out goes the string containing the name and units. Used for the
-        displays on terminal.
+    def __repr__(self):
+        """Human readable representation."""
+        try:
+            rep = self.name + self.units
+        except TypeError:
+            rep = self.name + self.units[0]
+        return rep
 
-        Returns
-        -------
-        string
-            Name and units of the spec.
-
-        """
-        return self.name + '    ' + self.units
+    def __str__(self):
+        """Machine readable representation."""
+        return self.name
 
     def tag(self):
         """Short summary.
@@ -474,7 +489,8 @@ class EMPIRE:
         if kplanets >= 2:
             names = [str(name) + '_' + str(kplanets) for name in names]
 
-        units = [" [Days]", " $[\\frac{m}{s}]$", " $[rad]$", "", " $[rads]$"]
+        units = [" [Days]", r" $[\frac{m}{s}]$", " $[rad]$", "",
+                 r" $[\frac{rad}{s}]$"]
         priors = ['uniform', 'uniform_spe_a',
                   'uniform_spe_b', 'uniform_spe_a', 'uniform_spe_b']
         new = sp.array([])
@@ -550,7 +566,10 @@ class EMPIRE:
                 aux = ''
             else:
                 aux = '_%i' % i+1
-            units = [' $[\\frac{m}{s%i}]$' % (i+1)]
+            if i > 0:
+                units = [r' $[\frac{m}{s^{%i}}]$' % (i+1)]
+            else:
+                units = [r' $[\frac{m}{s}]$']
             t = spec(names[0]+aux, units, 'uniform', limits[0], -sp.inf, 'general')
             new = sp.append(new, t)
 
@@ -1045,13 +1064,13 @@ class EMPIRE:
                     # change prior and lims for amplitude and eccentricity
                     # if phase or w are fixed
                     if (self.theta.list_[j].prior == 'uniform_spe_a' and
-                        self.theta.list_[j+1].prior == 'fixed'):
+                        self.theta.list_[j + 1].prior == 'fixed'):
                         self.theta.list_[j].prior = 'uniform'
                         if self.theta.list_[j].tag == 'Amplitude':
-                            self.cv[(j+1)//5][0] = 0
+                            self.cv[(j + 1)//5][0] = 0
                             self.theta.list_[j].lims = [0.1, jitt_lim]
                         elif self.theta.list_[j].tag == 'Eccentricity':
-                            self.cv[(j+1)//5][1] = 0
+                            self.cv[(j + 1)//5][1] = 0
                             self.theta.list_[j].lims = [0., 1]
                         self.theta.list_[j].lims = []
 
@@ -1251,14 +1270,20 @@ class EMPIRE:
 
             if self.VINES:  # saves chains, posteriors and log
                 self.saveplace = self.mklogfile(kplan)
-                emplib.instigator(self.cherry_chain_h, self.cherry_post, self.all_data, self.saveplace)
+                emplib.instigator(
+                                self.setup, self.theta,
+                                self.cherry_chain_h[:, :, self.coordinator],
+                                self.cherry_post,
+                                self.all_data, self.saveplace
+                                )
 
             if self.MUSIC:
                 thybiding.play()
 
             if self.INPLOT:
                 from emperors_canvas import CourtPainter
-                vangogh = CourtPainter(self.setup, kplan, self.saveplace+'/', self.PDF, self.PNG)
+                vangogh = CourtPainter(kplan, self.saveplace+'/',
+                                       self.PDF, self.PNG)
                 vangogh.paint_chains()
                 vangogh.paint_posteriors()
                 vangogh.paint_timeseries()
@@ -1312,17 +1337,19 @@ class EMPIRE:
 
 #
 
-#stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
+# stardat = sp.array(
+#     ['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
+
 
 stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
-stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
+# stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
 
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
 #setup = sp.array([5, 200, 12000])
-setup = sp.array([3, 200, 5000])
+setup = sp.array([2, 50, 80])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1331,12 +1358,12 @@ em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 
 # we actually run the chain from 0 to 2 signals
-#em.RAW = True  # no bayes cut
-em.bayes_factor = 5
+em.RAW = True  # no bayes cut
+# em.bayes_factor = 5
 
 em.ACC = 1
-em.MOAV = sp.array([0,0])  # not needed
-#em.burn_out = 1
+em.MOAV = sp.array([1, 2])  # not needed
+em.burn_out = 1
 #em.MOAV_STAR = 1
 
 em.VINES = True
@@ -1364,11 +1391,21 @@ em.changes_list = {0:['Period', 'prior', 'fixed'],
                    6:['Amplitude_2', 'prior', 'fixed'],
                    7:['Amplitude_2', 'val', 88.34]
                    }
-em.changes_list = {0:['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
-                   1:['Period_2', 'lims', [sp.log(199),sp.log(201)]]
-                   }
+# em.changes_list = {0: ['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
+#                    1: ['Period_2', 'lims', [sp.log(199), sp.log(201)]]
+#                    }
 
-em.conquer(2, 2)
+
+# em.conquer(2, 2)
+
+from emperors_canvas import CourtPainter
+vangogh = CourtPainter(2, 'datalogs/GJ876/10.1.19/', False, True)
+vangogh.paint_chains()
+vangogh.paint_posteriors()
+# vangogh.paint_timeseries()
+# vangogh.paint_fold()
+# vangogh.paint_histograms()
+# vangogh.paint_corners()
 
 
 if False:
