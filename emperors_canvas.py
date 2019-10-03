@@ -85,30 +85,51 @@ class CourtPainter:
 
     def __get_params(self, kplanet):
         """Retrieve model parameters."""
-        period = sp.median(self.cold[:, 5 * kplanet])
-        amplitude = sp.median(self.cold[:, 5 * kplanet + 1])
-        phase = sp.median(self.cold[:, 5 * kplanet + 2])
-        eccentricity = sp.median(self.cold[:, 5 * kplanet + 3])
-        longitude = sp.median(self.cold[:, 5 * kplanet + 4])
+        period = self.theta.list_[5 * kplanet + 0].val
+        amplitude = self.theta.list_[5 * kplanet + 1].val
+        phase = self.theta.list_[5 * kplanet + 2].val
+        eccentricity = self.theta.list_[5 * kplanet + 3].val
+        longitude = self.theta.list_[5 * kplanet + 4].val
         params = (period, amplitude, phase, eccentricity, longitude)
         return params
 
     def __get_CI_params(self, kplanet, alpha):
         """Retrieve model credibility interval for a given alpha."""
-        _, period_lo, period_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet], alpha)
-        _, amplitude_lo, amplitude_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 1], alpha)
-        _, phase_lo, phase_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 2], alpha)
-        _, eccentricity_lo, eccentricity_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 3], alpha)
-        _, longitude_lo, longitude_up = emplib.credibility_interval(
-            self.cold[:, 5 * kplanet + 4], alpha)
+        count = 0
+        if self.theta.list_[5 * kplanet + 0].prior == 'fixed':
+            period_lo = period_up = self.theta.list_[5 * kplanet + 0].val
+            count += 1
+        else:
+            _, period_lo, period_up = emplib.credibility_interval(
+                self.cold[:, 5 * kplanet - count], alpha)
+        if self.theta.list_[5 * kplanet + 1].prior == 'fixed':
+            amplitude_lo = amplitude_up = self.theta.list_[5 * kplanet + 1].val
+            count += 1
+        else:
+            _, amplitude_lo, amplitude_up = emplib.credibility_interval(
+                self.cold[:, 5 * kplanet + 1 - count], alpha)
+        if self.theta.list_[5 * kplanet + 2].prior == 'fixed':
+            phase_lo = phase_up = self.theta.list_[5 * kplanet + 2].val
+            count += 1
+        else:
+            _, phase_lo, phase_up = emplib.credibility_interval(
+                self.cold[:, 5 * kplanet + 2 - count], alpha)
+        if self.theta.list_[5 * kplanet + 3].prior == 'fixed':
+            ecc_lo = ecc_up = self.theta.list_[5 * kplanet + 3].val
+            count += 1
+        else:
+            _, ecc_lo, ecc_up = emplib.credibility_interval(
+                self.cold[:, 5 * kplanet + 3 - count], alpha)
+        if self.theta.list_[5 * kplanet + 4].prior == 'fixed':
+            longitude_lo = longitude_up = self.theta.list_[5 * kplanet + 4].val
+            count += 1
+        else:
+            _, longitude_lo, longitude_up = emplib.credibility_interval(
+                self.cold[:, 5 * kplanet + 4 - count], alpha)
         params_lo = (period_lo, amplitude_lo, phase_lo,
-                     eccentricity_lo, longitude_lo)
+                     ecc_lo, longitude_lo)
         params_up = (period_up, amplitude_up, phase_up,
-                     eccentricity_up, longitude_up)
+                     ecc_up, longitude_up)
         return params_lo, params_up
 
     def __rv_residuals(self):
@@ -271,122 +292,130 @@ class CourtPainter:
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
+        time_m = sp.linspace(self.time.min() - 10,
+                             self.time.max() + 10, 10000)
+        time_m -= 2450000
+
+        cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
+
+        rv_m = 0
+        rv_m_lo = [0, 0, 0]
+        rv_m_up = [0, 0, 0]
+
         for k in tqdm(range(self.kplanets)):
             params = self.__get_params(k)
 
-            fig = plt.figure(figsize=self.full_figsize)
-            gs = gridspec.GridSpec(3, 4)
-            ax = fig.add_subplot(gs[:2, :])
-            ax_r = fig.add_subplot(gs[-1, :])
-            cbar_ax = fig.add_axes([.85, .125, .015, .755])
-            fig.subplots_adjust(right=.84, hspace=0)
+            rv_m += empmir.mini_RV_model(params, time_m)
 
-            for i in range(self.nins):
-                ins = self.ins == i
-
-                ax.errorbar(
-                    self.time[ins] - 2450000, self.rv0[ins],
-                    yerr=self.err0[ins], linestyle='', marker=None,
-                    ecolor=self.error_color, **self.error_kwargs
-                )
-                im = ax.scatter(
-                    self.time[ins] - 2450000, self.rv0[ins],
-                    marker=self.markers[i], edgecolors='k', s=self.full_size,
-                    c=self.time_cb[ins], cmap=self.full_cmap
-                )
-                im.set_clim(cmin, cmax)
-
-                # Get residuals.
-                res = self.__rv_residuals()[ins]
-
-                ax_r.errorbar(
-                    self.time[ins] - 2450000, res, yerr=self.err0[ins],
-                    linestyle='', marker=None, ecolor=self.error_color,
-                    **self.error_kwargs
-                )
-                im_r = ax_r.scatter(
-                    self.time[ins] - 2450000, res, marker=self.markers[i],
-                    edgecolors='k', s=self.full_size, c=self.time_cb[ins],
-                    cmap=self.full_cmap
-                )
-
-                im_r.set_clim(cmin, cmax)
-            fig.colorbar(
-                im, cax=cbar_ax).set_label(
-                'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
-                fontsize=self.label_fontsize, fontname=self.fontname
-            )
-            time_m = sp.linspace(self.time.min() - 10,
-                                 self.time.max() + 10, 10000)
-            time_m -= 2450000
-            rv_m = empmir.mini_RV_model(params, time_m)
-
-            # Plot best model.
-            ax.plot(time_m, rv_m, '-k', linewidth=2)
-
-            # Plot models CI.
-            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
-            for s in cred_intervals:
+            for i, s in enumerate(cred_intervals):
                 params_lo, params_up = self.__get_CI_params(k, s)
                 params_lo = (params[0], params_lo[1],
                              params_lo[2], params_lo[3], params_lo[4])
                 params_up = (params[0], params_up[1],
                              params_up[2], params_up[3], params_up[4])
                 # Calculate new models.
-                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
-                rv_m_up = empmir.mini_RV_model(params_up, time_m)
+                rv_m_lo[i] += empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up[i] += empmir.mini_RV_model(params_up, time_m)
 
-                ax.fill_between(
-                    time_m, rv_m_lo, rv_m_up, color=self.CI_color, alpha=.25
-                )
+        fig = plt.figure(figsize=self.full_figsize)
+        gs = gridspec.GridSpec(3, 4)
+        ax = fig.add_subplot(gs[:2, :])
+        ax_r = fig.add_subplot(gs[-1, :])
+        cbar_ax = fig.add_axes([.85, .125, .015, .755])
+        fig.subplots_adjust(right=.84, hspace=0)
 
-            # A line to guide the eye.
-            ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+        for i in range(self.nins):
+            ins = self.ins == i
 
-            # Labels and tick stuff.
-            ax.set_ylabel(
-                r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
-                fontname=self.fontname
+            ax.errorbar(
+                self.time[ins] - 2450000, self.rv0[ins],
+                yerr=self.err0[ins], linestyle='', marker=None,
+                ecolor=self.error_color, **self.error_kwargs
             )
-            ax_r.set_ylabel(
-                'Residuals', fontsize=self.label_fontsize,
-                fontname=self.fontname
+            im = ax.scatter(
+                self.time[ins] - 2450000, self.rv0[ins],
+                marker=self.markers[i], edgecolors='k', s=self.full_size,
+                c=self.time_cb[ins], cmap=self.full_cmap
             )
-            ax_r.set_xlabel(
-                'Time (JD - 2450000)', fontsize=self.label_fontsize,
-                fontname=self.fontname
+            im.set_clim(cmin, cmax)
+
+            # Get residuals.
+            res = self.__rv_residuals()[ins]
+
+            ax_r.errorbar(
+                self.time[ins] - 2450000, res, yerr=self.err0[ins],
+                linestyle='', marker=None, ecolor=self.error_color,
+                **self.error_kwargs
+            )
+            im_r = ax_r.scatter(
+                self.time[ins] - 2450000, res, marker=self.markers[i],
+                edgecolors='k', s=self.full_size, c=self.time_cb[ins],
+                cmap=self.full_cmap
             )
 
-            ax_r.get_yticklabels()[-1].set_visible(False)
-            ax_r.minorticks_on()
-            ax.set_xticks([])
-            ax.tick_params(
-                axis='both', which='major',
-                labelsize=self.tick_labelsize
-            )
-            ax_r.tick_params(
-                axis='both', which='major',
-                labelsize=self.tick_labelsize
-            )
-            for tick in ax.get_yticklabels():
-                tick.set_fontname(self.fontname)
-            for tick in ax_r.get_yticklabels():
-                tick.set_fontname(self.fontname)
-            for tick in ax_r.get_xticklabels():
-                tick.set_fontname(self.fontname)
-            for tick in cbar_ax.get_yticklabels():
-                tick.set_fontname(self.fontname)
-            cbar_ax.tick_params(labelsize=self.tick_labelsize)
+            im_r.set_clim(cmin, cmax)
+        fig.colorbar(
+            im, cax=cbar_ax).set_label(
+            'JD - 2450000', rotation=270, labelpad=self.cbar_labelpad,
+            fontsize=self.label_fontsize, fontname=self.fontname
+        )
 
-            offset = (time_m.max() - time_m.min()) * .01
-            ax.set_xlim(time_m.min() - offset, time_m.max() + offset)
-            ax_r.set_xlim(time_m.min() - offset, time_m.max() + offset)
-            if self.pdf:
-                fig.savefig(self.working_dir + 'timeseries_' +
-                            str(k + 1) + '.pdf', bbox_inches='tight')
-            if self.png:
-                fig.savefig(self.working_dir + 'timeseries_' +
-                            str(k + 1) + '.png', bbox_inches='tight')
+        # Plot best model.
+        ax.plot(time_m, rv_m, '-k', linewidth=2)
+
+        # Plot models CI.
+        for i, s in enumerate(cred_intervals):
+            ax.fill_between(
+                time_m, rv_m_lo[i], rv_m_up[i], color=self.CI_color, alpha=.25
+            )
+
+        # A line to guide the eye.
+        ax_r.axhline(0, color='k', linestyle='--', linewidth=2, zorder=0)
+
+        # Labels and tick stuff.
+        ax.set_ylabel(
+            r'Radial Velocity (m s$^{-1}$)', fontsize=self.label_fontsize,
+            fontname=self.fontname
+        )
+        ax_r.set_ylabel(
+            'Residuals', fontsize=self.label_fontsize,
+            fontname=self.fontname
+        )
+        ax_r.set_xlabel(
+            'Time (JD - 2450000)', fontsize=self.label_fontsize,
+            fontname=self.fontname
+        )
+
+        ax_r.get_yticklabels()[-1].set_visible(False)
+        ax_r.minorticks_on()
+        ax.set_xticks([])
+        ax.tick_params(
+            axis='both', which='major',
+            labelsize=self.tick_labelsize
+        )
+        ax_r.tick_params(
+            axis='both', which='major',
+            labelsize=self.tick_labelsize
+        )
+        for tick in ax.get_yticklabels():
+            tick.set_fontname(self.fontname)
+        for tick in ax_r.get_yticklabels():
+            tick.set_fontname(self.fontname)
+        for tick in ax_r.get_xticklabels():
+            tick.set_fontname(self.fontname)
+        for tick in cbar_ax.get_yticklabels():
+            tick.set_fontname(self.fontname)
+        cbar_ax.tick_params(labelsize=self.tick_labelsize)
+
+        offset = (time_m.max() - time_m.min()) * .01
+        ax.set_xlim(time_m.min() - offset, time_m.max() + offset)
+        ax_r.set_xlim(time_m.min() - offset, time_m.max() + offset)
+        if self.pdf:
+            fig.savefig(self.working_dir + 'timeseries.pdf',
+                        bbox_inches='tight')
+        if self.png:
+            fig.savefig(self.working_dir + 'timeseries.png',
+                        bbox_inches='tight')
         plt.close('all')
 
     def paint_chains(self, cold_only=False):
