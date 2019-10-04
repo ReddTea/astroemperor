@@ -142,16 +142,17 @@ class CourtPainter:
         return residuals
 
     def __clean_rvs(self):
-        """Clean radial-velocities by adding the offset and jitter."""
-        instrumental = self.cold[:, -2 * self.nins:]
+        """Clean rvs by adding the instrumentals, ACC and MOAV."""
+        acc = self.theta.list_[self.kplanets * 2].val
+        # acc_m = empmir.acc_model()
+        inst_idx = self.theta.list('type') == 'instrumental'
+        instr = self.theta.list_[inst_idx]
         rv0 = copy.deepcopy(self.rv)
         err0 = copy.deepcopy(self.err)
-        acc = sp.median(self.cold[:, -2 * self.nins - 1])
         for i in range(self.nins):
-            jitter = sp.median(instrumental[:, i])
-            offset = sp.median(instrumental[:, i + 1])
+            jitter = instr[i].val
+            offset = instr[i + 1].val
             ins = self.ins == i
-            # Assume linear acceleration for now.
             rv0[ins] -= offset + acc
             err0[ins] = sp.sqrt(err0[ins] ** 2 + jitter ** 2)
         self.rv0 = rv0
@@ -167,8 +168,39 @@ class CourtPainter:
         minx, maxx = self.time.min(), self.time.max()
         cmin, cmax = self.time_cb.min(), self.time_cb.max()
 
+        cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
+
+        time_m = sp.linspace(self.time.min() - 10,
+                             self.time.max() + 10, 10000)
+
+        rv_m = 0
+        rv_m_lo = sp.zeros((len(time_m), 3), dtype=float)
+        rv_m_up = sp.zeros((len(time_m), 3), dtype=float)
+
         for k in tqdm(range(self.kplanets)):
             params = self.__get_params(k)
+            rem = 0  # Signal removal
+
+            for kk in range(self.kplanets):
+                if k == kk:
+                    continue
+                rem_pars = self.__get_params(kk)
+                rem += empmir.mini_RV_model(rem_pars, self.time)
+            plot_rv = self.rv0 - rem
+
+            rv_m = empmir.mini_RV_model(params, time_m)
+            time_m_p, rv_m_p, _ = emplib.phasefold(
+                time_m, rv_m, sp.zeros(10000), params[0])
+
+            for i, s in enumerate(cred_intervals):
+                params_lo, params_up = self.__get_CI_params(k, s)
+                params_lo = (params[0], params_lo[1],
+                             params_lo[2], params_lo[3], params_lo[4])
+                params_up = (params[0], params_up[1],
+                             params_up[2], params_up[3], params_up[4])
+                # Calculate new models.
+                rv_m_lo[:, i] = empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up[:, i] = empmir.mini_RV_model(params_up, time_m)
 
             fig = plt.figure(figsize=self.phase_figsize)
             gs = gridspec.GridSpec(3, 4)
@@ -180,7 +212,7 @@ class CourtPainter:
             for i in range(self.nins):  # plot per instrument.
                 ins = self.ins == i
                 t_p, rv_p, err_p = emplib.phasefold(
-                    self.time[ins], self.rv0[ins], self.err0[ins], params[0]
+                    self.time[ins], plot_rv[ins], self.err0[ins], params[0]
                 )
                 _, res_p, _p = emplib.phasefold(
                     self.time[ins], self.__rv_residuals()[ins], self.err0[ins],
@@ -213,25 +245,16 @@ class CourtPainter:
                 fontsize=self.label_fontsize, fontname=self.fontname
             )
 
-            time_m = sp.linspace(self.time.min() - 10,
-                                 self.time.max() + 10, 10000)
-            rv_m = empmir.mini_RV_model(params, time_m)
-            time_m_p, rv_m_p, _ = emplib.phasefold(
-                time_m, rv_m, sp.zeros(10000), params[0])
-
             # Plot best model.
             ax.plot(time_m_p, rv_m_p, '-k', linewidth=2)
             # Plot models CI.
-            cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
-            for s in cred_intervals:
-                params_lo, params_up = self.__get_CI_params(k, s)
-                # Calculate new models.
-                rv_m_lo = empmir.mini_RV_model(params_lo, time_m)
-                rv_m_up = empmir.mini_RV_model(params_up, time_m)
+            for i, s in enumerate(cred_intervals):
+                # params_lo, params_up = self.__get_CI_params(k, s)
+
                 _, rv_m_lo_p, _ = emplib.phasefold(
-                    time_m, rv_m_lo, sp.zeros(10000), params_lo[0])
+                    time_m, rv_m_lo[:, i], sp.zeros(10000), params[0])
                 _, rv_m_up_p, _ = emplib.phasefold(
-                    time_m, rv_m_up, sp.zeros(10000), params_up[0])
+                    time_m, rv_m_up[:, i], sp.zeros(10000), params[0])
                 ax.fill_between(time_m_p, rv_m_lo_p, rv_m_up_p,
                                 color=self.CI_color, alpha=.25)
 
@@ -299,10 +322,10 @@ class CourtPainter:
         cred_intervals = [.99, .95, .68]  # 3, 2, and 1 sigma
 
         rv_m = 0
-        rv_m_lo = [0, 0, 0]
-        rv_m_up = [0, 0, 0]
+        rv_m_lo = sp.zeros((len(time_m), 3), dtype=float)
+        rv_m_up = sp.zeros((len(time_m), 3), dtype=float)
 
-        for k in tqdm(range(self.kplanets)):
+        for k in range(self.kplanets):
             params = self.__get_params(k)
 
             rv_m += empmir.mini_RV_model(params, time_m)
@@ -310,12 +333,12 @@ class CourtPainter:
             for i, s in enumerate(cred_intervals):
                 params_lo, params_up = self.__get_CI_params(k, s)
                 params_lo = (params[0], params_lo[1],
-                             params_lo[2], params_lo[3], params_lo[4])
+                             params[2], params_lo[3], params_lo[4])
                 params_up = (params[0], params_up[1],
-                             params_up[2], params_up[3], params_up[4])
+                             params[2], params_up[3], params_up[4])
                 # Calculate new models.
-                rv_m_lo[i] += empmir.mini_RV_model(params_lo, time_m)
-                rv_m_up[i] += empmir.mini_RV_model(params_up, time_m)
+                rv_m_lo[:, i] += empmir.mini_RV_model(params_lo, time_m)
+                rv_m_up[:, i] += empmir.mini_RV_model(params_up, time_m)
 
         fig = plt.figure(figsize=self.full_figsize)
         gs = gridspec.GridSpec(3, 4)
@@ -366,7 +389,7 @@ class CourtPainter:
         # Plot models CI.
         for i, s in enumerate(cred_intervals):
             ax.fill_between(
-                time_m, rv_m_lo[i], rv_m_up[i], color=self.CI_color, alpha=.25
+                time_m, rv_m_lo[:, i], rv_m_up[:, i], color=self.CI_color, alpha=.25
             )
 
         # A line to guide the eye.
