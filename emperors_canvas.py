@@ -333,9 +333,9 @@ class CourtPainter:
             for i, s in enumerate(cred_intervals):
                 params_lo, params_up = self.__get_CI_params(k, s)
                 params_lo = (params[0], params_lo[1],
-                             params[2], params_lo[3], params_lo[4])
+                             params_lo[2], params_lo[3], params_lo[4])
                 params_up = (params[0], params_up[1],
-                             params[2], params_up[3], params_up[4])
+                             params_up[2], params_up[3], params_up[4])
                 # Calculate new models.
                 rv_m_lo[:, i] += empmir.mini_RV_model(params_lo, time_m)
                 rv_m_up[:, i] += empmir.mini_RV_model(params_up, time_m)
