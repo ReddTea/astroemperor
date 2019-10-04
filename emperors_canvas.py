@@ -28,6 +28,64 @@ primer punto de color negro en chains y posts?
 
 
 class CourtPainter:
+    """Plot driver for Emperor.
+
+    Parameters
+    ----------
+    kplanets : int
+        The number of planets to plot for.
+    working_dir : str
+        The directory containing Emperor`s outputs.
+    pdf : bool
+        Set to True to output plots in pdf.
+    png : bool
+        Set to True to output plots in png.
+
+    Examples
+    -------
+    Examples should be written in doctest format, and
+    should illustrate how to use the function/class.
+    >>>  TODO
+
+    Attributes
+    ----------
+    chains : array_like
+        Description of attribute `chains`.
+    cold : array_like
+        Description of attribute `cold`.
+    posteriors : array_like
+        Description of attribute `posteriors`.
+    all_rv : type
+        Description of attribute `all_rv`.
+    time : array_like
+        Description of attribute `time`.
+    rv : array_like
+        Description of attribute `rv`.
+    err : array_like
+        Description of attribute `err`.
+    ins : array_like
+        Description of attribute `ins`.
+    setup : array_like (3,)
+        Array with Emperor setup (ntemps, nwalkers, nsteps).
+    ntemps : int
+        Number of parallel tempering temperatures.
+    nwalkers : int
+        Number of MCMC walkers.
+    nsteps : int
+        Number of steps for each walker.
+    theta : spec_list
+        Internal spec_list object containing information for all model
+        parameters.
+    nins : int
+        Number of RV instruments.
+    ndim : int
+        Number of free parameters.
+    chain_titles : type
+        DEPRECATED
+    chain_units : type
+        DEPRECATED
+
+    """
 
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
     error_kwargs = {'lw': 1.75, 'zorder': 0}
