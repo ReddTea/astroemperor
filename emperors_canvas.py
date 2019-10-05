@@ -18,9 +18,11 @@ import corner
 import emperors_library as emplib
 import emperors_mirror as empmir
 '''
-needs: Only cold chains
 rv residuals plot
-se cae con acc=0
+se cae con acc=0 o fixed params
+try except, si una temp alta trae pocas muestras se cae
+cropped numbers in x
+Only cold chains
 primer punto de color negro en chains y posts?
 '''
 

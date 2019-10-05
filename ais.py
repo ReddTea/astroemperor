@@ -1258,11 +1258,30 @@ class EMPIRE:
 
             if self.INPLOT:
                 from emperors_canvas import CourtPainter
-                vangogh = CourtPainter(self.setup, kplan, self.saveplace+'/', self.PDF, self.PNG)
-                vangogh.paint_chains()
-                vangogh.paint_posteriors()
-                vangogh.paint_timeseries()
-                vangogh.paint_fold()
+                try:
+                    vangogh = CourtPainter(self.setup, kplan, self.saveplace+'/', self.PDF, self.PNG)
+                except:
+                    pass
+                try:
+                    vangogh.paint_timeseries()
+                except:
+                    pass
+                try:
+                    vangogh.paint_fold()
+                except:
+                    pass
+                try:
+                    vangogh.paint_chains()
+                except:
+                    pass
+                try:
+                    vangogh.paint_posteriors()
+                except:
+                    pass
+                try:
+                    vangogh.paint_histograms()
+                except:
+                    pass
 
                 pass
 
@@ -1314,15 +1333,15 @@ class EMPIRE:
 
 #stardat = sp.array(['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
 
-stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
+stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-#setup = sp.array([5, 200, 12000])
-setup = sp.array([3, 200, 5000])
+setup = sp.array([3, 200, 6000])
+setup = sp.array([3, 200, 10000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1335,7 +1354,7 @@ em.betas = None
 em.bayes_factor = 5
 
 em.ACC = 1
-em.MOAV = sp.array([0,0])  # not needed
+em.MOAV = sp.array([1,1])  # not needed
 #em.burn_out = 1
 #em.MOAV_STAR = 1
 
@@ -1354,7 +1373,7 @@ em.INPLOT = True
 
 em.MUSIC = False
 
-#'''
+'''
 em.changes_list = {0:['Period', 'prior', 'fixed'],
                    1:['Period', 'val', sp.log(61.1166)],
                    2:['Amplitude', 'prior', 'fixed'],
@@ -1364,11 +1383,13 @@ em.changes_list = {0:['Period', 'prior', 'fixed'],
                    6:['Amplitude_2', 'prior', 'fixed'],
                    7:['Amplitude_2', 'val', 88.34]
                    }
+
 em.changes_list = {0:['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
                    1:['Period_2', 'lims', [sp.log(199),sp.log(201)]]
                    }
+'''
 
-em.conquer(2, 2)
+em.conquer(1, 2)
 
 
 if False:
