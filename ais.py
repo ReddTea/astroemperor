@@ -1556,7 +1556,7 @@ if PLOT_PM:
 
         T0_r, P_r, r_r, sma_r, inc_r, ecc_r, w_r, c1_r, c2_r, ka_r, kr_r = em.ajuste
         theta__ = em.ajuste[:9]
-
+        theta_gp__ = em.ajuste[9:]
         # model
         params__ = [x, em.kplan-1, em.batman_ldn, em.batman_m, em.batman_p]
         y_transit = empmir.neo_lightcurve(theta__, params__)
@@ -1580,13 +1580,15 @@ if PLOT_PM:
 
         x2 = np.linspace(min(x), max(x), 1000)
         # gps
+        params2__ = [x2, em.kplan-1, em.batman_ldn, em.batman_m, em.batman_p]
         '''
         if True:  # dont use this
             for s in em.sampler.flatchain[0][np.random.randint(len(em.sampler.flatchain[0]), size=24)]:
-                radius = 10.**s[-1]
+                radius = 10.**s[-1]  # k_r
                 gp = george.GP(s[-2]* kernels.Matern32Kernel(radius))
                 gp.compute(x, y_error)
-                m = gp.sample_conditional(y - Model(s[:-2], x), x2) + Model(s[:-2], x2)
+                res = y - empmir.neo_lightcurve(s[:-2], params__)
+                m = gp.sample_conditional(res, x2) + empmir.neo_lightcurve(s[:-2], params2__)
                 plt.plot(x2, m, '-', color="#4682b4", alpha=0.2)
         '''
         plt.show()
