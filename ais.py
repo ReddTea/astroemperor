@@ -821,13 +821,18 @@ class EMPIRE:
         pbar.close()
 
         p0, lnprob0, lnlike0 = p, lnprob, lnlike
-        print("\nMean acceptance fraction: {0:.3f}".format(
-            sp.mean(self.sampler.acceptance_fraction)))
-        emplib.ensure(sp.mean(self.sampler.acceptance_fraction) !=
-                      0, 'Mean acceptance fraction = 0 ! ! !', fault)
+
+        print('\n ------------ Mean acceptance fraction ------------- \n')
+        tab_h = ['Chain', 'Mean', 'Minimum', 'Maximum']
+        tab_all = []
+        for t in range(self.ntemps):
+            maf = self.sampler.acceptance_fraction[t]
+            tab_all.append([t, sp.mean(maf), sp.amin(maf), sp.amax(maf)])
+        print(tabulate(tab_all, headers=tab_h))
+        print('\n --------------------------------------------------- \n')
+
+
         self.sampler.reset()
-
-
         print('\n ---------------------- CHAIN ---------------------- \n')
         pbar = tqdm(total=self.nsteps)
         for p, lnprob, lnlike in self.sampler.sample(p0, lnprob0=lnprob0,
@@ -1354,17 +1359,16 @@ class EMPIRE:
             #self.constrain = [38.15, 61.85]
             if self.ushallnotpass:
                 self.constrain = [15.9, 84.1]
-                print('FLAME OF UDUN')
-                if kplan > 0:
+                if kplan > 0 and self.sigmas.all():
+                    print('Priors remodeled successfully!')
                     for i in range(self.theta.ndim_):
                         __t = self.theta.list_[self.coordinator[i]]
                         if __t.type == 'keplerian':
-                            if __t.prior != 'fixed':
-                                __t.lims = sp.percentile(
-                                    self.cherry_chain[0][:, i], self.constrain)
-                                __t.prior = 'normal'
-                                __t.args = [self.ajuste[i], self.sigmas[i]]
-                                pass
+                            __t.lims = sp.percentile(
+                                self.cherry_chain[0][:, i], self.constrain)
+                            __t.prior = 'normal'
+                            __t.args = [self.ajuste[i], self.sigmas[i]]
+                            pass
 
             self.first_run = False
             kplan += 1
@@ -1385,7 +1389,7 @@ stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
 #BOUNDARY = sp.array([[-1.01515928e+01, -6.33312469e+00, 4.11098843e+00, 4.11105404e+00, 1.00520806e+01,   1.35949748e+01, -1.24823254e-02,   2.27443388e-02,   4.14811179e-02, 1.38568310e-01],
 #                     [-5.69294095e+00, 6.05896817e-02, 3.40831451e+00, 3.40863545e+00, -9.33328013e+00, -8.07370401e+00,  -2.4830391])
 #stardat = pmfiles
-setup = sp.array([2, 60, 120])
+setup = sp.array([3, 100, 3000])
 #setup = sp.array([5, 300, 10000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
@@ -1396,7 +1400,7 @@ em.CORNER = False  # corner plot disabled as it takes some time to plot
 
 # we actually run the chain from 0 to 2 signals
 #em.RAW = True  # no bayes cut
-em.bayes_factor = 10
+em.bayes_factor = 5
 
 em.ACC = 1
 em.MOAV = sp.array([1, 1])  # not needed

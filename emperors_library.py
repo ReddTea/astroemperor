@@ -162,9 +162,8 @@ def neo_p0(setup, *args):
             boundaries = t[C[j]].lims
             fact = sp.absolute(boundaries[0] - boundaries[1]) / nwalkers
             rnd = sp.random.uniform(0.9, 0.9999)
-            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.9999)
-
-            if (t[C[j]].prior=='uniform_spe_a' or t[C[j]].prior=='uniform_spe_b'):
+            dif = sp.arange(nwalkers) * fact * sp.random.uniform(0.9, 0.9999)  
+            if (t[C[j]].cv and t[C[j]].tag()!='Period'):
                 for i in range(nwalkers):
                     pos[temp][i][j] = (boundaries[1] + 3 * boundaries[0]) / \
                         4 + (dif[i] * 2. / 5. + fact / 2.0)

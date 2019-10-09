@@ -325,11 +325,10 @@ D = {'uniform':uniform,
 def neo_logp_rv(theta, params):
     _theta, ndim, C = params
     c, lp = 0, 0.
-
     for j in range(ndim):
         add_this = D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-    #    if add_this == -sp.inf:
-    #        print('prior failed', _theta[C[j]].name)
+#        if add_this == -sp.inf:
+#            print('prior failed', _theta[C[j]].name)
 
         lp += add_this
 
@@ -337,8 +336,12 @@ def neo_logp_rv(theta, params):
         if _theta[C[j]].cv:
             if _theta[C[j]].tag() == 'Amplitude':
                 lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
+#                if lp == -sp.inf:
+#                    print('prior failed extra1')
             elif _theta[C[j]].tag() == 'Eccentricity':
                 lp += D['normal'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2])
+#                if lp == -sp.inf:
+#                    print('prior failed extra2')
 
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
@@ -364,7 +367,6 @@ def neo_logl_rv(theta, paramis):
         theta = sp.insert(theta, a, _t[a].val)
 
     # count 'em  # this could be outside!!!!
-
     model_params = kplanets * 5
     ins_params = (nins + sp.sum(MOAV)) * 2
 
