@@ -1270,6 +1270,9 @@ class EMPIRE:
 
             if self.VINES:  # saves chains, posteriors and log
                 self.saveplace = self.mklogfile(kplan)
+                setup = sp.hstack(
+                        [self.setup, self.ACC, self.MOAV_STAR, self.MOAV]
+                        )
                 emplib.instigator(
                                 self.setup, self.theta,
                                 self.cherry_chain_h[:, :, self.coordinator],
@@ -1348,8 +1351,8 @@ stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-#setup = sp.array([5, 200, 12000])
-setup = sp.array([2, 50, 80])
+setup = sp.array([3, 200, 12000])
+# setup = sp.array([3, 120, 6000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 em.CORNER = False  # corner plot disabled as it takes some time to plot
@@ -1358,12 +1361,12 @@ em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 
 # we actually run the chain from 0 to 2 signals
-em.RAW = True  # no bayes cut
-# em.bayes_factor = 5
+# em.RAW = True  # no bayes cut
+em.bayes_factor = 5
 
 em.ACC = 1
-em.MOAV = sp.array([1, 2])  # not needed
-em.burn_out = 1
+em.MOAV = sp.array([1, 1])  # not needed
+# em.burn_out = 1
 #em.MOAV_STAR = 1
 
 em.VINES = True
@@ -1382,29 +1385,29 @@ em.INPLOT = True
 em.MUSIC = False
 
 #'''
-em.changes_list = {0:['Period', 'prior', 'fixed'],
-                   1:['Period', 'val', sp.log(61.1166)],
-                   2:['Amplitude', 'prior', 'fixed'],
-                   3:['Amplitude', 'val', 211.57],
-                   4:['Period_2', 'prior', 'fixed'],
-                   5:['Period_2', 'val', sp.log(30.0081)],
-                   6:['Amplitude_2', 'prior', 'fixed'],
-                   7:['Amplitude_2', 'val', 88.34]
-                   }
+# em.changes_list = {0:['Period', 'prior', 'fixed'],
+#                    1:['Period', 'val', 61.1166],
+#                    2:['Amplitude', 'prior', 'fixed'],
+#                    3:['Amplitude', 'val', 211.57],
+#                    4:['Period_2', 'prior', 'fixed'],
+#                    5:['Period_2', 'val', 30.0081],
+#                    6:['Amplitude_2', 'prior', 'fixed'],
+#                    7:['Amplitude_2', 'val', 88.34]
+#                    }
 # em.changes_list = {0: ['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
 #                    1: ['Period_2', 'lims', [sp.log(199), sp.log(201)]]
 #                    }
 
 
-# em.conquer(2, 2)
+em.conquer(2, 2)
 
-from emperors_canvas import CourtPainter
-vangogh = CourtPainter(2, 'datalogs/GJ876/10.1.19/', False, True)
-vangogh.paint_chains()
-vangogh.paint_posteriors()
+# from emperors_canvas import CourtPainter
+# vangogh = CourtPainter(2, 'datalogs/GJ876/10.4.19/', False, True)
+# vangogh.paint_chains()
+# vangogh.paint_posteriors()
+# vangogh.paint_histograms()
 # vangogh.paint_timeseries()
 # vangogh.paint_fold()
-# vangogh.paint_histograms()
 # vangogh.paint_corners()
 
 
