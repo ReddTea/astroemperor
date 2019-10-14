@@ -632,6 +632,9 @@ class CourtPainter:
                 plt.subplots_adjust(left=0.14, bottom=0.22,
                                     right=1.015, top=0.95)
 
+                ax.scatter(chain[0, i], post[0], s=self.post_size * 1.5,
+                           c='black')
+
                 im = ax.scatter(
                     chain[:, i], post, s=self.post_size, c=colors, lw=0,
                     cmap=self.post_cmap, alpha=self.post_alpha
