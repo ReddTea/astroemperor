@@ -1,5 +1,4 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
 
@@ -117,7 +116,9 @@ class CourtPainter:
         self.all_rv = emplib.read(working_dir + 'rv_data.pkl')
         self.time, self.rv, self.err, self.ins = self.all_rv
         self.setup = emplib.read(working_dir + 'setup.pkl')
-        self.ntemps, self.nwalkers, self.nsteps = self.setup
+        self.ntemps, self.nwalkers, self.nsteps, self.acc = self.setup[:5]
+        self.star_moav = self.setup[5]
+        self.moav = self.setup[-1]
         self.theta = emplib.read(working_dir + 'theta.pkl')
 
         self.nins = len(sp.unique(self.ins))
@@ -201,20 +202,50 @@ class CourtPainter:
 
     def __clean_rvs(self):
         """Clean rvs by adding the instrumentals, ACC and MOAV."""
-        acc = self.theta.list_[self.kplanets * 2].val
-        # acc_m = empmir.acc_model()
+        planet_theta = self.kplanets * 5
+        acc_t = self.theta.list_[planet_theta:planet_theta + self.acc]
+        acc_m = empmir.acc_model(acc_t, self.time, self.acc)
         inst_idx = self.theta.list('type') == 'instrumental'
         instr = self.theta.list_[inst_idx]
         rv0 = copy.deepcopy(self.rv)
         err0 = copy.deepcopy(self.err)
+
         for i in range(self.nins):
             jitter = instr[i].val
             offset = instr[i + 1].val
-            ins = self.ins == i
-            rv0[ins] -= offset + acc
+            ins = self.nins == i
+            rv0[ins] -= offset
             err0[ins] = sp.sqrt(err0[ins] ** 2 + jitter ** 2)
+        rv0 -= acc_m
         self.rv0 = rv0
         self.err0 = err0
+        residuals = self.__rv.__rv_residuals()
+        # Clean stellar moving average
+        used_theta = planet_theta + self.acc
+        smoav_t = self.theta.list_[used_theta:used_theta + self.star_moav]
+        for i in range(len(self.time)):
+            for c in range(self.star_moav):
+                if i > c:
+                    dt = sp.fabs(self.time[i - 1 - c] - self.time[i])
+                    MA = smoav_t[2 * c] * sp.exp(-dt / theta[2 * c + 1])
+                    MA *= residuals[i - 1 - c]
+                    self.rv0[i] -= MA
+        # Clean instrumental moving average
+        counter = 0
+        for i in range(self.nins):
+            ins = self.nins == i
+            time_ins = self.time[ins]
+            for t in range(len(time_ins)):
+                for c in range(self.moav[i]):
+                    if t > c:
+                        index = 2 * counter + 2 * i + 2 * (c + 1)
+                        res = residuals[i - 1 - c]
+                        dt = sp.fabs(time_ins[t - 1 - c] - time_ins[t])
+                        coeff = instr[index]
+                        timescale = instr[index + 1]
+                        MA = coeff * sp.exp(-dt / timescale) * res
+                        self.rv0[i] -= MA
+                counter += self.moav[i]
         pass
 
     def paint_fold(self):
@@ -447,7 +478,8 @@ class CourtPainter:
         # Plot models CI.
         for i, s in enumerate(cred_intervals):
             ax.fill_between(
-                time_m, rv_m_lo[:, i], rv_m_up[:, i], color=self.CI_color, alpha=.25
+                time_m, rv_m_lo[:, i], rv_m_up[:, i], color=self.CI_color,
+                alpha=.25
             )
 
         # A line to guide the eye.
