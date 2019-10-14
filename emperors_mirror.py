@@ -46,9 +46,9 @@ def acc_model(theta, time, ACC):
 
 
 def gen_model(theta, time, MOAV, residuals):
-    '''
+    """Stellar moving average.
     In goes residuals, and out too!
-    '''
+    """
     for i in range(len(time)):
         for c in range(MOAV):
             if i > c:
