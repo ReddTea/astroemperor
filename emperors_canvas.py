@@ -222,17 +222,17 @@ class CourtPainter:
         self.err0 = err0
         residuals = self.__rv_residuals()
         # Clean stellar moving average
-        used_theta = planet_theta + self.acc
-        smoav_t = self.theta.list_[used_theta:used_theta + self.star_moav]
-        for i in range(len(self.time)):
-            for c in range(self.star_moav):
-                if i > c:
-                    dt = sp.fabs(self.time[i - 1 - c] - self.time[i])
-                    timescale = self.theta.list_[2 * c + 1].val
-                    MA = smoav_t[2 * c].val * sp.exp(-dt / timescale)
-                    MA *= residuals[i - 1 - c]
-                    self.rv0[i] -= MA
-        # Clean instrumental moving average
+        # used_theta = planet_theta + self.acc
+        # smoav_t = self.theta.list_[used_theta:used_theta + self.star_moav]
+        # for i in range(len(self.time)):
+        #     for c in range(self.star_moav):
+        #         if i > c:
+        #             dt = sp.fabs(self.time[i - 1 - c] - self.time[i])
+        #             timescale = self.theta.list_[2 * c + 1].val
+        #             MA = smoav_t[2 * c].val * sp.exp(-dt / timescale)
+        #             MA *= residuals[i - 1 - c]
+        #             self.rv0[i] -= MA
+        # # Clean instrumental moving average
         counter = 0
         for i in range(self.nins):
             ins = self.nins == i
