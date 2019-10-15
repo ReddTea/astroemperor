@@ -507,6 +507,22 @@ def neo_lightcurve(theta, params):
     return flux
 
 
+def neo_init_batman(t, ld_mod, ldn):
+    '''
+    initializes batman
+    '''
+    n = {'t0': 0., 'per': 1., 'rp': 0.1, 'a': 15.,
+         'inc': 87., 'ecc':0., 'w':90.}
+    params = batman.TransitParams()
+    for x in n:
+        setattr(params, x, n[x])
+    params.limb_dark = ld_mod  # limb darkening model
+    ld_coefs = sp.ones(ldn)  # dummy coefficients
+
+    params.u = ld_coefs
+    model = batman.TransitModel(params, t)
+    return model, params
+
 K = {'Constant': 2. ** 2,
      'ExpSquaredKernel': kernels.ExpSquaredKernel(metric=1.**2),
      'ExpSine2Kernel': kernels.ExpSine2Kernel(gamma=1.0, log_period=1.0),
