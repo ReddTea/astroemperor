@@ -519,7 +519,7 @@ def neo_lightcurve(theta, params):
     return flux
 
 
-def neo_model_pm(t, ld_mod, ldn):
+def neo_init_batman(t, ld_mod, ldn):
     '''
     initializes batman
     '''
