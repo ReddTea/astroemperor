@@ -1274,7 +1274,7 @@ class EMPIRE:
                         [self.setup, self.ACC, self.MOAV_STAR, self.MOAV]
                         )
                 emplib.instigator(
-                                self.setup, self.theta,
+                                setup, self.theta,
                                 self.cherry_chain_h[:, :, self.coordinator],
                                 self.cherry_post,
                                 self.all_data, self.saveplace
@@ -1351,7 +1351,7 @@ stardat = sp.array(['GJ876_1_LICK.vels', 'GJ876_2_KECK.vels'])
 #pmfiles = sp.array(['flux/synth2.flux'])
 
 #stardat = pmfiles
-setup = sp.array([3, 200, 12000])
+setup = sp.array([1, 60, 120])
 # setup = sp.array([3, 120, 6000])
 em = EMPIRE(stardat, setup)
 # em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
@@ -1384,19 +1384,17 @@ em.INPLOT = True
 
 em.MUSIC = False
 
-#'''
-# em.changes_list = {0:['Period', 'prior', 'fixed'],
-#                    1:['Period', 'val', 61.1166],
-#                    2:['Amplitude', 'prior', 'fixed'],
-#                    3:['Amplitude', 'val', 211.57],
-#                    4:['Period_2', 'prior', 'fixed'],
-#                    5:['Period_2', 'val', 30.0081],
-#                    6:['Amplitude_2', 'prior', 'fixed'],
-#                    7:['Amplitude_2', 'val', 88.34]
-#                    }
-# em.changes_list = {0: ['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
-#                    1: ['Period_2', 'lims', [sp.log(199), sp.log(201)]]
-#                    }
+em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
+                   1:['Amplitude', 'lims', [-1.01515928e+01, -6.33312469e+00]],
+                   2:['Phase', 'lims', [1.00520806e+01,   1.35949748e+01]],
+                   3:['Eccentricity', 'lims', [-1.24823254e-02,   2.27443388e-02]],
+                   4:['Longitude', 'lims', [4.14811179e-02, 1.38568310e-01]],
+                   5:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]],
+                   6:['Amplitude_2', 'lims', [-5.69294095e+00, 6.05896817e-02]],
+                   7:['Phase_2', 'lims', [-9.33328013e+00, -8.07370401e+00]],
+                   8:['Eccentricity_2', 'lims', [-2.48303912e-01,  -7.10641857e-02]],
+                   9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
+                   }
 
 
 em.conquer(2, 2)
