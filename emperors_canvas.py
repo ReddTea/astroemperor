@@ -203,7 +203,8 @@ class CourtPainter:
     def __clean_rvs(self):
         """Clean rvs by adding the instrumentals, ACC and MOAV."""
         planet_theta = self.kplanets * 5
-        acc_t = self.theta.list_[planet_theta:planet_theta + self.acc].val
+        acc_t = self.theta.list_[planet_theta:planet_theta + self.acc]
+        acc_t = sp.array([a.val for a in acc_t])
         acc_m = empmir.acc_model(acc_t, self.time, self.acc)
         inst_idx = self.theta.list('type') == 'instrumental'
         instr = self.theta.list_[inst_idx]
@@ -219,7 +220,7 @@ class CourtPainter:
         rv0 -= acc_m
         self.rv0 = rv0
         self.err0 = err0
-        residuals = self.__rv.__rv_residuals()
+        residuals = self.__rv_residuals()
         # Clean stellar moving average
         used_theta = planet_theta + self.acc
         smoav_t = self.theta.list_[used_theta:used_theta + self.star_moav]
@@ -227,7 +228,8 @@ class CourtPainter:
             for c in range(self.star_moav):
                 if i > c:
                     dt = sp.fabs(self.time[i - 1 - c] - self.time[i])
-                    MA = smoav_t[2 * c] * sp.exp(-dt / theta[2 * c + 1])
+                    timescale = self.theta.list_[2 * c + 1].val
+                    MA = smoav_t[2 * c].val * sp.exp(-dt / timescale)
                     MA *= residuals[i - 1 - c]
                     self.rv0[i] -= MA
         # Clean instrumental moving average
@@ -241,8 +243,8 @@ class CourtPainter:
                         index = 2 * counter + 2 * i + 2 * (c + 1)
                         res = residuals[i - 1 - c]
                         dt = sp.fabs(time_ins[t - 1 - c] - time_ins[t])
-                        coeff = instr[index]
-                        timescale = instr[index + 1]
+                        coeff = instr[index].val
+                        timescale = instr[index + 1].val
                         MA = coeff * sp.exp(-dt / timescale) * res
                         self.rv0[i] -= MA
                 counter += self.moav[i]
@@ -631,9 +633,8 @@ class CourtPainter:
                 fig, ax = plt.subplots(figsize=self.post_figsize)
                 plt.subplots_adjust(left=0.14, bottom=0.22,
                                     right=1.015, top=0.95)
-
-                ax.scatter(chain[0, i], post[0], s=self.post_size * 1.5,
-                           c='black')
+                ax.scatter(chain[0, i], post[0], s=self.post_size * 3,
+                           c='red', zorder=100, marker='D')
 
                 im = ax.scatter(
                     chain[:, i], post, s=self.post_size, c=colors, lw=0,

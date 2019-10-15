@@ -1361,8 +1361,8 @@ em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 
 # we actually run the chain from 0 to 2 signals
-# em.RAW = True  # no bayes cut
-em.bayes_factor = 5
+em.RAW = True  # no bayes cut
+# em.bayes_factor = 5
 
 em.ACC = 1
 em.MOAV = sp.array([1, 1])  # not needed
