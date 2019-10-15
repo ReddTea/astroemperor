@@ -116,7 +116,7 @@ class CourtPainter:
         self.all_rv = emplib.read(working_dir + 'rv_data.pkl')
         self.time, self.rv, self.err, self.ins = self.all_rv
         self.setup = emplib.read(working_dir + 'setup.pkl')
-        self.ntemps, self.nwalkers, self.nsteps, self.acc = self.setup[:5]
+        self.ntemps, self.nwalkers, self.nsteps, self.acc = self.setup[:4]
         self.star_moav = self.setup[5]
         self.moav = self.setup[-1]
         self.theta = emplib.read(working_dir + 'theta.pkl')
