@@ -5,6 +5,7 @@ import scipy as sp
 from PyAstronomy.pyasl import MarkleyKESolver
 from emperors_library import normal_pdf
 import batman
+import copy
 
 def RV_model(THETA, time, kplanets):
     modelo = 0.0
@@ -45,10 +46,45 @@ def acc_model(theta, time, ACC):
         return 0.
 
 
+def inst_moav(theta, time, ins, nins, moav, residuals):
+    """Calculate the instrumental moving average model."""
+    counter = 0
+    insmoav = sp.zeros_like(time)
+    for i in range(nins):
+        idx = ins == i
+        time_ins = time[idx]
+        for t in range(len(time_ins)):
+            for c in range(moav[i]):
+                th = theta[counter:counter + moav[i]*2]
+                if t > c:
+                    res = residuals[i - 1 - c]
+                    dt = sp.fabs(time_ins[t - 1 - c] - time_ins[t])
+                    coeff = th[c].val
+                    timescale = th[c + 1].val
+                    MA = coeff * sp.exp(-dt / timescale) * res
+                    insmoav[i] = MA
+        counter += moav[i] * 2
+    return insmoav
+
+
+def stellar_moav(theta, time, star_moav, residuals):
+    """Calculate the stellar moving average model."""
+    moav = sp.zeros_like(time)
+    for i in range(len(time)):
+        for c in range(star_moav):
+            if i > c:
+                dt = sp.fabs(time[i - 1 - c] - time[i])
+                timescale = theta[2 * c + 1]
+                MA = theta[2 * c] * sp.exp(-dt / timescale)
+                MA *= residuals[i - 1 - c]
+                moav[i] = MA
+    return moav
+
+
 def gen_model(theta, time, MOAV, residuals):
-    '''
+    """Stellar moving average.
     In goes residuals, and out too!
-    '''
+    """
     for i in range(len(time)):
         for c in range(MOAV):
             if i > c:
@@ -534,7 +570,6 @@ def neo_init_batman(t, ld_mod, ldn):
     params.u = ld_coefs
     model = batman.TransitModel(params, t)
     return model, params
-
 
 K = {'Constant': 2. ** 2,
      'ExpSquaredKernel': kernels.ExpSquaredKernel(metric=1.**2),

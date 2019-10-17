@@ -1,5 +1,4 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
@@ -20,17 +19,9 @@ if True:
     import emperors_library as emplib
     import emperors_mirror as empmir
 
-
-'''
-needs: Only cold chains
-rv residuals plot
-se cae con acc=0
-primer punto de color negro en chains y posts, o un triangulo?
-'''
-
-
 class CourtPainter:
     """Plot driver for Emperor.
+
     Parameters
     ----------
     kplanets : int
@@ -41,11 +32,13 @@ class CourtPainter:
         Set to True to output plots in pdf.
     png : bool
         Set to True to output plots in png.
+
     Examples
     -------
     Examples should be written in doctest format, and
     should illustrate how to use the function/class.
     >>>  TODO
+
     Attributes
     ----------
     chains : array_like
@@ -83,6 +76,7 @@ class CourtPainter:
         DEPRECATED
     chain_units : type
         DEPRECATED
+
     """
 
     markers = ['o', 'v', '^', '>', '<', '8', 's', 'p', 'H', 'D', '*', 'd']
@@ -115,7 +109,9 @@ class CourtPainter:
         self.all_rv = emplib.read(working_dir + 'rv_data.pkl')
         self.time, self.rv, self.err, self.ins = self.all_rv
         self.setup = emplib.read(working_dir + 'setup.pkl')
-        self.ntemps, self.nwalkers, self.nsteps = self.setup
+        self.ntemps, self.nwalkers, self.nsteps, self.acc = self.setup[:4]
+        self.star_moav = self.setup[4]
+        self.moav = self.setup[5:]
         self.theta = emplib.read(working_dir + 'theta.pkl')
 
         self.nins = len(sp.unique(self.ins))
@@ -199,20 +195,37 @@ class CourtPainter:
 
     def __clean_rvs(self):
         """Clean rvs by adding the instrumentals, ACC and MOAV."""
-        acc = self.theta.list_[self.kplanets * 2].val
-        # acc_m = empmir.acc_model()
         inst_idx = self.theta.list('type') == 'instrumental'
+        moav_idx = self.theta.list('type') == 'instrumental_moav'
+        gen_idx = self.theta.list('type') == 'general'
         instr = self.theta.list_[inst_idx]
+        moav = self.theta.list_[moav_idx]
+        gen = self.theta.list_[gen_idx]
+        acc_t = gen[:self.acc]
+        acc_t = sp.array([a.val for a in acc_t])
+        acc_m = empmir.acc_model(acc_t, self.time, self.acc)
         rv0 = copy.deepcopy(self.rv)
         err0 = copy.deepcopy(self.err)
+
         for i in range(self.nins):
-            jitter = instr[i].val
-            offset = instr[i + 1].val
             ins = self.ins == i
-            rv0[ins] -= offset + acc
-            err0[ins] = sp.sqrt(err0[ins] ** 2 + jitter ** 2)
+            rv0[ins] -= instr[i + 1].val
+            err0[ins] = sp.sqrt(err0[ins] ** 2 + instr[i].val ** 2)
+        rv0 -= acc_m
         self.rv0 = rv0
         self.err0 = err0
+        residuals = self.__rv_residuals()
+        # Clean stellar moving average
+        smoav_t = gen[self.acc:]
+        smoav_t = sp.array([a.val for a in smoav_t])
+        self.rv0 -= empmir.stellar_moav(
+            smoav_t, self.time, self.star_moav, residuals
+        )
+        residuals = self.__rv_residuals()
+        # Clean instrumental moving average
+        self.rv0 -= empmir.inst_moav(
+            moav, self.time, self.ins, self.nins, self.moav, residuals
+        )
         pass
 
     def paint_fold(self):
@@ -445,7 +458,8 @@ class CourtPainter:
         # Plot models CI.
         for i, s in enumerate(cred_intervals):
             ax.fill_between(
-                time_m, rv_m_lo[:, i], rv_m_up[:, i], color=self.CI_color, alpha=.25
+                time_m, rv_m_lo[:, i], rv_m_up[:, i], color=self.CI_color,
+                alpha=.25
             )
 
         # A line to guide the eye.
@@ -597,6 +611,9 @@ class CourtPainter:
                 fig, ax = plt.subplots(figsize=self.post_figsize)
                 plt.subplots_adjust(left=0.14, bottom=0.22,
                                     right=1.015, top=0.95)
+
+                ax.scatter(chain[0, i], post[0], s=self.post_size * 3,
+                           c='red', zorder=100, marker='D')
 
                 im = ax.scatter(
                     chain[:, i], post, s=self.post_size, c=colors, lw=0,
