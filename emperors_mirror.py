@@ -171,25 +171,34 @@ def henshin(thetas, kplanets):
     return thetas
 
 def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
-    for i in range(len(anticoor)):
-        thetas = sp.insert(thetas, anticoor[i], sp.ones(len(thetas[0]))*fixed_values[i], axis=2)
+    try:
+        for t in range(len(thetas)):
+            for i in range(len(anticoor)):
+                thetas[t] = sp.insert(thetas[t], anticoor[i], fixed_values[anticoor[i]], axis=1)
+    except:  # RAW
+        for i in range(len(anticoor)):
+            thetas = sp.insert(thetas, anticoor[i], fixed_values[anticoor[i]], axis=2)
     for t in range(len(thetas)):
         for i in range(kplanets):
-            Pk = thetas[t][:, i*5]
-            if tags[i][0] == 1:
+            if tags[i][0]:
+                Pk = thetas[t][:, i*5]
+                print('changed period! (devs note)')
+            if tags[i][1]:
                 Ask = thetas[t][:, i*5 + 1]
                 Ack = thetas[t][:, i*5 + 2]
                 Ak = Ask ** 2 + Ack ** 2
                 Phasek = sp.where(Ask>=0, sp.arccos(Ack / (Ak ** 0.5)), 2*sp.pi - sp.arccos(Ack / (Ak ** 0.5)))
                 thetas[t][:, i*5 + 1] = Ak
                 thetas[t][:, i*5 + 2] = Phasek
-            if tags[i][1] == 1:
+                print('changed amplitude! (devs note)')
+            if tags[i][2]:
                 Sk = thetas[t][:, i*5 + 3]
                 Ck = thetas[t][:, i*5 + 4]
                 ecck  = Sk ** 2 + Ck ** 2
                 wk = sp.where(Sk>=0, sp.arccos(Ck / (ecck ** 0.5)), 2*sp.pi - sp.arccos(Ck / (ecck ** 0.5)))
                 thetas[t][:, i*5 + 3] = ecck
                 thetas[t][:, i*5 + 4] = wk
+                print('changed eccentricity! (devs note)')
 
             thetas[t][:, i*5] = sp.exp(Pk)
     return thetas
@@ -352,19 +361,23 @@ D = {'uniform':uniform,
 def neo_logp_rv(theta, params):
     _theta, ndim, C = params
     c, lp = 0, 0.
-
     for j in range(ndim):
         add_this = D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-    #    if add_this == -sp.inf:
-    #        print('prior failed', _theta[C[j]].name)
+#        if add_this == -sp.inf:
+#            print('prior failed', _theta[C[j]].name)
 
         lp += add_this
 
-        if _theta[C[j]].prior == 'uniform_spe_a':
-            if _theta[C[j]].tag() == 'Eccentricity':
-                lp += D['normal'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2])
-            elif _theta[C[j]].tag() == 'Amplitude':
+        ## use cv for this
+        if _theta[C[j]].cv:
+            if _theta[C[j]].tag() == 'Amplitude':
                 lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
+#                if lp == -sp.inf:
+#                    print('prior failed extra1')
+            elif _theta[C[j]].tag() == 'Eccentricity':
+                lp += D['normal'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2])
+#                if lp == -sp.inf:
+#                    print('prior failed extra2')
 
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
@@ -390,7 +403,6 @@ def neo_logl_rv(theta, paramis):
         theta = sp.insert(theta, a, _t[a].val)
 
     # count 'em  # this could be outside!!!!
-
     model_params = kplanets * 5
     ins_params = (nins + sp.sum(MOAV)) * 2
 

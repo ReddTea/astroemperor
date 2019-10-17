@@ -1,30 +1,23 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 # -*- coding: utf-8 -*-
+
 from __future__ import division, print_function
+if True:
 
-import copy
-import os
-from decimal import Decimal  # histograms
+    import copy
+    import os
+    from decimal import Decimal  # histograms
 
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import scipy as sp
-from scipy.stats import norm
-from tqdm import tqdm
+    import matplotlib.gridspec as gridspec
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as ticker
+    import scipy as sp
+    from scipy.stats import norm
+    from tqdm import tqdm
 
-import corner
-import emperors_library as emplib
-import emperors_mirror as empmir
-
-
-'''
-needs: Only cold chains
-rv residuals plot
-se cae con acc=0
-primer punto de color negro en chains y posts?
-'''
-
+    import corner
+    import emperors_library as emplib
+    import emperors_mirror as empmir
 
 class CourtPainter:
     """Plot driver for Emperor.
@@ -202,9 +195,6 @@ class CourtPainter:
 
     def __clean_rvs(self):
         """Clean rvs by adding the instrumentals, ACC and MOAV."""
-        # acc_t = self.theta.list_[planet_theta:planet_theta + self.acc]
-        # acc_t = sp.array([a.val for a in acc_t])
-        # acc_m = empmir.acc_model(acc_t, self.time, self.acc)
         inst_idx = self.theta.list('type') == 'instrumental'
         moav_idx = self.theta.list('type') == 'instrumental_moav'
         gen_idx = self.theta.list('type') == 'general'
@@ -218,11 +208,9 @@ class CourtPainter:
         err0 = copy.deepcopy(self.err)
 
         for i in range(self.nins):
-            jitter = instr[i].val
-            offset = instr[i + 1].val
             ins = self.ins == i
-            rv0[ins] -= offset
-            err0[ins] = sp.sqrt(err0[ins] ** 2 + jitter ** 2)
+            rv0[ins] -= instr[i + 1].val
+            err0[ins] = sp.sqrt(err0[ins] ** 2 + instr[i].val ** 2)
         rv0 -= acc_m
         self.rv0 = rv0
         self.err0 = err0
@@ -623,6 +611,7 @@ class CourtPainter:
                 fig, ax = plt.subplots(figsize=self.post_figsize)
                 plt.subplots_adjust(left=0.14, bottom=0.22,
                                     right=1.015, top=0.95)
+
                 ax.scatter(chain[0, i], post[0], s=self.post_size * 3,
                            c='red', zorder=100, marker='D')
 
