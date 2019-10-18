@@ -370,9 +370,9 @@ def neo_logl_rv(theta, paramis):
     model_params = kplanets * 5
     ins_params = (nins + sp.sum(MOAV)) * 2
 
-    acc_params = ACC
+
     gen_moav_params = MOAV_STAR * 2
-    gen_params = acc_params + gen_moav_params
+    gen_params = ACC + gen_moav_params
 
     a1 = (theta[:model_params])  # keplerian
     a2 = theta[model_params:model_params+ACC]  # acc
@@ -451,10 +451,14 @@ def neo_logl_pm(theta, paramis):
         theta1 = sp.insert(theta1, a, _t[a].val)
 
     # 1 armar el modelo con batman, es decir, llamar neo_lc
-    theta_b = theta1[:-len(gp)]
-    theta_g = theta1[-len(gp):]
-
     params_b = time, kplanets, ld, batman_m, batman_p
+
+    if gaussian_processor:
+        theta_b = theta1[:-len(gp)]
+        theta_g = theta1[-len(gp):]
+
+    else:
+        theta_b = theta1
     model = neo_lightcurve(theta_b, params_b)
     # 2 calcular res
     PM_residuals = flux - model  # why some people do the *1e6  # DEL
@@ -465,19 +469,29 @@ def neo_logl_pm(theta, paramis):
     # 4 armar kernel, hacer GP(kernel), can this be done outside?!
     #theta_gp = theta1[-len(gp):]
     #theta_gp[1] = 10 ** theta_gp[1]  # for k_r in Matern32Kernel
-    theta_g[-1] = 10.**theta_g[-1]
-    gp.set_parameter_vector(theta_g)  # last <gp> params, check for fixed shit?
-    #raise Exception('debug')
-    # should be jitter with err
-    #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
-    gp.compute(time, err)
-    if gaussian_processor == 'george':
-        return gp.lnlikelihood(PM_residuals, quiet=True)  # george
-    if gaussian_processor == 'celerite':
-        try:
-            return gp.log_likelihood(PM_residuals)  # celerite
-        except:
-            return -sp.inf
+    if gaussian_processor:
+        theta_g[-1] = 10.**theta_g[-1]
+        gp.set_parameter_vector(theta_g)  # last <gp> params, check for fixed shit?
+        #raise Exception('debug')
+        # should be jitter with err
+        #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
+        gp.compute(time, err)
+        if gaussian_processor == 'george':
+            return gp.lnlikelihood(PM_residuals, quiet=True)  # george
+        if gaussian_processor == 'celerite':
+            try:
+                return gp.log_likelihood(PM_residuals)  # celerite
+            except:
+                return -sp.inf
+    else:
+        inv_sigma2 = 1.0 / (err**2)
+        lnl = sp.sum(PM_residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
+        if True:
+            if lnl == sp.inf:
+                print('like failed')
+        return -0.5 * lnl
+        return
+
 
     #this should go outside
     '''

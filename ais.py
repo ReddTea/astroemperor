@@ -435,14 +435,14 @@ class EMPIRE:
             self.george_gp = {}  # not needed i guess
             self.george_k = {}  # not needed i guess
 
-            self.gaussian_processor = 'george'
+            self.gaussian_processor = ''
             self.george_kernels = sp.array([])
             self.george_jitter = True
 
             self.celerite_kernels = sp.array([])
             self.celerite_jitter = True
 
-            self.emperors_gp = 0
+            self.emperors_gp = []
 
             #  Correlate with rv's
             self.time, self.rv, self.err, self.ins = 0., 0., 0., 0.
@@ -996,7 +996,7 @@ class EMPIRE:
         if self.RV:
         # INITIALIZE GENERAL PARAMS
             # acc, moavcoef, moavtimescale (moav for star)
-            gen_lims = sp.array([[-1., 1.], [-0.2, 0.2], [0.1, 6.]])
+            gen_lims = sp.array([[-0.1, 0.1], [-0.2, 0.2], [0.1, 6.]])
             self._theta_gen(gen_lims, None)
 
             # INITIALIZE INSTRUMENT PARAMS
@@ -1079,7 +1079,7 @@ class EMPIRE:
                     self._theta_photo(free_lims_pm, None, self.kplan,
                                       self.batman_ldn[self.kplan - 1])
                     # INITIALIZE BATMAN
-                    self.batman_m[self.kplan - 1], self.batman_p[self.kplan - 1] = empmir.neo_model_pm(
+                    self.batman_m[self.kplan - 1], self.batman_p[self.kplan - 1] = empmir.neo_init_batman(
                         self.time_pm, self.batman_ld[self.kplan - 1], self.batman_ldn[self.kplan - 1])
                     pass
 
@@ -1432,92 +1432,89 @@ class EMPIRE:
 stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
 stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
 
-setup = sp.array([1, 40, 80])
+setup = sp.array([2, 60, 120])
 #setup = sp.array([5, 300, 10000])
 #em = EMPIRE(stardat, setup)
 
 #pmfiles = sp.array(['flux/transit_ground_r.flux'])
-pmfiles = sp.array(['flux/synth2_KHAN.flux'])
-stardat = pmfiles
+pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2'])
+#stardat = pmfiles
 em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 
 #em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 em.bayes_factor = 5
-em.ACC = 1
-em.MOAV = sp.array([1, 1])  # not needed
+#em.ACC = 1
+#em.MOAV = sp.array([1, 1])  # not needed
 
 #em.burn_out = 1
-#em.MOAV_STAR = 1
+#em.MOAV_STAR = 2
 
 em.RAW = True  # no bayes cut
 em.CORNER = False  # corner plot disabled as it takes some time to plot
-em.VINES = True
+em.VINES = False
 em.ushallnotpass = False  # constrain for next run
-em.INPLOT = False
+em.INPLOT = True
 
 
 em.ACC_pm = 0
 em.batman_ld = ['quadratic']
-em.gaussian_processor = 'george'
+#em.gaussian_processor = 'george'
 #em.gaussian_processor = 'celerite'
 
-em.george_kernels = sp.array([['Matern32Kernel']])
-em.george_jitter = False
+#em.george_kernels = sp.array([['Matern32Kernel']])
+#em.george_jitter = False
 
+#ignore this
+PLOT_PM = True
+PLOT_PM1 = True
 #em.celerite_kernels = sp.array([['Matern32Term', 'RealTerm']])
 #em.celerite_jitter = False
 
 em.MUSIC = False
+if True:
+    '''
+    em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
+                       1:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]]
+                       }
+    '''
+    # GJ876 constrained around the signal
+    '''
+    em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
+                       1:['Amplitude', 'lims', [-1.01515928e+01, -6.33312469e+00]],
+                       2:['Phase', 'lims', [1.00520806e+01,   1.35949748e+01]],
+                       3:['Eccentricity', 'lims', [-1.24823254e-02,   2.27443388e-02]],
+                       4:['Longitude', 'lims', [4.14811179e-02, 1.38568310e-01]],
+                       5:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]],
+                       6:['Amplitude_2', 'lims', [-5.69294095e+00, 6.05896817e-02]],
+                       7:['Phase_2', 'lims', [-9.33328013e+00, -8.07370401e+00]],
+                       8:['Eccentricity_2', 'lims', [-2.48303912e-01,  -7.10641857e-02]],
+                       9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
+                       }
 
-'''
-em.changes_list = {0:['Period', 'prior', 'fixed'],
-                   1:['Period', 'val', sp.log(61.1166)],
-                   2:['Amplitude', 'prior', 'fixed'],
-                   3:['Amplitude', 'val', 211.57],
-                   4:['Period_2', 'prior', 'fixed'],
-                   5:['Period_2', 'val', sp.log(30.0081)],
-                   6:['Amplitude_2', 'prior', 'fixed'],
-                   7:['Amplitude_2', 'val', 88.34]
-                   }
-
-em.changes_list = {0:['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
-                   1:['Period_2', 'lims', [sp.log(199),sp.log(201)]]
-                   }
-'''
-# GJ876 constrained around the signal
-'''
-em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
-                   1:['Amplitude', 'lims', [-1.01515928e+01, -6.33312469e+00]],
-                   2:['Phase', 'lims', [1.00520806e+01,   1.35949748e+01]],
-                   3:['Eccentricity', 'lims', [-1.24823254e-02,   2.27443388e-02]],
-                   4:['Longitude', 'lims', [4.14811179e-02, 1.38568310e-01]],
-                   5:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]],
-                   6:['Amplitude_2', 'lims', [-5.69294095e+00, 6.05896817e-02]],
-                   7:['Phase_2', 'lims', [-9.33328013e+00, -8.07370401e+00]],
-                   8:['Eccentricity_2', 'lims', [-2.48303912e-01,  -7.10641857e-02]],
-                   9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
-                   }
-
-'''
+    '''
 # for synth2_KHAN
+# # true params
+# t_ = [2458042.0, 3.3, 0.015, 15., 89.8, 0.0, 90., 0.1, 0.3]
+# t1_= [2458046.0, 4.5, 0.02, 20, 89.8, 0.0, 90., 0.2, 0.4]
+'''
 em.changes_list = {0:['t0', 'lims', [2458041.9, 2458042.1]],
-                   1:['Period', 'lims', [30.29, 30.31]],
-                   2:['Planet Radius', 'lims', [0.099, 0.101],],
-                   3:['SemiMajor Axis', 'lims', [100.119, 100.121]],
-                   4:['Inclination', 'lims', [90.29, 90.31]],
-                   5:['Eccentricity', 'lims', [0.3135, 0.3145]],
-                   6:['Longitude', 'lims', [120.119,120.121]],
-                   7:['coef1', 'lims', [0.09,0.11]],
-                   8:['coef2', 'lims', [0.29,0.31]],
-                   9:['kernel0_0', 'lims', [0.001, 0.004]],  #k_a
-                   10:['kernel0_1', 'lims', [0.003, 0.005]]  #k_r
+                   1:['Period', 'lims', [3.29, 3.31]],
+                   2:['Planet Radius', 'lims', [0.014, 0.016],],
+                   3:['SemiMajor Axis', 'lims', [14.9, 15.1]],
+                   4:['Inclination', 'lims', [89.7, 89.9]],
+                   5:['Eccentricity', 'prior', 'fixed'],
+                   6:['Eccentricity', 'val', 0],
+                   7:['Longitude', 'prior', 'fixed',
+                   8:['Longitude', 'val', '90'],
+                   9:['coef1', 'lims', [0.09,0.11]],
+                   10:['coef2', 'lims', [0.29,0.31]],
                     }
+'''
 em.conquer(1, 1)
 
 
-PLOT_PM = True
-PLOT_PM1 = True
+
 
 if PLOT_PM:
     font = {'family': 'serif',
@@ -1527,16 +1524,16 @@ if PLOT_PM:
             }
     x,y,y_error = em.time_pm, em.rv_pm, em.err_pm
 
-    T0_f, P_f, r_f, sma_f, inc_f, ecc_f, w_f, c1_f, c2_f, ka_f, kr_f = map(
+    T0_f, P_f, r_f, sma_f, inc_f, ecc_f, w_f, c1_f, c2_f = map(
         lambda v: (v[1], v[2]-v[1], v[1]-v[0]), zip(*sp.percentile(
             em.sampler.flatchain[0], [16, 50, 84], axis=0)))
 
 
-    import batman
-    import george
-    from george import kernels
 
     if PLOT_PM1:
+        import batman
+        import george
+        from george import kernels
         plt.subplots(figsize=(16,8))
         plt.grid(True)
         plt.xlim( (min(x)-0.01) , (max(x+0.01)))
@@ -1554,9 +1551,9 @@ if PLOT_PM:
         # data
         plt.errorbar(x, y, yerr=y_error, fmt='b.', alpha=1/1.)
 
-        T0_r, P_r, r_r, sma_r, inc_r, ecc_r, w_r, c1_r, c2_r, ka_r, kr_r = em.ajuste
+        T0_r, P_r, r_r, sma_r, inc_r, ecc_r, w_r, c1_r, c2_r = em.ajuste
         theta__ = em.ajuste[:9]
-        theta_gp__ = em.ajuste[9:]
+        #theta_gp__ = em.ajuste[9:]
         # model
         params__ = [x, em.kplan-1, em.batman_ldn, em.batman_m, em.batman_p]
         y_transit = empmir.neo_lightcurve(theta__, params__)

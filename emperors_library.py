@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import pickle
 import scipy as sp
+from scipy.special import erf
 
 a = sp.array(['RV_dataset1.vels', 'RV_dataset14.vels'])
 aa = sp.array(['RV_dataset14.vels'])
@@ -163,7 +164,7 @@ def phasefold(time, rv, err, period):
     return time_phased, rv_phased, err_phased
 
 
-def credibility_interval(post, alpha=.68):
+def credibility_interval(post, alpha=1.):
     """Calculate bayesian credibility interval.
     Parameters:
     -----------
@@ -181,8 +182,10 @@ def credibility_interval(post, alpha=.68):
     up : float
         Upper part of the credibility interval.
     """
-    lower_percentile = 100 * (1 - alpha) / 2
-    upper_percentile = 100 * (1 + alpha) / 2
+    z = erf(alpha/sp.sqrt(2))
+
+    lower_percentile = 100 * (1 - z) / 2
+    upper_percentile = 100 * (1 + z) / 2
     low, med, up = sp.percentile(
         post, [lower_percentile, 50, upper_percentile]
     )
