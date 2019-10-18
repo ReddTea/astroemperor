@@ -549,7 +549,7 @@ class EMPIRE:
                 if MOAV[n_] > 1:
                     names1 = [str(name) + '_' + str(j // 2 + 1) for name in names]
                 t = spec(names1[j % 2 + 2], units[j % 2 + 2], priors[j % 2 + 2],
-                         limits[j % 2 + 2], -sp.inf, 'instrumental')
+                         limits[j % 2 + 2], -sp.inf, 'instrumental_moav')
                 new = sp.append(new, t)
             self.theta.list_ = sp.append(self.theta.list_, new)
         pass
