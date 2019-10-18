@@ -118,7 +118,8 @@ def instigator(setup, theta, cherry_chain, cherry_post, all_data, saveplace):
 
 def save(obj, out_dir, type):
     """Pickle the given object.
-    It pickles either the setup (3x1 arr), theta object, cherry_chain,
+
+    It pickles either the setup (nx1 arr), theta object, cherry_chain,
     cherry_post or all rv data into a pkl file for later use.
     """
     pickle_out = open(out_dir + '/' + type + '.pkl', 'wb')
