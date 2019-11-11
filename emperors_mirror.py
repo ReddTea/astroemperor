@@ -181,7 +181,7 @@ def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
     for t in range(len(thetas)):
         for i in range(kplanets):
             if tags[i][0]:
-                Pk = thetas[t][:, i*5]
+                Pk = sp.exp(thetas[t][:, i*5])
                 print('changed period! (devs note)')
             if tags[i][1]:
                 Ask = thetas[t][:, i*5 + 1]
@@ -200,7 +200,6 @@ def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
                 thetas[t][:, i*5 + 4] = wk
                 print('changed eccentricity! (devs note)')
 
-            thetas[t][:, i*5] = sp.exp(Pk)
     return thetas
 
 
@@ -267,7 +266,6 @@ def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, 
 import george
 from george import kernels
 from george.modeling import Model
-
 
 def logl_rvpm(theta, params):
     params_rv, params_pm = params
@@ -506,12 +504,12 @@ def neo_logl_pm(theta, paramis):
     #theta_gp = theta1[-len(gp):]
     #theta_gp[1] = 10 ** theta_gp[1]  # for k_r in Matern32Kernel
     if gaussian_processor:
-        theta_g[-1] = 10.**theta_g[-1]
+        #theta_g[-1] = 10.**theta_g[-1]
         gp.set_parameter_vector(theta_g)  # last <gp> params, check for fixed shit?
         #raise Exception('debug')
         # should be jitter with err
         #gp.compute(time, sp.sqrt(err**2+theta_gp[0]**2))
-        gp.compute(time, err)
+        gp.compute(time, err)  # hmm ?
         if gaussian_processor == 'george':
             return gp.lnlikelihood(PM_residuals, quiet=True)  # george
         if gaussian_processor == 'celerite':
@@ -522,11 +520,9 @@ def neo_logl_pm(theta, paramis):
     else:
         inv_sigma2 = 1.0 / (err**2)
         lnl = sp.sum(PM_residuals ** 2 * inv_sigma2 - sp.log(inv_sigma2)) + sp.log(2*sp.pi) * ndat
-        if True:
-            if lnl == sp.inf:
-                print('like failed')
+        if lnl == sp.inf:
+            print('like failed')
         return -0.5 * lnl
-        return
 
 
     #this should go outside
@@ -542,6 +538,7 @@ def neo_logl_pm(theta, paramis):
     '''
     pass
 
+
 def neo_lightcurve(theta, params):
     #['t0', 'Period', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
     #         'Eccentricity', 'Longitude', 'LD coef']
@@ -549,7 +546,7 @@ def neo_lightcurve(theta, params):
     time, kplanets = params[0], params[1]
     ld, batman_m, batman_p = params[2], params[3], params[4]
 
-    flux = sp.zeros(len(time))
+    flux = sp.ones(len(time))
     #  thetas go in corrected
 
     for k in range(kplanets):
@@ -564,7 +561,7 @@ def neo_lightcurve(theta, params):
         batman_p[k].ecc = theta[np + 5]
         batman_p[k].w = theta[np + 6]
         batman_p[k].u = theta[np + 7:np + 7 + ld[k]]
-        flux += batman_m[k].light_curve(batman_p[k])  # calculates light curve
+        flux *= batman_m[k].light_curve(batman_p[k])  # calculates light curve
     #raise Exception('dasd')  # DEL
     return flux
 
@@ -618,6 +615,7 @@ def neo_update_kernel(theta, params):
     pass
 
 
+import celerite
 from celerite import terms as cterms
 
 #  2 or sp.log(10.) ?
@@ -625,11 +623,11 @@ T = {'Constant': 1. ** 2,
      'RealTerm':cterms.RealTerm(log_a=2., log_c=2.),
      'ComplexTerm':cterms.ComplexTerm(log_a=2., log_b=2., log_c=2., log_d=2.),
      'SHOTerm':cterms.SHOTerm(log_S0=2., log_Q=2., log_omega0=2.),
-     'Matern32Term':cterms.Matern32Term(log_sigma=2., log_rho=2.0),
-     'JitterTerm':cterms.JitterTerm(log_sigma=2.0)}
+     'Matern32Term':cterms.Matern32Term(log_sigma=2., log_rho=2.),
+     'JitterTerm':cterms.JitterTerm(log_sigma=1e-8)}
 
 
-def neo_term(terms):
+def neo_init_terms(terms):
     t_out = T[terms[0][0]]
     for f in range(len(terms[0])):
         if f == 0:
@@ -648,3 +646,14 @@ def neo_term(terms):
                     t *= T[func]
             t_out += t
     return t_out
+
+def neo_init_cgp(terms):
+    return celerite.GP(terms)
+
+
+
+
+
+
+
+#

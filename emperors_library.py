@@ -4,9 +4,6 @@ import pickle
 import scipy as sp
 from scipy.special import erf
 
-a = sp.array(['RV_dataset1.vels', 'RV_dataset14.vels'])
-aa = sp.array(['RV_dataset14.vels'])
-
 
 def read_data(instruments, data_type='rv_file'):
     """Data pre-processing."""

@@ -7,6 +7,7 @@
 Na fone Eyfelevoy bashni
 S Ayfona selfi zayeboshim
 A nakhuya zh yeshche nam nash voyazh?
+VOYAAAAAAAAAAZH
 '''
 
 
@@ -159,6 +160,7 @@ class spec_list:
 
         To get length of speclist now do: len(speclist)
         """
+        return len(self.list_)
 
     def _update_list_(self):
         """Update the ndim_, C and A attributes.
@@ -371,14 +373,85 @@ class EMPIRE:
                     'nonlinear': 2
                     }  # dictionary with limb darkening dimentionality
 
+        self.lk = {'Constant': 1,
+                    'RealTerm':2,
+                    'ComplexTerm':4,
+                    'SHOTerm':3,
+                    'Matern32Term':2,
+                    'JitterTerm':1}
+
         self.kplan = 0
-        self.kplan_pm = 0
+        self.fplan = 0
 
 
         ###  READING DATA  ###
 
-        if False:  # this will contain rv+pm
-            pass
+        if file_type = 'rvpm_file':  # this will contain rv+pm
+            self.rvfiles, self.pmfiles = stardat
+            rvdat = emplib.read_data(self.rvfiles)
+            pmdat = emplib.read_data(self.pmfiles, data_type='pm_file')
+            # time, radial velocities, error and instrument flag
+            self.all_data, self.all_data_pm = rvdat[0], pmdat[0]
+            self.time, self.rv, self.err, self.ins = self.all_data
+            self.time_pm, self.rv_pm, self.err_pm, self.ins_pm = pmdat[0]
+
+            # star activity index and flag
+            self.staract, self.starflag = rvdat[1], rvdat[2]
+            self.staract_pm, self.starflag_pm = pmdat[1], pmdat[2]
+
+            self.totcornum = rvdat[3]  # quantity if star activity is given
+            self.totcornum_pm = pmdat[3]  # ?
+
+
+
+            self.nins = len(self.rvfiles)  # number of instruments
+            self.nins_pm = len(self.pmfiles)
+            self.ndat = len(self.time)  # number of datapoints
+            self.ndat_pm = len(self.time_pm)
+            self.RV, self.PM = True, True  # setup data type marker
+
+
+            # About the search parameters
+            self.ACC = 0  # Acceleration polynomial order, default is 1, a line
+            self.MOAV_STAR = 0  # Moving Average for the star activity
+
+            self.ACC_pm = 0  # Acceleration order
+            self.MOAV_STAR_pm = 0  #
+
+            self.WN = True  # white noise, jitter fitting (dont touch) # DEL
+            self.MOAV = sp.array([0 for _ in range(self.nins)])  # MOAV order for each instrument
+
+            self.WN_pm = True  # jitter fitting (dont touch)
+            self.MOAV_pm = sp.array([0, 0])  # MOAV order for each instrument
+
+            self.starname = self.rvfiles[0].split('_')[0]
+            self.ins_names = [self.rvfiles[i].split('_')[1].split('.')[0] for i in range(self.nins)]
+            self.ins_names_pm = [self.pmfiles[i].split('_')[1].split('.')[0] for i in range(self.nins_pm)]
+
+
+            # batmans assistance dictionaries
+            self.batman_m = {}  # holds batmans model
+            self.batman_p = {}  # holds batmans parameters
+            self.batman_ld = []  # holds batmans limb darkening
+            self.batman_ldn = []  # holds batmans ld total number of parameters
+
+            # gp support dictionaries
+            self.george_gp = {}  # not needed i guess  # DEL
+            self.george_k = {}  # not needed i guess
+
+            self.gaussian_processor = ''
+            self.george_kernels = sp.array([])
+            self.george_jitter = True
+
+            self.celerite_kernels = sp.array([])
+            self.celerite_jitter = False
+
+            self.emperors_gp = []
+
+            #  Correlate with rv's
+
+            self.neo_logl = empmir.neo_logl_rvpm
+            self.neo_logp = empmir.neo_logp_rvpm
 
         elif file_type == 'rv_file':  # for RV data
             self.rvfiles = stardat
@@ -452,16 +525,13 @@ class EMPIRE:
             self.george_jitter = True
 
             self.celerite_kernels = sp.array([])
-            self.celerite_jitter = True
+            self.celerite_jitter = False
 
             self.emperors_gp = []
 
             #  Correlate with rv's
             self.time, self.rv, self.err, self.ins = 0., 0., 0., 0.
             self.totcornum = 0.
-
-
-
 
 
             self.starname = self.pmfiles[0].split('_')[0]
@@ -518,8 +588,6 @@ class EMPIRE:
 
         units = [" [Days]", r" $[\frac{m}{s}]$", " $[rad]$", "",
                  r" $[\frac{rad}{s}]$"]
-        priors = ['uniform', 'uniform_spe_a',
-                  'uniform_spe_b', 'uniform_spe_a', 'uniform_spe_b']
         priors = ['uniform', 'uniform', 'uniform', 'uniform', 'uniform']
         new = sp.array([])
         for i in range(5):
@@ -623,7 +691,7 @@ class EMPIRE:
             self.theta.list_ = sp.append(new, self.theta.list_)
         else:
             self.theta.list_ = sp.insert(
-                self.theta.list_, (kplanets - 1) * (7 + limb_dark), new)
+                self.theta.list_, (kplanets - 1) * (7 + ldn), new)
         pass
 
     def _theta_george_pm(self, limits, conditions, kplanets):
@@ -647,13 +715,18 @@ class EMPIRE:
         names = sp.array(
             ['kernel%i' % kn for kn in range(len(self.celerite_kernels))])
 
+        if self.celerite_jitter:
+            t = spec('Jitter', 'm/s', 'uniform', limits, -sp.inf, 'celeritian')
+            self.theta.list_ = sp.append(self.theta.list_, t)
+
         for kn in range(len(self.celerite_kernels)):
-            for c in range(len(self.celerite_kernels[kn]) + 1):
-                t = spec(names[kn] + '_' + str(c), '',
-                         'uniform', limits, -sp.inf, 'celeritian')
-                self.theta.list_ = sp.append(self.theta.list_, t)
-        t = spec('Jitter', 'm/s', 'uniform', [0, 10], -sp.inf, 'celeritian')
-        self.theta.list_ = sp.append(self.theta.list_, t)
+            for km in range(len(self.celerite_kernels[kn])):
+                for kt in range(self.lk[self.celerite_kernels[kn, km]]):
+                    t = spec(names[kn] + '_' + str(km) + '_' + str(kt), '',
+                            'uniform', limits, -sp.inf, 'celeritian')
+                    self.theta.list_ = sp.append(self.theta.list_, t)
+        #t = spec('Jitter', 'm/s', 'uniform', [0, 10], -sp.inf, 'celeritian')
+        #self.theta.list_ = sp.append(self.theta.list_, t)
         pass
 
     def _theta_gen_pm(self, limits, conditions):
@@ -676,6 +749,28 @@ class EMPIRE:
             new = sp.append(new, t)
         if len(new) > 0:
             self.theta.list_ = sp.append(new, self.theta.list_)
+        pass
+
+    def _theta_joined(self, limits, conditions):
+        names = ["Period", "Amplitude", "Phase", "Eccentricity", "Longitude"]
+        units = [" [Days]", r" $[\frac{m}{s}]$", " $[rad]$", "",
+                 r" $[\frac{rad}{s}]$"]
+        priors = ['joined', 'uniform', 'uniform', 'joined', 'joined']
+
+        names += ['t0', 'Planet Radius', 'SemiMajor Axis', 'Inclination',
+                  'Eccentricity', 'Longitude']
+        names_ld = ['coef1', 'coef2', 'coef3', 'coef4']
+
+        units = [" [Days]", " $[\\frac{m}{s}]$", " $[Stellar Radii]$", "Stellar Radii",
+                 " $[rads]$", '', '$[rads]$']
+
+        new = sp.array([])
+        for i in range(5):
+            t = spec(names[i], units[i], priors[i], limits[i],
+                     -sp.inf, 'keplerian', args=conditions[i])
+            new = sp.append(new, t)
+
+        self.theta.list_ = sp.insert(self.theta.list_, (kplanets - 1) * 5, new)
         pass
 
     def mklogfile(self, kplanets):
@@ -910,7 +1005,7 @@ class EMPIRE:
         pass
 
 
-    def conquer(self, from_k, to_k, from_k_pm=0, to_k_pm=0, logl=logl, logp=logp):
+    def conquer(self, from_k, to_k, from_k_pm=0, to_k_pm=5, logl=logl, logp=logp):
         # 1 handle data
         # 2 set adecuate model
         # 3 generate values for said model, different step as this should allow configuration
@@ -939,14 +1034,16 @@ class EMPIRE:
         ##########################################
         # 3 Set model to run (reads inputs)
         ##########################################
-        from also import Accumulator
-        prepo1 = Accumulator()
-        also = prepo1.also
+        #from also import Accumulator
+        #prepo1 = Accumulator()
+        #also = prepo1.also
+
+
 
         ##########################################
         # 3a Sets the boundaries of the EMPIRE
         ##########################################
-        if also(self.RV):
+        if self.RV:
             # for instruments in rv
             acc_lims = sp.array([-1., 1.])
             jitt_limiter = sp.amax(abs(self.rv))
@@ -967,7 +1064,7 @@ class EMPIRE:
             e_lims = sp.array([-sqrte, sqrte])
             free_lims_rv = [p_lims, a_lims, a_lims, e_lims, e_lims]
 
-        if also(self.PM):
+        if self.PM:
             # create limits for instruments
             acc_bnd = sp.array([-1., 1.])
             jitt_bounder = sp.amax(abs(self.rv_pm))
@@ -996,12 +1093,14 @@ class EMPIRE:
 
             pass
 
-        if also(self.RV and self.PM):  # Here goes the rvpm
+        if (self.RV and self.PM):  # Here goes the rvpm
+            self.fplan = from_k_pm
+            self.joined_signals = 5
             pass
 
-        if prepo1.none:
-            raise Exception('Mark RV or PM')
-            pass
+        # if prepo1.none:
+        #     raise Exception('Mark RV or PM')
+        #     pass
 
         self.oldlogpost = -sp.inf
 
@@ -1034,6 +1133,8 @@ class EMPIRE:
             # INITIALIZE GEORGE
             # for n in range(len(self.george_kernels)):
             if self.gaussian_processor == 'george':
+                ins_bnd = sp.array([0., 10.])
+                self._theta_george_pm(ins_bnd, None, 0)
                 try:  # put somewhere else # DEL
                     import george
                 except ImportError:
@@ -1056,31 +1157,42 @@ class EMPIRE:
                     self.time_pm, self.err_pm)  # DEL  que ondi esto
 
                 #raise Exception('Debug')
-                ins_bnd = sp.array([0., 10.])
-                self._theta_george_pm(ins_bnd, None, 0)
 
             if self.gaussian_processor == 'celerite':
-                import celerite
-                self.celerite_k = empmir.neo_term(self.celerite_kernels)
-                if self.celerite_jitter:
-                    self.celerite_gp = celerite.GP(self.celerite_k,
-                                                   mean=0., fit_mean=False,
-                                                   white_noise=sp.log(0.1**2),
-                                                   fit_white_noise=True)
-                else:
-                    self.celerite_gp = celerite.GP(self.celerite_k)
-                self.emperors_gp = self.celerite_gp
-
-                self.emperors_gp.compute(self.time_pm, self.err_pm)
                 ins_bnd = sp.array([-10, 10])
                 self._theta_celerite_pm(ins_bnd, None, 0)
+                try:  # put somewhere else # DEL
+                    import celerite
+                except ImportError:
+                    raise ImportError('You don t have the package george installed.\
+                                       Try pip install celerite.')
+                self.celerite_k = empmir.neo_init_terms(self.celerite_kernels)
+                if self.celerite_jitter:
+                    self.celerite_k += empmir.neo_init_terms([['JitterTerm']])
+                    # self.celerite_gp = celerite.GP(self.celerite_k,
+                    #                                mean=0., fit_mean=False,
+                    #                                white_noise=sp.log(0.1**2),
+                    #                                fit_white_noise=True)
 
+                self.celerite_gp = celerite.GP(self.celerite_k, mean=0.)
+                self.emperors_gp = self.celerite_gp
+
+                self.emperors_gp.compute(self.time_pm)
 
         self.first_run = True
         while self.kplan <= to_k:
             if self.kplan > 0:
                 # INITIALIZE KEPLERIAN PARAMS
-                if self.RV:
+                if self.RV and self.PM:
+                    self._theta_joined()
+                    if self.kplan==self.fplan:
+                        conds_ = [[], [0.0001, jl_], [], [0, 1], []]
+                        self.batman_ldn.append(self.ld[self.batman_ld[self.kplan - 1]])
+                        self.batman_m[self.kplan - 1], self.batman_p[self.kplan - 1] = empmir.neo_init_batman(
+                            self.time_pm, self.batman_ld[self.kplan - 1], self.batman_ldn[self.kplan - 1])
+                        pass
+
+                elif self.RV:
                     conds_ = [[], [0.0001, jl_], [], [0, 1], []]
                     if self.first_run and from_k > 1:
                         for i in sp.arange(from_k)+1:
@@ -1089,7 +1201,7 @@ class EMPIRE:
                     else:
                         self._theta_rv(free_lims_rv, conds_, self.kplan, from_k)
                     pass
-                if self.PM:
+                elif self.PM:
                     # INITIALIZE PHOTOMETRIC PARAMS
                     self.batman_ldn.append(self.ld[self.batman_ld[self.kplan - 1]])
                     self._theta_photo(free_lims_pm, None, self.kplan,
@@ -1098,6 +1210,8 @@ class EMPIRE:
                     self.batman_m[self.kplan - 1], self.batman_p[self.kplan - 1] = empmir.neo_init_batman(
                         self.time_pm, self.batman_ld[self.kplan - 1], self.batman_ldn[self.kplan - 1])
                     pass
+                else:
+                    raise Exception('Something really weird happened!!')
 
         ##########################################
         # 3c Apply user commands
@@ -1140,20 +1254,10 @@ class EMPIRE:
                             self.theta.list_[j-1].lims = [0., 1]  # for ecc
                             self.theta.CV[j//5][2] = False  # no CV on ecc-w
 
-                    '''
-                    # if amplitude or ecc are fixed
-                    if (self.theta.list_[j].prior == 'uniform_spe_b' and
-                        self.theta.list_[j-1].prior == 'fixed'):  # amplitude fixed, so phase
-                        self.theta.list_[j].prior = 'uniform'
-                        self.theta.list_[j].cv = False
-                        self.theta.list_[j-1].cv = False
-
-                        self.theta.list_[j].lims = [0., 2*sp.pi]  # for both
-                        if self.theta.list_[j].tag() == 'Phase':
-                            self.theta.CV[j//5][1] = False  # amplitude fixed
-                        if self.theta.list_[j].tag() == 'Longitude':
-                            self.theta.CV[j//5][2] = False  # ecc fixed
-                    '''
+            sub_ind = ((sp.arange(self.kplan * 5) % 5) + 1) // 2
+            for j in range(self.kplan*5):
+                if self.theta.list_[j].cv == False:
+                    self.theta.CV[j//5][((j%5)+1)//2] = False
             self.theta._update_list_()
             # show the initialized params and priors, developers
             tab_all = []
@@ -1272,11 +1376,15 @@ class EMPIRE:
                     self.theta.list_[self.coordinator[i]].val = self.ajuste_h[self.coordinator[i]]
 
             if self.PM:
+                ## will need changes after combined
+                import copy
+                self.cherry_chain_h = copy.deepcopy(self.cherry_chain)
+                self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
+                self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
+
                 for i in range(self.theta.ndim_):
                     self.theta.list_[self.coordinator[i]].true_val = self.ajuste[i]
-                    self.theta.list_[self.coordinator[i]].val = self.ajuste[self.coordinator[i]]
-
-
+                    self.theta.list_[self.coordinator[i]].val = self.ajuste_h[i]
 
 
             self.sample_sizes = sp.array(
@@ -1288,7 +1396,6 @@ class EMPIRE:
             # dis goes at the end
             print('\n\n--------------- Best Fit ---------------\n\n')
             print(tabulate(self.theta.list('name', 'val', 'prior').T, headers=['Name', 'Value', 'Prior']))
-
 
 
             #residuals = empmir.RV_residuals(ajuste, self.rv, self.time,
@@ -1303,6 +1410,7 @@ class EMPIRE:
 
         #BIC & AIC
             if self.RV:
+                setup_ = sp.hstack([self.setup, self.ACC, self.MOAV_STAR, self.MOAV])
                 self.NEW_BIC = sp.log(self.ndat) * \
                     self.theta.ndim_ - 2 * self.like_max
                 self.OLD_BIC = sp.log(self.ndat) * \
@@ -1312,8 +1420,11 @@ class EMPIRE:
 
                 if self.VINES:  # saves chains, posteriors and log
                     self.saveplace = self.mklogfile(self.kplan)
-                    emplib.instigator(self.setup, self.theta, self.cherry_chain_h,
-                                      self.cherry_post, self.all_data, self.saveplace)
+                    emplib.instigator(
+                                    setup_, self.theta,
+                                    self.cherry_chain_h[:, :, self.coordinator],
+                                    self.cherry_post,
+                                    self.all_data, self.saveplace)
                     if self.INPLOT:
                         print('printing')
                         from emperors_canvas import CourtPainter
@@ -1348,6 +1459,7 @@ class EMPIRE:
 
 
             if self.PM:
+                setup_ = sp.hstack([self.setup, 0, 0, 0])
                 self.NEW_BIC = sp.log(self.ndat_pm) * \
                     self.theta.ndim_ - 2 * self.post_max
                 self.OLD_BIC = sp.log(self.ndat_pm) * \
@@ -1356,8 +1468,12 @@ class EMPIRE:
                 self.OLD_AIC = 2 * - 2 * self.oldlogpost
                 if self.VINES:  # saves chains, posteriors and log
                     self.saveplace = self.mklogfile(self.kplan)
-                    emplib.instigator(self.setup, self.theta, self.cherry_chain,
-                                      self.cherry_post, self.all_data, self.saveplace)
+
+                    emplib.instigator(
+                                    setup_, self.theta,
+                                    self.cherry_chain_h[:, :, self.coordinator],
+                                    self.cherry_post,
+                                    self.all_data, self.saveplace)
                     if self.INPLOT:
                         print('printing')
                         from emperors_canvas import CourtPainter
@@ -1390,31 +1506,10 @@ class EMPIRE:
 
                         pass
 
-            if self.VINES:  # saves chains, posteriors and log
-                self.saveplace = self.mklogfile(kplan)
-                setup = sp.hstack(
-                        [self.setup, self.ACC, self.MOAV_STAR, self.MOAV]
-                        )
-                emplib.instigator(
-                                setup, self.theta,
-                                self.cherry_chain_h[:, :, self.coordinator],
-                                self.cherry_post,
-                                self.all_data, self.saveplace
-                                )
 
             if self.MUSIC:
                 thybiding.play()
 
-            if self.INPLOT:
-                from emperors_canvas import CourtPainter
-                vangogh = CourtPainter(kplan, self.saveplace+'/',
-                                       self.PDF, self.PNG)
-                vangogh.paint_chains()
-                vangogh.paint_posteriors()
-                vangogh.paint_timeseries()
-                vangogh.paint_fold()
-
-                pass
             h = ['Criteria', 'This Run', 'Previous Run', 'Difference', 'Requirement', 'Condition']
 
             bic_c = self.OLD_BIC - self.NEW_BIC
@@ -1464,58 +1559,78 @@ class EMPIRE:
 # stardat = sp.array(
 #     ['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
 
-stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
+#stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
+stardat = sp.array(['synth_RV.vels'])
 stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
-
-setup = sp.array([2, 60, 120])
+setup = sp.array([2, 80, 200])
 #setup = sp.array([5, 300, 10000])
-#em = EMPIRE(stardat, setup)
+em = EMPIRE(stardat, setup)
 
 
-#pmfiles = sp.array(['flux/transit_ground_r.flux'])
-pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2'])
-#stardat = pmfiles
-em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
+####pmfiles = sp.array(['flux/transit_ground_r.flux'])
+# pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2.flux'])
+# stardat = pmfiles
+# em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 
 #em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 em.bayes_factor = 5
-#em.ACC = 1
-#em.MOAV = sp.array([1, 1])  # not needed
+em.ACC = 0
+em.MOAV = sp.array([0,0])  # not needed
+#em.MOAV_STAR = 0
 
 #em.burn_out = 1
-#em.MOAV_STAR = 2
 
 em.RAW = True  # no bayes cut
 em.CORNER = False  # corner plot disabled as it takes some time to plot
-em.VINES = False
 em.ushallnotpass = False  # constrain for next run
-em.INPLOT = True
+#em.VINES = True
+#em.INPLOT = True
 
 
-em.ACC_pm = 0
-em.batman_ld = ['quadratic']
+# em.ACC_pm = 0
+# em.batman_ld = ['quadratic', 'quadratic']
 #em.gaussian_processor = 'george'
-#em.gaussian_processor = 'celerite'
+# em.gaussian_processor = 'celerite'
 
 #em.george_kernels = sp.array([['Matern32Kernel']])
 #em.george_jitter = False
-
-#ignore this
-PLOT_PM = True
-PLOT_PM1 = True
-#em.celerite_kernels = sp.array([['Matern32Term', 'RealTerm']])
-#em.celerite_jitter = False
+#[[rt,rt]] = rt*rt
+#[[rt],[rt]] = rt+rt
+# em.celerite_kernels = sp.array([['SHOTerm']])
+# em.celerite_jitter = True
 
 em.MUSIC = False
+
+# rv test gj876
 if True:
-    '''
-    em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
-                       1:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]]
-                       }
-    '''
+
+    #em.changes_list = { 0:['Period', 'lims', [sp.log(3.515), sp.log(3.525)]]
+    #                    }
+
     # GJ876 constrained around the signal
-    '''
+    #'''
+    em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
+                       1:['Amplitude', 'lims', [205, 207]],
+                       2:['Phase', 'lims', [5.64, 5.655]],
+                       3:['Eccentricity', 'lims', [0., 0.001]],
+                       4:['Longitude', 'lims', [0.0, 0.001]],
+                       5:['Amplitude', 'cv', False],
+                       6:['Phase', 'cv', False],
+                       7:['Eccentricity', 'cv', False],
+                       8:['Longitude', 'cv', False],
+                       9:['Offset_LICK', 'prior', 'uniform'],
+                       10:['Offset_LICK', 'lims', [-24.9, -24.7]],
+                       11:['Offset_KECK', 'prior', 'uniform'],
+                       12:['Offset_KECK', 'lims', [7.14, 7.15]],
+                       13:['Jitter_LICK', 'prior', 'uniform'],
+                       14:['Jitter_LICK', 'lims', [12.3, 12.4]],
+                       15:['Jitter_KECK', 'prior', 'uniform'],
+                       16:['Jitter_KECK', 'lims', [35, 36]]
+                       }
+
+
+
     em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
                        1:['Amplitude', 'lims', [-1.01515928e+01, -6.33312469e+00]],
                        2:['Phase', 'lims', [1.00520806e+01,   1.35949748e+01]],
@@ -1528,71 +1643,39 @@ if True:
                        9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
                        }
 
-'''
-em.changes_list = {0:['Period', 'prior', 'fixed'],
-                   1:['Period', 'val', sp.log(61.1166)],
-                   2:['Amplitude', 'prior', 'fixed'],
-                   3:['Amplitude', 'val', 211.57],
-                   4:['Period_2', 'prior', 'fixed'],
-                   5:['Period_2', 'val', sp.log(30.0081)],
-                   6:['Amplitude_2', 'prior', 'fixed'],
-                   7:['Amplitude_2', 'val', 88.34]
-                   }
+    #'''
+    em.conquer(1, 1)
+    pass
 
-em.changes_list = {0:['Period', 'lims', [sp.log(0.79), sp.log(0.80)]],
-                   1:['Period_2', 'lims', [sp.log(199),sp.log(201)]]
-                   }
-'''
-# GJ876 constrained around the signal
-'''
-em.changes_list = {0:['Period', 'lims', [4.11098843e+00, 4.11105404e+00]],
-                   1:['Amplitude', 'lims', [-1.01515928e+01, -6.33312469e+00]],
-                   2:['Phase', 'lims', [1.00520806e+01,   1.35949748e+01]],
-                   3:['Eccentricity', 'lims', [-1.24823254e-02,   2.27443388e-02]],
-                   4:['Longitude', 'lims', [4.14811179e-02, 1.38568310e-01]],
-                   5:['Period_2', 'lims', [3.40831451e+00, 3.40863545e+00]],
-                   6:['Amplitude_2', 'lims', [-5.69294095e+00, 6.05896817e-02]],
-                   7:['Phase_2', 'lims', [-9.33328013e+00, -8.07370401e+00]],
-                   8:['Eccentricity_2', 'lims', [-2.48303912e-01,  -7.10641857e-02]],
-                   9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
-                   }
-
-em.conquer(2, 2)
-
-# from emperors_canvas import CourtPainter
-# vangogh = CourtPainter(2, 'datalogs/GJ876/10.4.19/', False, True)
-# vangogh.paint_chains()
-# vangogh.paint_posteriors()
-# vangogh.paint_histograms()
-# vangogh.paint_timeseries()
-# vangogh.paint_fold()
-# vangogh.paint_corners()
-
-
+# pm test khan
 if False:
-'''
-# for synth2_KHAN
-# # true params
-# t_ = [2458042.0, 3.3, 0.015, 15., 89.8, 0.0, 90., 0.1, 0.3]
-# t1_= [2458046.0, 4.5, 0.02, 20, 89.8, 0.0, 90., 0.2, 0.4]
-'''
-em.changes_list = {0:['t0', 'lims', [2458041.9, 2458042.1]],
-                   1:['Period', 'lims', [3.29, 3.31]],
-                   2:['Planet Radius', 'lims', [0.014, 0.016],],
-                   3:['SemiMajor Axis', 'lims', [14.9, 15.1]],
-                   4:['Inclination', 'lims', [89.7, 89.9]],
-                   5:['Eccentricity', 'prior', 'fixed'],
-                   6:['Eccentricity', 'val', 0],
-                   7:['Longitude', 'prior', 'fixed',
-                   8:['Longitude', 'val', '90'],
-                   9:['coef1', 'lims', [0.09,0.11]],
-                   10:['coef2', 'lims', [0.29,0.31]],
-                    }
-'''
-em.conquer(1, 1)
+    # for synth2_KHAN
+    # # true params
+    #t_ = [2458042.0, 3.52, 0.102, 8.06, 86.1, 0.0, 90., 0.1, 0.3]
+    #t1_= [2458046.0, 7, 0.12, 12, 86.2, 0.0, 90., 0.1, 0.2, 0.4]
+    em.changes_list = {0:['t0', 'lims', [2458041.98, 2458042.02]],
+                       1:['Period', 'lims', [3.518, 3.522]],
+                       2:['Planet Radius', 'lims', [0.1018, 0.1022]],
+                       3:['SemiMajor Axis', 'lims', [8.058, 8.062]],
+                       4:['Inclination', 'lims', [86.098, 86.102]],
+                       5:['Eccentricity', 'lims', [0, 0.0001]],
+                       6:['Longitude', 'lims', [89.9999, 90]],
+                       7:['coef1', 'lims', [0.098,0.102]],
+                       8:['coef2', 'lims', [0.298,0.302]],
+                       9:['t0_2', 'lims', [2458045.98, 2458046.02]],
+                       10:['Period_2', 'lims', [6.998, 7.002]],
+                       11:['Planet Radius_2', 'lims', [0.1198, 0.1202]],
+                       12:['SemiMajor Axis_2', 'lims', [11.998, 12.002]],
+                       13:['Inclination_2', 'lims', [86.198, 86.202]],
+                       14:['Eccentricity_2', 'lims', [0, 0.0001]],
+                       15:['Longitude_2', 'lims', [89.9999, 90]],
+                       16:['coef1_2', 'lims', [0.198,0.202]],
+                       17:['coef2_2', 'lims', [0.398,0.402]]
+                       }
+    em.conquer(1, 1)
+    pass
 
-
-
+PLOT_PM = False
 
 if PLOT_PM:
     font = {'family': 'serif',
@@ -1601,10 +1684,6 @@ if PLOT_PM:
             'size': 20,
             }
     x,y,y_error = em.time_pm, em.rv_pm, em.err_pm
-
-    T0_f, P_f, r_f, sma_f, inc_f, ecc_f, w_f, c1_f, c2_f = map(
-        lambda v: (v[1], v[2]-v[1], v[1]-v[0]), zip(*sp.percentile(
-            em.sampler.flatchain[0], [16, 50, 84], axis=0)))
 
 
 
@@ -1616,7 +1695,7 @@ if PLOT_PM:
         plt.grid(True)
         plt.xlim( (min(x)-0.01) , (max(x+0.01)))
         delt_y = max(y)-min(y)
-        plt.ylim(sp.mean(y)-delt_y*1.1, sp.mean(y)+delt_y*0.9)
+        plt.ylim(sp.amin(y)- 0.003, 1.005)
 
         font = {'family': 'serif',
                 'color':  'black',
@@ -1629,12 +1708,17 @@ if PLOT_PM:
         # data
         plt.errorbar(x, y, yerr=y_error, fmt='b.', alpha=1/1.)
 
-        T0_r, P_r, r_r, sma_r, inc_r, ecc_r, w_r, c1_r, c2_r = em.ajuste
-        theta__ = em.ajuste[:9]
+        theta__ = em.ajuste[:9*(em.kplan-1)]
+        T0_r, P_r, r_r, sma_r, inc_r, ecc_r, w_r, c1_r, c2_r = em.ajuste[:9]
+        theta_gp = em.ajuste[9*(em.kplan-1):]
+        # if len(em.ajuste)>10:  # not relevant thou
+        #     T0_r2, P_r2, r_r2, sma_r2, inc_r2, ecc_r2, w_r2, c1_r2, c2_r2=em.ajuste[9:18]
         #theta_gp__ = em.ajuste[9:]
         # model
         params__ = [x, em.kplan-1, em.batman_ldn, em.batman_m, em.batman_p]
         y_transit = empmir.neo_lightcurve(theta__, params__)
+
+
         plt.plot(x, y_transit, 'r',  linewidth=2)
 
 
@@ -1653,22 +1737,39 @@ if PLOT_PM:
         #plt.text(x[0]+0.10, 1.0075, '+ '+ r_tp, fontdict=font)
         #plt.text(x[0]+0.102, 1.0065, '-  '+ r_tm, fontdict=font)
 
-        x2 = np.linspace(min(x), max(x), 1000)
-        # gps
-        params2__ = [x2, em.kplan-1, em.batman_ldn, em.batman_m, em.batman_p]
-        '''
-        if True:  # dont use this
-            for s in em.sampler.flatchain[0][np.random.randint(len(em.sampler.flatchain[0]), size=24)]:
-                radius = 10.**s[-1]  # k_r
-                gp = george.GP(s[-2]* kernels.Matern32Kernel(radius))
-                gp.compute(x, y_error)
-                res = y - empmir.neo_lightcurve(s[:-2], params__)
-                m = gp.sample_conditional(res, x2) + empmir.neo_lightcurve(s[:-2], params2__)
-                plt.plot(x2, m, '-', color="#4682b4", alpha=0.2)
-        '''
+
+
         plt.show()
 
-    x2 = np.linspace(min(x), max(x), 1200)
+    if True:
+        plt.subplots(figsize=(16,8))
+        plt.grid(True)
+        plt.xlim( (min(x)-0.01) , (max(x+0.01)))
+        delt_y = max(y)-min(y)
+        plt.ylim(sp.amin(y)- 0.003, 1.005)
+
+        font = {'family': 'serif',
+                'color':  'black',
+                'weight': 'normal',
+                'size': 20,
+                }
+
+        # central black line
+        plt.plot((x[0], x[-1]), (1., 1.), 'k', linewidth=4)
+        # data
+        plt.errorbar(x, y, yerr=y_error, fmt='b.', alpha=1/1.)
+        samples = em.sampler.flatchain[0, :]
+        for s in samples[sp.random.randint(len(samples), size=24), 9*(em.kplan-1):]:
+            em.emperors_gp.set_parameter_vector(s)
+            mu = em.emperors_gp.predict(y, x, return_cov=False)
+            plt.plot(x, mu, color='orange', alpha=0.3)
+        em.emperors_gp.set_parameter_vector(em.ajuste[9*(em.kplan-1):])
+        mu0 = em.emperors_gp.predict(y,x,return_cov=False)
+        plt.plot(x, mu0, color='red')
+        plt.show()
+
+
+
     #M1, P1 = neo_init_batman(x2)
 
 
