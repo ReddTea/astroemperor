@@ -202,6 +202,32 @@ def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
 
     return thetas
 
+def nano_henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
+    t2 = sp.ones_like(thetas)
+    for i in range(kplanets):
+        if tags[i][0]:
+            t2[i*5] = sp.exp(thetas[i*5])
+            print('changed period! (devs note)')
+        if tags[i][1]:
+            Ask = thetas[i*5 + 1]
+            Ack = thetas[i*5 + 2]
+            Ak = Ask ** 2 + Ack ** 2
+            Phasek = sp.where(Ask>=0, sp.arccos(Ack / (Ak ** 0.5)), 2*sp.pi - sp.arccos(Ack / (Ak ** 0.5)))
+            t2[i*5 + 1] = Ak
+            t2[i*5 + 2] = Phasek
+            print('changed amplitude! (devs note)')
+        if tags[i][2]:
+            Sk = thetas[i*5 + 3]
+            Ck = thetas[i*5 + 4]
+            ecck  = Sk ** 2 + Ck ** 2
+            wk = sp.where(Sk>=0, sp.arccos(Ck / (ecck ** 0.5)), 2*sp.pi - sp.arccos(Ck / (ecck ** 0.5)))
+            t2[i*5 + 3] = ecck
+            t2[i*5 + 4] = wk
+            print('changed eccentricity! (devs note)')
+    for i in range(len(thetas))[5*kplanets:]:
+        t2[i] = thetas[i]
+    return thetas
+
 
 def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, totcornum, ACC):
     ndat = len(time)
@@ -266,29 +292,6 @@ def RV_residuals(theta, rv, time, ins, staract, starflag, kplanets, nins, MOAV, 
 import george
 from george import kernels
 from george.modeling import Model
-
-def logl_rvpm(theta, params):
-    params_rv, params_pm = params
-    #time, rv, err = params_rv[0], params_rv[1], params_rv[2]
-    #ins, staract, starflag = params_rv[3], params_rv[4], params_rv[5]
-    kplanets, nins, MOAV = params_rv[6], params_rv[7], params_rv[8]
-    totcornum, PACC = params_rv[9], params_rv[10]
-
-    ndim_rv = 5*kplanets + 2*nins*(MOAV+1) + (1 + PACC) + totcornum
-    theta_rv = theta[:ndim_rv]
-    P = sp.array([theta[5*k] for k in range(kplanets)])
-    #print P, 'periods\n\n'
-    LOGL_RV = logl_rv(theta_rv, params_rv)
-    #if kplanets == 1:
-    #    print LOGL_RV, 'LOGL_RV'  # LOGL_PM, 'LOGL_RV, LOGL_PM\n\n'  # PMPMPM
-    #'''
-    theta_pm = theta[ndim_rv:]
-    if kplanets > 0:
-        LOGL_PM = logl_pm(theta_pm, params_pm, P)
-    else:
-        LOGL_PM = 0.0
-    #'''
-    return LOGL_RV + LOGL_PM
 
 
 # should all go in library  # DEL
@@ -356,27 +359,28 @@ D = {'uniform':uniform,
      'hou_cov':hou_cov
      }
 
-def neo_logp_rv(theta, params):
+def neo_logp_rv(theta, params, CHECK=False):
     _theta, ndim, C = params
     c, lp = 0, 0.
     for j in range(ndim):
         add_this = D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
-#        if add_this == -sp.inf:
-#            print('prior failed', _theta[C[j]].name)
-
         lp += add_this
 
+        if CHECK:
+            if add_this == -sp.inf:
+                print(_theta[C[j]], theta[j], _theta[C[j]].lims)
         ## use cv for this
         if _theta[C[j]].cv:
             if _theta[C[j]].tag() == 'Amplitude':
                 lp += D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None)
-#                if lp == -sp.inf:
-#                    print('prior failed extra1')
+                if CHECK:
+                    if D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, None) == -sp.inf:
+                        print(theta[j]**2+theta[j+1]**2, _theta[C[j]].args)
             elif _theta[C[j]].tag() == 'Eccentricity':
                 lp += D['normal'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2])
-#                if lp == -sp.inf:
-#                    print('prior failed extra2')
-
+                if CHECK:
+                    if D['uniform'](theta[j]**2+theta[j+1]**2, _theta[C[j]].args, [0., 0.1**2]) == -sp.inf:
+                        print(theta[j]**2+theta[j+1]**2, _theta[C[j]].args)
     # add HILL criteria!!
     #G = 39.5  ##6.67408e-11 * 1.9891e30 * (1.15740741e-5) ** 2  # in Solar Mass-1 s-2 m3
     #MP = sp.zeros(kplanets)  # this goes in hill
@@ -457,10 +461,11 @@ def neo_logl_rv(theta, paramis):
     if True:
         if lnl == sp.inf:
             print('like failed')
+    #raise Exception('deb')
     return -0.5 * lnl
 
 
-def neo_logp_pm(theta, params):
+def neo_logp_pm(theta, params, CHECK=False):
     _theta, ndim, C = params
     c, lp = 0, 0.
 
@@ -650,6 +655,64 @@ def neo_init_terms(terms):
 def neo_init_cgp(terms):
     return celerite.GP(terms)
 
+
+def neo_logp_rvpm(theta, params):
+    _theta, ndim, C = params
+    c, lp = 0, 0.
+    for j in range(ndim):
+        lp += D[_theta[C[j]].prior](theta[j], _theta[C[j]].lims, _theta[C[j]].args)
+    return lp
+
+
+def neo_logl_rvpm(theta, paramis):
+    _t, indexer, params = paramis
+    AC, B, CV = indexer
+
+    params_rv, params_pm = params[0], params[1]
+
+    kplanets, nins, MOAV = params_rv[6], params_rv[7], params_rv[8]
+    MOAV_STAR, totcornum, ACC = params_rv[9], params_rv[10], params_rv[11]
+
+    # THETA CORRECTION FOR FIXED THETAS
+    for a in AC:
+        theta = sp.insert(theta, a, _t[a].val)
+
+    # count 'em  # this could be outside!!!! # DEL
+    all_rv = kplanets * 5
+    all_rv += (nins + sp.sum(MOAV)) * 2
+    all_rv += MOAV_STAR * 2
+    all_rv += ACC
+
+    # armar thetas
+    theta_rv = theta[:all_rv]  # DEL
+    theta_pm = theta  # DEL
+    for b in B:
+        theta_pm = sp.insert(theta_pm, b[0], theta[b[1]])
+    theta_pm = theta_pm[all_rv:]  # DEL
+
+    #t0, per, pr, sma, inc, ecc, w
+    # per, amp, pha, ecc, w
+    x = sp.array([(True, False, False, True, True) for _ in range(kplanets)]).reshape(-1)
+    x1 = sp.arange(len(x))
+    xx = x1[x]
+
+
+    #raise Exception('deb')
+
+    #ndim_rv = 5*kplanets + 2*nins*(MOAV+1) + (1 + PACC) + totcornum
+    #theta_rv = theta[:ndim_rv]
+    #P = sp.array([theta[5*k] for k in range(kplanets)])
+    #theta_pm = theta[ndim_rv:]
+    logl_params_rv = [_t, AC, params_rv]
+    logl_params_pm = [_t, AC, params_pm]
+
+    LOGL_RV = neo_logl_rv(nano_henshin_hou(theta_rv, kplanets, CV, _t.list('val'), AC), logl_params_rv)
+    print('loglrv', LOGL_RV)
+    #raise Exception('deb')
+    LOGL_PM = neo_logl_pm(theta_pm, logl_params_pm)
+    print('loglpm', LOGL_PM)
+    #print('pass2')
+    return LOGL_RV + LOGL_PM
 
 
 
