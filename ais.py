@@ -476,6 +476,7 @@ class EMPIRE:
             self.neo_logl = empmir.neo_logl_rvpm
             self.neo_logp = empmir.neo_logp_rvpm
 
+
         elif file_type == 'rv_file':  # for RV data
             self.rvfiles = stardat
             rvdat = emplib.read_data(stardat)
@@ -508,7 +509,6 @@ class EMPIRE:
 
             self.neo_logl = empmir.neo_logl_rv
             self.neo_logp = empmir.neo_logp_rv
-
 
         elif file_type == 'pm_file':
             self.pmfiles = stardat
@@ -1477,8 +1477,19 @@ class EMPIRE:
                 self.cherry_post = sp.array([self.posteriors[temp][cherry_locat[temp]] for temp in range(self.ntemps)])
                 self.sigmas = sp.array([sp.std(self.cherry_chain[0][:, i]) for i in range(self.theta.ndim_)])
 
-            if self.RV:  # henshin
-                import copy
+            import copy
+            if (self.RV and self.PM):
+                self.cherry_chain_h = copy.deepcopy(self.cherry_chain)
+                self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
+                self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
+
+                for b in self.theta.B:
+                    self.ajuste = sp.insert(self.ajuste, b[0], self.ajuste[b[1]])
+
+                self.theta.list_[self.coordinator[i]].true_val = self.ajuste[i]
+                self.theta.list_[self.coordinator[i]].val = self.ajuste_h[self.coordinator[i]]
+                pass
+            elif self.RV:  # henshin
                 self.cherry_chain_h = empmir.henshin_hou(copy.deepcopy(self.cherry_chain), self.kplan, self.theta.CV_, self.theta.list('val'), self.anticoor)
                 self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
                 self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
@@ -1487,9 +1498,8 @@ class EMPIRE:
                     self.theta.list_[self.coordinator[i]].true_val = self.ajuste[i]
                     self.theta.list_[self.coordinator[i]].val = self.ajuste_h[self.coordinator[i]]
 
-            if self.PM:
+            elif self.PM:
                 ## will need changes after combined
-                import copy
                 self.cherry_chain_h = copy.deepcopy(self.cherry_chain)
                 self.ajuste_h = self.cherry_chain_h[0][sp.argmax(self.cherry_post[0])]
                 self.sigmas_h = sp.array([sp.std(self.cherry_chain_h[0][:, i]) for i in range(self.theta.ndim_)])
@@ -1655,8 +1665,8 @@ class EMPIRE:
                         if __t.type == 'keplerian':
                             __t.lims = sp.percentile(
                                 self.cherry_chain[0][:, i], self.constrain)
-                            __t.prior = 'normal'
-                            __t.args = [self.ajuste[i], self.sigmas[i]]
+                            #__t.prior = 'normal'
+                            #__t.args = [self.ajuste[i], self.sigmas[i]]
                             pass
 
             self.first_run = False
@@ -1672,55 +1682,69 @@ class EMPIRE:
 #     ['GJ357_1_HARPS.dat', 'GJ357_2_UVES.dat', 'GJ357_3_KECK.vels'])
 
 #stardat = sp.array(['LTT9779_harps.fvels', 'LTT9779_ESPRESSO.fvels'])
-stardat = sp.array(['TOI1047_CORALIE_sanz.dat', 'TOI1047_FEROS_sanz.dat'])
+
+# stardat = sp.array(['TOI1047_CORALIE_sanz.dat', 'TOI1047_FEROS_sanz.dat'])
 #rvfiles = sp.array(['synth_RV.vels'])
-#stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
-setup = sp.array([2, 60, 120])
-#setup = sp.array([5, 300, 10000])
+
+stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
+setup = sp.array([5, 150, 15000])
+#setup = sp.array([2, 50, 1000])
 em = EMPIRE(stardat, setup)
+em.ACC = 1
+em.MOAV = sp.array([1, 1])  # not needed
+#setup = sp.array([5, 150, 15000])
 
 
 ####pmfiles = sp.array(['flux/transit_ground_r.flux'])
-pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2.flux'])
-stardat = pmfiles
-em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
+# pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2.flux'])
+# stardat = pmfiles
+# em = EMPIRE(stardat, setup, file_type='pm_file')  # ais.empire
 
 ###rvpm
-#pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2.flux'])
-#stardat = [rvfiles, pmfiles]
-#em = EMPIRE(stardat, setup, file_type='rvpm_file')  # ais.empire
+# rvfiles = sp.array(['synth_RV.vels'])
+# pmfiles = sp.array(['synth_KHAN2.flux', 'synth_GENGHIS2.flux'])
+# stardat = [rvfiles, pmfiles]
+# em = EMPIRE(stardat, setup, file_type='rvpm_file')  # ais.empire
+# em.ACC = 1
+# em.MOAV = sp.array([0, 0])  # not needed
+# em.ACC_pm = 0
+# em.batman_ld = ['quadratic', 'quadratic']
+# em.gaussian_processor = 'celerite'
+# em.celerite_kernels = sp.array([['RealTerm']])
+# em.celerite_jitter = True
+# em.CV = sp.array([False, False, False])
 
 #em.betas = None
 #em.betas = sp.array([1.0, 0.55, 0.3025, 0.1663, 0.0915])
 em.bayes_factor = 5
-#em.ACC = 1
-#em.MOAV = sp.array([1,1])  # not needed
+
 #em.MOAV_STAR = 0
 
 #em.burn_out = 1
 
 em.RAW = True  # no bayes cut
 em.CORNER = False  # corner plot disabled as it takes some time to plot
-em.ushallnotpass = False  # constrain for next run
+em.ushallnotpass = True  # constrain for next run
 em.VINES = True
-em.INPLOT = False
+em.INPLOT = True
+
+# em.ACC_pm = 0
+# em.batman_ld = ['quadratic', 'quadratic']
+# em.gaussian_processor = 'celerite'
+# em.celerite_kernels = sp.array([['RealTerm']])
+# em.celerite_jitter = True
+
+#
+# #[[rt,rt]] = rt*rt
+# #[[rt],[rt]] = rt+rt
 
 
-em.ACC_pm = 0
-em.batman_ld = ['quadratic', 'quadratic']
-em.gaussian_processor = 'celerite'
-
-#[[rt,rt]] = rt*rt
-#[[rt],[rt]] = rt+rt
-em.celerite_kernels = sp.array([['RealTerm']])
-em.celerite_jitter = True
-
-#em.CV = sp.array([False, False, False])
+#
 
 em.MUSIC = False
 
 # rv test gj876
-if False:
+if True:
 
     #em.changes_list = { 0:['Period', 'lims', [sp.log(3.515), sp.log(3.525)]]
     #                    }
@@ -1759,13 +1783,13 @@ if False:
                        8:['Eccentricity_2', 'lims', [-2.48303912e-01,  -7.10641857e-02]],
                        9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
                        }
-
     '''
-    em.conquer(0, 3)
+
+    em.conquer(0,3)
     pass
 
 # pm test khan
-if True:
+if False:
     # for synth2_KHAN
     # # true params
     #t_ = [2458042.0, 3.52, 0.102, 8.06, 86.1, 0.0, 90., 0.1, 0.3]
@@ -1789,10 +1813,10 @@ if True:
                        16:['coef1_2', 'lims', [0.198,0.202]],
                        17:['coef2_2', 'lims', [0.398,0.402]]
                        }
-    em.conquer(0, 1)
+    em.conquer(1, 2)
     pass
 
-PLOT_PM = True
+PLOT_PM = False
 
 if PLOT_PM:
     font = {'family': 'serif',

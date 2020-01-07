@@ -182,6 +182,7 @@ def henshin_hou(thetas, kplanets, tags, fixed_values, anticoor):
         for i in range(kplanets):
             if tags[i][0]:
                 Pk = sp.exp(thetas[t][:, i*5])
+                thetas[t][:, i*5] = Pk
                 print('changed period! (devs note)')
             if tags[i][1]:
                 Ask = thetas[t][:, i*5 + 1]
@@ -656,7 +657,7 @@ def neo_init_cgp(terms):
     return celerite.GP(terms)
 
 
-def neo_logp_rvpm(theta, params):
+def neo_logp_rvpm(theta, params, CHECK=False):
     _theta, ndim, C = params
     c, lp = 0, 0.
     for j in range(ndim):
@@ -664,7 +665,7 @@ def neo_logp_rvpm(theta, params):
     return lp
 
 
-def neo_logl_rvpm(theta, paramis):
+def neo_logl_rvpm(theta, paramis, CHECK=False):
     _t, indexer, params = paramis
     AC, B, CV = indexer
 
@@ -707,10 +708,12 @@ def neo_logl_rvpm(theta, paramis):
     logl_params_pm = [_t, AC, params_pm]
 
     LOGL_RV = neo_logl_rv(nano_henshin_hou(theta_rv, kplanets, CV, _t.list('val'), AC), logl_params_rv)
-    print('loglrv', LOGL_RV)
+    if CHECK:
+        print('loglrv', LOGL_RV)
     #raise Exception('deb')
     LOGL_PM = neo_logl_pm(theta_pm, logl_params_pm)
-    print('loglpm', LOGL_PM)
+    if CHECK:
+        print('loglpm', LOGL_PM)
     #print('pass2')
     return LOGL_RV + LOGL_PM
 
