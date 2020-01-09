@@ -1120,9 +1120,9 @@ class EMPIRE:
             sqrta, sqrte = jl_, 1.
             sqrta, sqrte = sqrta ** 0.5, sqrte ** 0.5
             free_lims = sp.array([sp.log(0.1), sp.log(
-                max(self.time)), -sqrta, sqrta, -sqrta, sqrta, -sqrte, sqrte, -sqrte, sqrte])
+                max(self.time)-min(self.time)), -sqrta, sqrta, -sqrta, sqrta, -sqrte, sqrte, -sqrte, sqrte])
 
-            p_lims = sp.array([sp.log(0.1), sp.log(max(self.time))])
+            p_lims = sp.array([sp.log(0.1), sp.log(max(self.time)-min(self.time))])
             a_lims = sp.array([-sqrta, sqrta])
             e_lims = sp.array([-sqrte, sqrte])
             free_lims_rv = [p_lims, a_lims, a_lims, e_lims, e_lims]
@@ -1470,6 +1470,7 @@ class EMPIRE:
                 self.cherry_chain = sp.array([chains[temp] for temp in sp.arange(self.ntemps)])
                 self.cherry_post = sp.array([self.posteriors[temp] for temp in range(self.ntemps)])
                 self.sigmas = sp.array([sp.std(self.cherry_chain[0][:, i]) for i in range(self.theta.ndim_)])
+
             else:
                 cherry_locat = sp.array([max(self.posteriors[temp]) - self.posteriors[temp] < self.bayes_factor for temp in sp.arange(self.ntemps)])
 
@@ -1542,6 +1543,7 @@ class EMPIRE:
 
                 if self.VINES:  # saves chains, posteriors and log
                     self.saveplace = self.mklogfile(self.kplan)
+                    # se cae con RAW=False ! ! DEL
                     emplib.instigator(
                                     setup_, self.theta,
                                     self.cherry_chain_h[:, :, self.coordinator],
@@ -1657,7 +1659,7 @@ class EMPIRE:
 
             if self.ushallnotpass:
                 #self.constrain = [38.15, 61.85]
-                self.constrain = [15.9, 84.1]
+                self.constrain = [15.866, 84.134]
                 if self.kplan > 0 and self.sigmas.all():
                     print('Priors remodeled successfully!')
                     for i in range(self.theta.ndim_):
@@ -1687,8 +1689,8 @@ class EMPIRE:
 #rvfiles = sp.array(['synth_RV.vels'])
 
 stardat = sp.array(['GJ876_LICK.vels', 'GJ876_KECK.vels'])
-setup = sp.array([5, 150, 15000])
-#setup = sp.array([2, 50, 1000])
+setup = sp.array([5, 120, 15000])
+#setup = sp.array([2, 50, 1500])
 em = EMPIRE(stardat, setup)
 em.ACC = 1
 em.MOAV = sp.array([1, 1])  # not needed
@@ -1784,8 +1786,7 @@ if True:
                        9:['Longitude_2', 'lims', [3.47811764e-02,   1.79877743e-01]]
                        }
     '''
-
-    em.conquer(0,3)
+    em.conquer(0,2)
     pass
 
 # pm test khan
