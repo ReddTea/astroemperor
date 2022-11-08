@@ -9,6 +9,8 @@ import numpy as np
 import sys
 import matplotlib.pyplot as pl
 
+np.random.seed(1234)
+
 if True:
     # Simulation setup
 
