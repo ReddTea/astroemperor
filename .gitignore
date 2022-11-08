@@ -1,8 +1,3 @@
-datalogs/
-datafiles/
-tests/
-gj876.info
-
 # Editors
 .vscode/
 .idea/
