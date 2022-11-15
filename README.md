@@ -89,7 +89,9 @@ You will see chain plots, posterior plots, histograms, phasefolded curves, the c
 I'll update this soon, promise.
 
 ## Autorun
+```sh
 _run_auto__(setup, up_to_k, param=int, acc=int, moav=int)
+```
 
 setup: Sets the number of temperatures, walkers and steps you will use, respectively
 
@@ -107,7 +109,9 @@ acc: Sets the acceleration order. 0 for no acceleration, 1 for linear accelerati
 moav: Sets the moving average order.
 
 ## conditions
+```sh
 .conds.append([param_name, attribute, value])
+```
 
 This modifies the corresponding parameter. It's equivalent to do in the proper part of the run:
 Parameter[param_name].attribute = value
