@@ -88,33 +88,59 @@ You will see chain plots, posterior plots, histograms, phasefolded curves, the c
 # List of Commands
 I'll update this soon, promise.
 
+## Autorun
+_run_auto__(setup, up_to_k, param=int, acc=int, moav=int)
+
+setup: Sets the number of temperatures, walkers and steps you will use, respectively
+
+up_to_k: Up to the k-th keplerian signal
+
+param: Sets the parameterisation to use for the keplerian model.
+
+param = 0 sets the vanilla configuration, with [period, amplitude, phase, eccentricity and longitude of periastron (w)].
+param = 1 uses the Hou parameterisation, as seen on Sec. 2 in https://arxiv.org/pdf/1104.2612.pdf
+param = 2 uses the time of inferior conjunction instead of phase. [period, amplitude, t0, eccentricity, w]
+param = 3 uses both the time of inferior conjuction and Hou's parameterisation [per, amp, t0, sqrt(e)sin(w), sqrt(e)cos(w)]
+
+acc: Sets the acceleration order. 0 for no acceleration, 1 for linear acceleration, 2 for linear plus quadratic...
+
+moav: Sets the moving average order.
+
+## conditions
+.conds.append([param_name, attribute, value])
+
+This modifies the corresponding parameter. It's equivalent to do in the proper part of the run:
+Parameter[param_name].attribute = value
+
+param_name: str with the name of the parameter.
+attribute: str with the name of any attribute of the Parameter object.
+value: The value you want to change it to.
+
+## Others
+
 
 | Command           | Action                                                                                                                                                 | Input Type  | Default                                        |
 |-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|------------------------------------------------|
-| Setup             |                                                                                                                                                        |             |                                                |
-| cores             | Sets the number of threads you are using.                                                                                                              | Int         | Default is maximum! **Let's up the tempo.**    |
-| burn_out          | The steps for the burn-in phase.                                                                                                                       | Int         | Default is half the steps for the chainlength. |
-| CONSTRAIN         | Constrains the search according to the results of the previous analyzed model.                                                                         | Boolean     | Default is True. (should be always True)       |
-| thin              | Thins the chain.                                                                                                                                       | Int         | 1                                              |
-| betas             | Sets the beta factor for each temperature.                                                                                                             | Array       | None                                           |
+| Setup             | Sets the number of temperatures, walkers and steps you will use, respectively                                                                          | Array       | Input by user                                  |
+| cores__           | Sets the number of threads you are using.                                                                                                              | Int         | Default is maximum! **Let's up the tempo.**    |
+| *burn_out         | Deprecated! The steps for the burn-in phase.                                                                                                           | Int         | Default is half the steps for the chainlength. |
+| switch_constrain  | Constrains the search according to the results of the previous analyzed model.                                                                         | Boolean     | Default is False (True is recommended)         |
+| *thin             | Deprecated. Thins the chain.                                                                                                                           | Int         | 1                                              |
+| betas             | Sets the beta factor for each temperature.                                                                                                             | Array       | None (inputs [1/sqrt{2}^i for i in ntemps])    |
 | Statistical Tools |                                                                                                                                                        |             |                                                |
-| bayes_factor      | Changes the in-chain comparison factor.                                                                                                                | float       | sp.log(150)                                    |
-| model_comparison  | Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running.                                        | float       | 5.0                                            |
+| bayes_factor      | Changes the in-chain comparison factor.                                                                                                                | float       | np.log(10000)                                  |
+| *model_comparison | Deprecated. Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running.                            | float       | 5.0                                            |
 | BIC               | This is the BIC used to compare models. Default is 5.                                                                                                  | float       | 5.0                                            |
 | AIC               | This is the AIC used to compare models. Default is 5.                                                                                                  | float       | 5.0                                            |
 | Model             |                                                                                                                                                        |             |                                                |
-| MOAV              | Sets the Moving Average Order for the rednoise model (can be 0).                                                                                       | Int         | 1                                              |
-| eccprior          | Sets the sigma for the Prior Normal Distribution for eccentricity.                                                                                     | float       | 0.3                                            |
-| jittprior         | Sets the sigma for the Prior Normal Distribution for jitter.                                                                                           | float       | 5.0                                            |
-| jittmean          | Sets the mu for the Prior Normal Distribution for jitter.                                                                                              | float       | 5.0 as well                                    |
-| STARMASS          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           | float/False | False                                          |
-| HILL              | Enables the fact that the Hill Stability Criteria has to comply as a prior (requires STARMASS)                                                         | boolean     | False                                          |
+| *MOAV             | Deprecated. Sets the Moving Average Order for the rednoise model (can be 0).                                                                           | Int         | 1                                              |
+| eccentricity_prargs | Sets the mean and sigma for the Prior Normal Distribution for eccentricity.                                                                                   | float       | [0, 0.1]                                       |
+| jitter_prargs     | Sets the mean and sigma for the Prior Normal Distribution for jitter.                                                                                           | float       | [5, 5]                                         |
+| starmass          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           | float/False | False                                          |
+| *HILL             | Deprecated. Enables the fact that the Hill Stability Criteria has to comply as a prior (requires STARMASS)                                             | boolean     | False                                          |
 | Plotting          |                                                                                                                                                        |             |                                                |
-| PLOT              | Enables Plotting.                                                                                                                                      | boolean     | True                                           |
-| CORNER            | Enables Corner plot.                                                                                                                                   | boolean     | True                                           |
-| HISTOGRAMS        | Enables Beautiful Histograms for the keplerian parameters.                                                                                             | boolean     | True                                           |
-| PNG               | Enables PNG plots. (light weight and fast)                                                                                                             | boolean     | True                                           |
-| PDF               | Enables PDF plots. (heavy and slow, maximum quality!)                                                                                                  | boolean     | False                                          |
-| draw_every_n      | Draws 1 every n points in the plots, without thining the chain for the statistics. So it takes shorter on printing the plots (never necessary in .PNG) | int         | 1                                              |
-| Easter            |                                                                                                                                                        |             |                                                |
-| MUSIC             | Sounds so you don't have to explicitly check EMPEROR to know what is it doing.                                                                         | boolean     | False                                          |
+| plot_show         | Displays plots after run.                                                                                                                              | boolean     | False                                          |
+| plot_save         | Saves plots after run.                                                                                                                                 | boolean     | False                                          |
+| *CORNER           | Deprecated. Enables Corner plot.                                                                                                                       | boolean     | True                                           |
+| *HISTOGRAMS       | Deprecated. Enables Beautiful Histograms for the keplerian parameters.                                                                                 | boolean     | True                                           |
+| plot_fmt          | Choose the plotting format.                                                                                                                            | str         | 'png'                                          |
