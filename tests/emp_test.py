@@ -11,6 +11,7 @@ np.random.seed(1234)
 
 sim = astroemperor.Simulation()
 
+# Dynesty setup looks like this
 '''
 sim.set_engine('dynesty_dynamic') # reddemcee, dynesty, dynesty_dynamic, pymc3
 setup = np.array([200, 20])  # nlive, nlive_batch
@@ -19,34 +20,46 @@ sim.dynesty_config['nlive_init'] = 200
 sim.dynesty_config['nlive_batch'] = 20
 sim.dynesty_config['maxiter'] = 800
 '''
+
+# reddemcee setup looks like this
 sim.set_engine('reddemcee')
 
 sim.reddemcee_config['burnin'] = 'half'
 sim.reddemcee_config['thinby'] = 1
-setup = np.array([3, 50, 100])
+setup = np.array([5, 200, 2000])  # ntemps, nwalkers, nsteps
     
+
 sim.ModelSelection.set_criteria = 'BIC'  # default is BIC
 sim.ModelSelection.set_tolerance = 5
 
-#sim.save_loc = '../otrafolder/'
+# alt save location
+# sim.save_loc = '../otrafolder/'
 
-my_parameterisation = 0
-# evidence -169 +- 0.2
-# max posterior -137
+# keplerian parameterisation
+# 0 is vanilla (phase)
+# 1 is full hou (cv on both amplitude and ecc)
+# 2 is with tp instead of vanilla
+# 3 is with tp and hou on ecc
 
+my_parameterisation = 0  
+
+# load data and add instrument names!
 sim.load_data('synth')
 sim.instrument_names = ['Synth Data 1', 'Synth Data 2']
 
+#You can add conditions on the parameters like so:
+# on limits, prior, value, etc
+
 if True:
     if my_parameterisation == 0:
-        sim.add_condition(['Period 1', 'limits', [58, 62]])
-        sim.add_condition(['Period 2', 'limits', [23, 25]])
+        sim.add_condition(['Period 1', 'limits', [10, 100]])
+        sim.add_condition(['Period 2', 'limits', [10, 100]])
 
-        sim.add_condition(['Amplitude 1', 'limits', [198, 202]])
-        sim.add_condition(['Amplitude 2', 'limits', [98, 102]])
+        sim.add_condition(['Amplitude 1', 'limits', [50, 300]])
+        sim.add_condition(['Amplitude 2', 'limits', [50, 300]])
 
-        sim.add_condition(['Phase 1', 'limits', [np.pi/4-0.1, np.pi/4+0.1]])
-        sim.add_condition(['Phase 2', 'limits', [np.pi/3-0.1, np.pi/3+0.1]])
+        sim.add_condition(['Phase 1', 'limits', [0., np.pi/2]])
+        sim.add_condition(['Phase 2', 'limits', [0., np.pi/2]])
 
         sim.add_condition(['Eccentricity 1', 'fixed', 0])
         sim.add_condition(['Eccentricity 2', 'fixed', 0])
@@ -95,34 +108,43 @@ if True:
     if my_parameterisation == 3:
         pass
 
+# enable a multiprocessing method
+# 0 no mp, 1 multiprocessing
+# 2 multiprocess, 3 multiprocessing.ThreadPool
+# 4 pathos.ProcessingPool 5 schwimmbad SerialPool
+# 6 schwimmbad.JobLib, 7 schwimmbad.MultiPool
+sim.multiprocess_method = 1  
 
-sim.multiprocess_method = 1  # 0 no mp, 1 multiprocessing
-
-
+# Dynamics options
 sim.starmass = 0.3  # None or 0 for nothing done here
-sim.switch_dynamics = True
-sim.switch_constrain = True
-sim.constrain_method = 'GM'   # 'sigma', 'GM'
-sim.constrain_sigma = 1
+sim.switch_dynamics = True  # turns on in-run amd-hill criteria
 
-sim.gaussian_mixtures_fit = True
+# Next-Run options
+sim.switch_constrain = True  # sets the prior of the next run based on this run's prior
+sim.constrain_method = 'GM'  # with which method it does it: ['sigma', 'GM']
+#sim.constrain_sigma = 1  # if constrain_method == 'sigma'
 
-sim.plot_gaussian_mixtures['plot'] = True
+sim.gaussian_mixtures_fit = True  # Posterior always fited with gaussian mixtures
 
-sim.plot_keplerian_model['plot'] = True  # hist, uncertain
-sim.plot_keplerian_model['hist'] = True
-sim.plot_keplerian_model['errors'] = True
-sim.plot_keplerian_model['uncertain'] = False
-sim.plot_keplerian_model['format'] = 'pdf'
+
+# plots  # ? write here all custom options
+sim.plot_gaussian_mixtures['plot'] = True  # this habilitates the plot
+
+
+sim.plot_keplerian_model['plot'] = True  # this habilitates the plot
+sim.plot_keplerian_model['hist'] = True  # side histograms
+sim.plot_keplerian_model['errors'] = False  # errorbars
+sim.plot_keplerian_model['uncertain'] = False  # uncertainty estimation! takes time!
 sim.plot_keplerian_model['logger_level'] = 'CRITICAL'  # ERROR, CRITICAL
 
+sim.plot_keplerian_model['format'] = 'pdf'
 
-sim.plot_trace['plot'] = True
+
+sim.plot_trace['plot'] = True  # this habilitates the plot
 sim.plot_trace['modes'] = [0,1,2,3]  # 0:trace, 1:norm_post, 2:dens_interv, 3:corner
 
 
-#sim.run_auto(setup, k_start=2, k_end=2, parameterisation=my_parameterisation, moav=0, pool=1)
-sim.run_auto(setup, k_start=1, k_end=2,
+sim.run_auto(setup, k_start=2, k_end=2,
                        parameterisation=my_parameterisation,
                        moav=0, accel=0)
 
