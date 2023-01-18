@@ -1,0 +1,7 @@
+include src/astroemperor/support/likelihoods/*.like
+include src/astroemperor/support/models/*.model
+include src/astroemperor/support/PAE/*.pae
+include src/astroemperor/support/pools/*.pool
+include src/astroemperor/support/priors/*.prior
+
+include src/astroemperor/support/*.scr
