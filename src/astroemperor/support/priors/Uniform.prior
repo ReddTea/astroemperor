@@ -1,0 +1,5 @@
+def Uniform(x, limits, args):
+    if limits[0] <= x <= limits[1]:
+        return 0.
+    else:
+        return -np.inf

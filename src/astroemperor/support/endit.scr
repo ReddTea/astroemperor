@@ -1,0 +1,22 @@
+def run_thing():
+    start = time.time()
+    sampler.run_mcmc(p1, nsteps, progress=True)
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')
+
+    sampler_metadata = {}
+
+    sampler_metadata['acceptance_fraction'] = sampler.get_attr('acceptance_fraction')
+    sampler_metadata['betas'] = sampler.betas
+    sampler_metadata['ratios'] = sampler.ratios
+
+    sampler_metadata['get_autocorr_time'] = sampler.get_func('get_autocorr_time', kwargs=dict([('quiet', True)]))
+    sampler_metadata['thermodynamic_integration'] = sampler.thermodynamic_integration()
+
+    with open('sampler_pickle.pkl','wb') as md_save:
+      pickle.dump(sampler_metadata, md_save)
+
+
+if __name__ == '__main__':
+    run_thing()

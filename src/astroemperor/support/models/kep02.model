@@ -1,0 +1,7 @@
+    per, A, tp, ecc, w = theta[{}]
+
+    freq = 2. * np.pi / per
+    M = freq * (my_data['BJD'] - tp)
+    E = np.array([kepler.solve(m, ecc) for m in M])
+    f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
+    model0 += A * (np.cos(f + w) + ecc * np.cos(w))

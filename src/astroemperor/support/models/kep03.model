@@ -1,0 +1,16 @@
+    per, A, tp, S, C = theta[{}]
+
+    ecc = S ** 2 + C ** 2
+    if ecc < 1e-5:
+        w = 0
+    else:
+        w = np.arccos(C / (ecc ** 0.5))  # longitude of periastron
+        if S < 0:
+            w = 2 * np.pi - np.arccos(C / (ecc ** 0.5))
+
+    freq = 2. * np.pi / per
+
+    M = freq * (my_data['BJD'] - tp)
+    E = np.array([kepler.solve(m, ecc) for m in M])
+    f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
+    model0 += A * (np.cos(f + w) + ecc * np.cos(w))

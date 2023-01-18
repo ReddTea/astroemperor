@@ -1,0 +1,7 @@
+    # parameterisation == 1
+
+    periods = np.exp(theta[slice(0, b_len*kplanets, b_len)])
+    amps = theta[slice(1, b_len*kplanets, b_len)] ** 2 + theta[slice(2, b_len*kplanets, b_len)] ** 2
+    eccs = theta[slice(3, b_len*kplanets, b_len)] ** 2 + theta[slice(4, b_len*kplanets, b_len)] ** 2
+
+    x = np.array([periods, amps, eccs])

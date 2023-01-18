@@ -1,0 +1,3 @@
+from multiprocessing.pool import ThreadPool as Pool3
+
+mypool = Pool3()

@@ -1,0 +1,3 @@
+from multiprocess import Pool as Pool2
+
+mypool = Pool2()

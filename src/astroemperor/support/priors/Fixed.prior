@@ -1,0 +1,2 @@
+def Fixed(x, limits, args):
+    return 0.

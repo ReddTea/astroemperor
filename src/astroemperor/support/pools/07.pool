@@ -1,0 +1,3 @@
+from schwimmbad import MultiPool as Pool7
+
+mypool = Pool7()

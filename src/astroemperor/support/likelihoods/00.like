@@ -1,0 +1,3 @@
+def my_likelihood(theta):
+    model, err2 = my_model(theta)
+    return -0.5 * np.sum((my_data['RV'] - model) ** 2 / err2 + np.log(err2)) + np.log(2*np.pi) * len(my_data)

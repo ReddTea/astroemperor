@@ -1,0 +1,24 @@
+    residuals = my_data['RV'] - model0
+
+    my_mask = (my_data['Flag'] == {0})
+
+    mod = theta[{1}][0] * my_mask  # OFFSET
+
+    if {2} > 0:
+        theta_ma = theta[{1}][2:]
+        t_ = my_data['BJD'][my_mask]
+        for i in range(len(t_)):
+            for c in range({2}):
+                if i > c:
+                    dt = abs(t_[i] - t_[i - 1 - c])
+                    macoef = theta_ma[2 * c]
+                    matime = theta_ma[2 * c + 1]
+                    MA = macoef * np.exp(-dt / matime) * residuals[my_mask][i - 1 - c]
+                    mod[my_mask][i] += MA
+                    residuals[my_mask][i] -= MA
+
+
+    new_err = my_mask * theta[{1}][1] ** 2
+
+    model0 += mod
+    err20 += new_err
