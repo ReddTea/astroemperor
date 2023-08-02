@@ -7,6 +7,12 @@
 import numpy as np
 import astroemperor
 
+try:
+    from jupyterthemes import jtplot
+    jtplot.style(theme=jtplot.infer_theme(), ticks=True, grid=False, fscale=1.5)
+except:
+    print('jupyterthemes package not detected!')
+
 np.random.seed(1234)
 
 sim = astroemperor.Simulation()
@@ -27,13 +33,13 @@ sim.set_engine('reddemcee')
 sim.reddemcee_config['burnin'] = 'half'
 sim.reddemcee_config['thinby'] = 1
 setup = np.array([5, 200, 2000])  # ntemps, nwalkers, nsteps
-    
+
 
 sim.ModelSelection.set_criteria = 'BIC'  # default is BIC
 sim.ModelSelection.set_tolerance = 5
 
 # alt save location
-# sim.save_loc = '../otrafolder/'
+sim.save_loc = '../../../data2/ppena/reddresults/'
 
 # keplerian parameterisation
 # 0 is vanilla (phase)
@@ -41,7 +47,7 @@ sim.ModelSelection.set_tolerance = 5
 # 2 is with tp instead of vanilla
 # 3 is with tp and hou on ecc
 
-my_parameterisation = 0  
+my_parameterisation = 0
 
 # load data and add instrument names!
 sim.load_data('synth')
@@ -113,8 +119,8 @@ if True:
 # 2 multiprocess, 3 multiprocessing.ThreadPool
 # 4 pathos.ProcessingPool 5 schwimmbad SerialPool
 # 6 schwimmbad.JobLib, 7 schwimmbad.MultiPool
-sim.multiprocess_method = 1  
-
+sim.multiprocess_method = 1
+sim.cores__ = 30
 # Dynamics options
 sim.starmass = 0.3  # None or 0 for nothing done here
 sim.switch_dynamics = True  # turns on in-run amd-hill criteria

@@ -1,0 +1,27 @@
+    # Instrumental Part, ins03.model
+
+    my_mask = (my_data['Flag'] == {0})
+
+    mod = my_mask * theta[{1}][0]  # OFFSET
+
+    # STARACT Part
+
+    cornum_ins = cornums[{0}-1]
+    if cornum_ins:
+        theta_sa = theta[{1}][2:]
+        staract_locs = [5+j+np.sum(cornums[:{0}-1]) for j in range(cornum_ins)]
+
+        for j in range(cornum_ins):
+            staract_values = my_data[my_mask].iloc[:, int(staract_locs[j])].values
+            staract_normed_values = 2*(staract_values - min(staract_values)) / (max(staract_values) - min(staract_values)) - 1
+            #norm_values = staract_values - np.mean(staract_values)
+            #norm_values /= np.sum(norm_values)
+
+            mod[my_mask] += theta_sa[j] * staract_normed_values
+
+    new_err = my_mask * theta[{1}][1] ** 2
+
+    model0 += mod
+    err20 += new_err
+
+    # End Instrumental Part

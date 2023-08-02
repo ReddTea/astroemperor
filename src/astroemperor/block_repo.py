@@ -1,8 +1,8 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.3
-# date 14 nov 2022
+# version 0.7.8
+# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -115,11 +115,17 @@ def mk_InstrumentBlock(my_data, number=1, moav=0, sa=False):
                 pnames.append(f'MACoefficient {number} Order {j + 1}')
                 pnames.append(f'MATimescale {number} Order {j+1}')
 
+                punits.append(r'($\frac{m}{s}$)')
                 punits.append('(Days)')
             else:
                 pnames.extend((f'MACoefficient Order {j + 1}', f'MATimescale Order {j + 1}'))
+                punits.extend((r'($\frac{m}{s}$)', '(Days)'))
         math_display = f'{math_display} + 𝛴ᵢ𝛴ₘ 𝛷ₘ⋅exp((t₍ᵢ₋ₘ₎-tᵢ)/𝜏ₘ)⋅𝜀(t₍ᵢ₋ₘ₎)'
 
+    if sa != 0:
+        for si in range(sa):
+            pnames.append(f'Staract {number} {si}')
+            punits.append('')
     bdim = len(pnames)
 
     pvalues = [-np.inf for _ in range(bdim)]
@@ -161,11 +167,17 @@ def mk_InstrumentBlock(my_data, number=1, moav=0, sa=False):
             b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3], moav,
                                  my_data.values[:, 0], my_data.values[:, 4:],
                                  my_data.shape[1]-4])
-            b_script = None
+            b_script = 'ins02.model'
     else:
         insmod = Instrument_Model
         b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3]])
         b_script = 'ins00.model'
+        if sa:
+            ###
+            insmod = Instrument_Model_SA
+            b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3]])
+            b_script = 'ins03.model'
+            pass
 
     b_name = f'InstrumentalBlock {number}'
 
@@ -365,20 +377,22 @@ def SmartLimits(my_data, b, *args, **kwargs):
                                    ])
             '''
         if d['starmass']:
-            _extracted_from_SmartLimits_122(b, uni)
-        if not d['dynamics_already_included'] and d['kplan'] > 1:
-            d0 = {'name': 'Hill',
-                  'display_name': 'Dynamical Criteria',
-                  'prior': 'Hill',
-                  'limits':[None, None],
-                  'prargs':[d['kplan'], d['starmass']],
-                  'has_prior':True,
-                  'has_posterior':False,
-                  'unit':None,
-                  'fixed':None,
-                  }
-            d['dynamics_already_included'] = True
-            b.add_additional_parameters(d0)
+            sma_minmass_add_additional(b, uni)
+
+            if d['dynamics']:
+                if not d['dynamics_already_included'] and d['kplan'] > 1:
+                    d0 = {'name': 'Hill',
+                        'display_name': 'Dynamical Criteria',
+                        'prior': 'Hill',
+                        'limits':[None, None],
+                        'prargs':[d['kplan'], d['starmass']],
+                        'has_prior':True,
+                        'has_posterior':False,
+                        'unit':None,
+                        'fixed':None,
+                        }
+                    d['dynamics_already_included'] = True
+                    b.add_additional_parameters(d0)
         '''
             if d['dynamics']:
                 if d['kplan'] > 1 and b.number_ == d['kplan']:
@@ -387,7 +401,7 @@ def SmartLimits(my_data, b, *args, **kwargs):
                     b.dynamics_bool = True
                 else:
                     b.dynamics_bool = False
-            '''
+        '''
 
     elif b.type_ == 'Instrumental':
         jit_limits, jit_prargs = args
@@ -401,59 +415,22 @@ def SmartLimits(my_data, b, *args, **kwargs):
 
         if b.moav > 0:
             for _ in range(b.moav):
-                lims.extend(([0.5, 1], [15, 25]))
-                priors.extend((uni, uni))
-                prargs.extend((None, None))
-        '''
-            elif b.type_ == 'AdditionalPriors':
-                my_params = []
+                lims.append([0.0, 0.3])
+                lims.append([5, 25])
 
-                pnames = []
-                punits = []
-                pvalues = []
-                ppriors = []
-                plimits = []
+                priors.append(uni)
+                priors.append(uni)
 
-                ptypes = []
-                prargs = []
-                ptformargs = []
-                pfixed = []
-                psigma = []
-                if False:
-                    # All CVs go here!!!
-                    sig_limiter = my_data['RV'].std(ddof=0)
-                    per_limiter = my_data['BJD'].max() - my_data['BJD'].min()
-                    amp_limiter = sig_limiter * np.sqrt(3)
-                    angle_limits = [0, 2*np.pi]
+                prargs.append(None)
+                prargs.append(None)
 
-                    ecc_limits, ecc_prargs = d['prargs']
-                if True:
-                    #Hill goes here
-                    if d['dynamics']:
-                        if d['kplan'] > 1:
-                            prarg = [d['kplan'], d['starmass']]
+        if b.cornum > 0:
+            for _ in range(b.cornum):
+                lims.append([-1., 1.])
+                priors.append(uni)
+                prargs.append(None)
 
-                            pnames.append('Hill')
-                            ppriors.append('Hill')
-                            pvalues.append(None)
-                            plimits.append([None, None])
-                            punits.append(None)
-                            prargs.append(prarg)
-                            ptypes.append(None)
-                            ptformargs.append(None)
-                            pfixed.append(None)
-                            psigma.append(None)
 
-                bdim = len(pnames)
-                for i in range(bdim):
-                    d0 = {'name':pnames[i], 'prior':ppriors[i], 'value':pvalues[i],
-                              'limits':plimits[i], 'unit':punits[i], 'prargs':prargs[i],
-                              'type':ptypes[i], 'ptformargs':ptformargs[i], 'fixed':pfixed[i],
-                              'sigma':psigma[i]}
-                    my_params.append(Parameter(d0))
-                b.list_ = np.array(my_params)
-                return
-            '''
     elif b.type_ != 'Acceleration':
         print(f'type_ {b.type_} not recognised. \nSmartLimits failed')
 
@@ -463,7 +440,7 @@ def SmartLimits(my_data, b, *args, **kwargs):
 
 
 # TODO Rename this here and in `SmartLimits`
-def _extracted_from_SmartLimits_122(b, uni):
+def sma_minmass_add_additional(b, uni):
     pnames = ['Semi-Major Axis', 'Minimum Mass']
     pdisplay_names = [f'{x} {b.number_}' for x in pnames]
     ppriors = [uni, uni]

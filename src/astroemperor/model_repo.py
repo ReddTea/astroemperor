@@ -1,8 +1,8 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.3
-# date 14 nov 2022
+# version 0.7.8
+# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -196,6 +196,31 @@ def Instrument_Moav_SA_Model(theta, *args, **kwargs):
                     MA = macoef * np.exp(-dt / matime) * residuals[my_mask][i - 1 - c]
                     mod[my_mask][i] += MA
                     residuals[my_mask][i] -= MA
+
+    new_err = my_mask * theta[1] ** 2
+
+    return mod, new_err
+
+
+def Instrument_Model_SA(theta, *args, **kwargs):
+    # time and residuals should exclusively be the ones for this instrument
+    ins_no = args[0]
+    flags = args[1]
+    maorder = args[2]
+    time = args[3]
+
+    staracts = args[4]
+    cornum = args[5]
+
+    #print('in model 2', offset*[flags == ins_no])
+
+    my_mask = (flags == ins_no)
+    mod = theta[0] * my_mask  # OFFSET
+    #residuals = rv - mod
+
+    if cornum:
+        for j in range(cornum):
+            mod[my_mask] += theta[2 * (maorder + 1) + j] * staracts[j]
 
     new_err = my_mask * theta[1] ** 2
 

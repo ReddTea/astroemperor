@@ -1,9 +1,8 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
-# version 0.3
-# date 14 nov 2022
+# version 0.7.8
+# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -11,6 +10,7 @@
 # **DEB  : debugging needed in this part
 # **DEL  : DELETE AT SOME POINT
 # **FIN  : Finish this
+
 import numpy as np
 from .utils import flatten, cps, GM_Estimator, get_support
 
@@ -346,6 +346,11 @@ class ReddModel(object):
             tdims += b.ndim_
             ntdims += (len(b)-b.ndim_)
 
+        # updates nsai
+        self.cornums = []
+        for b in self:
+            if b.type_ == 'Instrumental':
+                self.cornums.append(b.cornum)
 
     def get_attr_param(self, call):
         return [b.get_attr(call) for b in self]
@@ -466,11 +471,5 @@ class my_stats():
             return 0
         else:
             return -np.inf
-
-
-
-
-
-
 
 #

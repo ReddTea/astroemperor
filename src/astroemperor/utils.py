@@ -1,8 +1,8 @@
-# @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/ /^\s*class/
+# @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.3
-# date 14 nov 2022
+# version 0.7.8
+# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -25,6 +25,73 @@ _ROOT = os.path.dirname(__file__)
 
 def get_support(path):
     return os.path.join(_ROOT, 'support', path)
+
+
+from functools import singledispatch
+import shutil
+
+class nuker(object):
+    def __init__(self, loc=''):
+        self._loc = loc
+        self._target_folder = ''
+        self._dr = ''
+        self.IamSure = False
+        self._nuclear = False
+
+    @property
+    def dr(self):
+        return self._dr
+
+    @dr.setter
+    def dr(self, val):
+        self._dr = val
+
+    @property
+    def loc(self):
+        return self._loc
+
+    @loc.setter
+    def loc(self, val: str):
+        self._loc = val
+
+
+    def aim(self, target):
+        if type(target) == str:
+            self._target_folder = target
+            self._dr = f'{self._loc}datalogs/{self._target_folder}/'
+            self._target_list = os.listdir(self._dr)
+
+        if type(target) == tuple:
+            holder = []
+            tmin, tmax = target[0], target[1] + 1
+            for i in range(tmin, tmax):
+                run_name = f'run_{i}'
+                if run_name in self._target_list:
+                    holder.append(run_name)
+            self._target_list = holder
+
+        if type(target) == bool and target:
+            self._dr = f'{self._loc}datalogs/'
+            self._nuclear = True
+            self._target_list = os.listdir(self._dr)
+
+        for x in self._target_list:
+            if x[0] == '.':
+                self._target_list.remove(x)
+
+
+    def nuke(self):
+        if not self.IamSure:
+            print('You are about to delete the following directories:\n')
+            for tg in self._target_list:
+                print(f'    - {self._dr}{tg}\n')
+            print('if you are really sure, set nuker.IamSure = True')
+        else:
+            if type(self._target_list) == str:
+                shutil.rmtree(self._dr)
+            if type(self._target_list) == list:
+                for tg in self._target_list:
+                    shutil.rmtree(f'{self._dr}{tg}')
 
 
 def fold(x, y, yerr=None, per=None):
@@ -171,7 +238,7 @@ def getExtremePoints(data, typeOfExtreme = None, maxPoints = None):
     # If we have maxpoints we want to make sure the timeseries has a cutpoint
     # in each segment, not all on a small interval
     if maxPoints is not None:
-        idx = idx[:maxPoints]
+        idx = idx[-maxPoints:]
         if len(idx) < maxPoints:
             return (np.arange(maxPoints) + 1) * (len(data)//(maxPoints + 1))
 
@@ -199,16 +266,23 @@ def ensure_dir(name, loc=''):
         dr = dr.split('_')[0] + '_' + str(aux)
 
     os.makedirs(dr)
-    os.makedirs(f'{dr}/histograms')
-    os.makedirs(f'{dr}/posteriors')
-    os.makedirs(f'{dr}/posteriors/GMEstimates')
-    os.makedirs(f'{dr}/likelihoods')
-    os.makedirs(f'{dr}/chains')
-    os.makedirs(f'{dr}/traces')
-    os.makedirs(f'{dr}/models')
-    os.makedirs(f'{dr}/models/uncertainpy')
-    os.makedirs(f'{dr}/models/temp')
+    os.makedirs(f'{dr}/plots')
+    os.makedirs(f'{dr}/plots/histograms')
+    os.makedirs(f'{dr}/plots/GMEstimates')
+    os.makedirs(f'{dr}/plots/traces')
+    os.makedirs(f'{dr}/plots/models')
+    os.makedirs(f'{dr}/plots/models/uncertainpy')
+
+    os.makedirs(f'{dr}/samples')
+    os.makedirs(f'{dr}/samples/posteriors')
+    os.makedirs(f'{dr}/samples/likelihoods')
+    os.makedirs(f'{dr}/samples/chains')
+
     os.makedirs(f'{dr}/temp')
+    os.makedirs(f'{dr}/temp/models')
+
+    os.makedirs(f'{dr}/restore')
+    os.makedirs(f'{dr}/restore/backends')
 
     return dr
 
@@ -303,6 +377,7 @@ class reddlog(object):
             self.terminal_width = os.get_terminal_size().columns
         except:
             self.terminal_width = pd.get_option('display.width')
+        self.baddies_list = ["\x1b[", '0m', '1m', '4m', '7m', '31m', '32m']
 
     def saveto(self, location):
         np.savetxt(f'{location}/log.dat', np.array([self.log]), fmt='%100s')
@@ -317,7 +392,11 @@ class reddlog(object):
         if attrs is None:
             attrs = []
         if save:
-            self.log += msg
+            msg0 = msg
+            for b in self.baddies_list:
+                msg0 = msg0.replace(b, '')
+
+            self.log += msg0
         if center:
             msg = msg.center(self.terminal_width)
         if c:
@@ -445,7 +524,7 @@ class DataWrapper(object):
         # identify and name SAI
         nsa = ncol - 3
         if nsa > 0:
-            names.extend(f'Staract {j}' for j in range(nsa))
+            names.extend(f'Staract {len(self.ndata)} {j}' for j in range(nsa))
         self.nsai.append(nsa)
 
         df = pd.DataFrame(data, columns=names)
@@ -453,8 +532,14 @@ class DataWrapper(object):
         # substract RV
         if abs(df.mean()['RV']) > 1e-6:
             df['RV'] -= df.mean()['RV']
+
+        for nam in names:
+            if nam[:3] == 'Sta':
+                if abs(df.mean()[nam]) > 1e-6:
+                    df[nam] -= df.mean()[nam]
+                    df[nam] = df[nam] / (df.max()[nam] - df.min()[nam])
         # create another column containing flags for the instrument
-        df['Flag'] = np.ones(ndat, int) * len(self.ndata)
+        df.insert(loc=3, column='Flag', value=np.ones(ndat, int) * len(self.ndata))
         self.data.append(df)
 
         return 'Reading data from {0}'.format(filename)
@@ -497,8 +582,6 @@ class ModelWrapper(object):
 
     def __call__(self, x):
         return self.func(x, *self.fargs, **self.fkwargs)
-
-
 
 
 #

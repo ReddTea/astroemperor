@@ -1,3 +1,5 @@
+    # Instrumental Part, ins00.model
+
     my_mask = (my_data['Flag'] == {0})
 
     mod = theta[{1}][0] * my_mask
@@ -6,3 +8,5 @@
 
     model0 += mod
     err20 += new_err
+
+    # End Instrumental Part

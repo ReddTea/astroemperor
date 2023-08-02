@@ -2,8 +2,8 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.3.0
-# date 29 nov 2022
+# version 0.7.8
+# date 1 aug 2023
 # sourcery skip
 
 # my coding convention
@@ -30,28 +30,36 @@ from reddcolors import Palette
 from .model_repo import *
 from .unmodel_repo import *
 from .block import ReddModel
-from .utils import fold_dataframe, nullify_output, flatten, get_support
+from .utils import fold_dataframe, nullify_output, flatten, get_support, getExtremePoints
 
 
 rc = Palette()
 
 
-def plot_GM_Estimator(estimator, saveloc='', fmt='png', sig_factor=4, fill_cor=0, plot_name='', plot_title=None, plot_ylabel=None):
+def plot_GM_Estimator(estimator, options=None):
     # sourcery skip: use-fstring-for-formatting
+    if options is None:
+        options = {}
+    if True:
+        saveloc = options['saveloc']
+        saveplace = saveloc + '/plots/GMEstimates/'
+
+        plot_fmt = options['format']  # 'png'
+        plot_nm = options['plot_name']  # ''
+        plot_title = options['plot_title']  # None
+        plot_ylabel = options['plot_ylabel'] # None
+        fill_cor = options['fill_cor']  # 0
+
+        sig_factor = options['sig_factor']
+
+        if plot_title is None:
+            plot_title = 'Optimal estimate with Gaussian Mixtures\n for '
+
+        if plot_ylabel is None:
+            plot_ylabel = 'Probability Density'
 
     cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
     colors = np.array([cor,cor,cor,cor,cor]).flatten()
-
-    if plot_title is None:
-        plot_title = 'Optimal estimate with Gaussian Mixtures\n for '
-
-    if plot_ylabel is None:
-        plot_ylabel = 'Probability Density'
-    ## COL
-    sig_factor = sig_factor
-    saveplace = saveloc + '/posteriors/GMEstimates/'
-    plot_fmt = fmt
-    plot_nm = plot_name
 
 
     n_components = estimator.n_components
@@ -76,12 +84,12 @@ def plot_GM_Estimator(estimator, saveloc='', fmt='png', sig_factor=4, fill_cor=0
         yy[i] = np.append(np.append(0, yy[i]), 0)
         ax.fill(xx[i], yy[i], c=colors[fill_cor], alpha=1/sig_factor, zorder=2*(i+1)-1)
 
+        vlines_kwargs = {'lw':[1.5, 1.5], 'ls':['--']}
         ax.vlines([xx[i][0], xx[i][-1]], ymin=[min(yy[i]), min(yy[i])],
                                          ymax=[yy[i][1], yy[i][-2]],
                                          colors=[rc.fg, rc.fg],
-                                         lw=[1.5, 1.5],
-                                         ls=['--'],
-                                         zorder=2*(i+1))
+                                         zorder=2*(i+1),
+                                         **vlines_kwargs)
 
         xticks.extend((xx[i][0], xx[i][-1]))
     ax.vlines(mu, ymin=[min(yy[0])],
@@ -125,8 +133,8 @@ def plot_GM_Estimator(estimator, saveloc='', fmt='png', sig_factor=4, fill_cor=0
     ax.set_xticks(xticks, minor=False)
     ax.set_yticks(yticks, minor=False)
     ax.legend(framealpha=0.)
-    ax.set_title(plot_title+'{}'.format(plot_nm))
-    ax.set_xlabel('{} [{}]'.format(plot_nm, estimator.unit))
+    ax.set_title(plot_title+'{}'.format(plot_nm[2:]))
+    ax.set_xlabel('{} {}'.format(plot_nm[2:], estimator.unit))
     ax.set_ylabel(plot_ylabel)
 
 
@@ -144,7 +152,7 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                       1:'Normalised Posterior',
                       2:'Density Interval',
                       3:'Corner Plot'}
-    saveplace = saveloc + '/traces/'
+    saveplace = saveloc + '/plots/traces/'
 
     cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
     colors_ = np.array([cor,cor,cor,cor,cor]).flatten()
@@ -170,10 +178,9 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                                     trace_kwargs={'color':rc.fg})
 
                         pl.subplots_adjust(hspace=0.60)
-                        savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], b.name_, fmt)
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
                         pl.savefig(savefigname)
 
-                # distr
                 elif trace_mode == 1:
                     for b in my_model:
                         for p in b[b.C_]:
@@ -188,9 +195,8 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                             #pl.ylabel('Probability Density')
                             pl.xlabel('Value')
 
-                            savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], p.name, fmt)
+                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {p.name}.{fmt}'
                             pl.savefig(savefigname)
-                # density intervals
                 elif trace_mode == 2:
                     for b in my_model:
                         axes = az.plot_density(
@@ -204,9 +210,8 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                         fig = axes.flatten()[0].get_figure()
                         fig.suptitle("94% High Density Intervals")
 
-                        savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], b.name_, fmt)
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
                         pl.savefig(savefigname)
-                # corner plot
                 elif trace_mode == 3:
                     ax = az.plot_pair(arviz_data,
                             kind=["scatter", "kde"],
@@ -220,7 +225,7 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                                                         'alpha':0.75},
                             )
 
-                    savefigname = saveplace+'{}.{}'.format(trace_mode_dic[trace_mode], fmt)
+                    savefigname = saveplace + f'{trace_mode_dic[trace_mode]}.{fmt}'
                     pl.savefig(savefigname)
 
             elif eng_name == 'dynesty':
@@ -236,10 +241,9 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                                                     trace_color=rc.fg,
                                                     labels=vnb,
                                                     dims=b.slice_true)
-                        savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], b.name_, fmt)
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
                         pl.savefig(savefigname)
-                # Normalised Posterior
-                elif trace_mode == 1:   
+                elif trace_mode == 1:
                     arviz_data = az.from_emcee(sampler=sampler,
                                                 var_names=vn)
 
@@ -250,9 +254,8 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
 
                             az.plot_dist(arviz_data.posterior[p.name].values)
 
-                            savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], p.name, fmt)
+                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {p.name}.{fmt}'
                             pl.savefig(savefigname)
-                # density intervals
                 elif trace_mode == 2:
                     arviz_data = az.from_emcee(sampler=sampler,
                                                 var_names=vn)
@@ -268,9 +271,8 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                         fig = axes.flatten()[0].get_figure()
                         fig.suptitle("94% High Density Intervals")
 
-                        savefigname = saveplace+'{} {}.{}'.format(trace_mode_dic[trace_mode], b.name_, fmt)
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
                         pl.savefig(savefigname)
-                # corner plot
                 elif trace_mode == 3:
                     arviz_data = az.from_emcee(sampler=sampler,
                                                 var_names=vn)
@@ -285,11 +287,11 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
                             point_estimate_marker_kwargs={'color':'red',
                                                         's':90},
                             )
-                    savefigname = saveplace+'{}.{}'.format(trace_mode_dic[trace_mode], fmt)
+                    savefigname = saveplace + f'{trace_mode_dic[trace_mode]}.{fmt}'
                     pl.savefig(savefigname)
 
             else:
-                print('Method is not yet implemented for {}'.format(eng_name))
+                print(f'Method is not yet implemented for {eng_name}')
                 return None
 
             pl.close('all')
@@ -297,12 +299,13 @@ def plot_traces(sampler, eng_name, my_model, saveloc='', trace_modes=None, fmt='
             print(f'Trace plot for {trace_mode_dic[trace_mode]} failed!')
 
 
-def plot_KeplerianModel(my_data, my_model, res, saveloc='', options=None):
+def plot_KeplerianModel(my_data, my_model, res, options=None):
     if options is None:
         options = {}
     if True:
-        saveplace = saveloc + '/models/'
-        unsaveplace = saveloc + '/models/uncertainpy/'
+        saveloc = options['saveloc']
+        saveplace = saveloc + '/plots/models/'
+        unsaveplace = saveloc + '/plots/models/uncertainpy/'
 
         plot_fmt = options['format']
         switch_histogram = options['hist']
@@ -311,9 +314,12 @@ def plot_KeplerianModel(my_data, my_model, res, saveloc='', options=None):
         logger_level = options['logger_level']
         gC = options['gC']
 
+        axhline_kwargs = {'color':'gray', 'linewidth':2}
+        errorbar_kwargs = {'marker':'o', 'ls':''}
 
         posterior_method = 'GM'
-        c = ['C0', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+        #c = ['C0', 'C1', 'C2', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+        c = ['C0', 'C1', 'C2', 'C4', 'C6', 'C7', 'C8', 'C9']
         colors = np.array([c,c,c,c,c]).flatten()
 
         temp_file_names = []
@@ -332,10 +338,10 @@ def plot_KeplerianModel(my_data, my_model, res, saveloc='', options=None):
         x = ReddModel(data_arg, blocks_arg)
         x.A_ = []
 
-        temp_script = 'temp_mod_0{}.py'.format(mod_number)
+        temp_script = f'temp_mod_0{mod_number}.py'
         temp_file_names.append(temp_script)
-        temp_mod_names.append('{}/temp/temp_model_{}{}.py'.format(saveloc, x.model_script_no, tail_x))
-        temp_dat_names.append('{}/temp/temp_data{}.csv'.format(saveloc, tail_x))
+        temp_mod_names.append(f'{saveloc}/temp/temp_model_{x.model_script_no}{tail_x}.py')
+        temp_dat_names.append(f'{saveloc}/temp/temp_data{tail_x}.csv')
 
         with open(temp_script, 'w') as f:
             f.write(open(get_support('init.scr')).read())
@@ -344,11 +350,13 @@ def plot_KeplerianModel(my_data, my_model, res, saveloc='', options=None):
 import kepler
 ''')
             # CONSTANTS
-            f.write('''
+            f.write(f'''
 nan = np.nan
 A_ = []
 mod_fixed_ = []
 gaussian_mixture_objects = dict()
+
+cornums = {my_model.cornums}
 ''')
 
             f.write(open(x.write_model_(loc=saveloc, tail=tail_x)).read())
@@ -360,8 +368,8 @@ gaussian_mixture_objects = dict()
         OGM = my_model
 
         # Block selection
-        DB_A = [b for b in OGM if b.display_on_data_==True]
-        NDB_A = [b for b in OGM if b.display_on_data_==False]
+        DB_A = [b for b in OGM if b.display_on_data_==True]  # Keplerians
+        NDB_A = [b for b in OGM if b.display_on_data_==False]  # Instrumental
 
         pbar_tot = 1 + len(DB_A)
 
@@ -386,16 +394,18 @@ gaussian_mixture_objects = dict()
         D['eRV'] = np.sqrt(D['eRV'].values**2 + ndferr.values)
 
         # get the residuals
+        D['residuals'] = D['RV'].values
+        if DB_A:
+            create_mod(D, DB_A, '_DM_A', 1)
 
-        create_mod(D, DB_A, '_DM_A', 1)
+            import temp_mod_01
+            DM_A_mod = reload(temp_mod_01).my_model
 
-        import temp_mod_01
-        DM_A_mod = reload(temp_mod_01).my_model
 
-        D['residuals'] = D['RV'].values - DM_A_mod(ajuste)[0]
+            D['residuals'] -= DM_A_mod(ajuste)[0]
 
-        # Here we are done. We have 3 different datasets
-        # display, og-no_display, continuous
+            # Here we are done. We have 3 different datasets
+            # display, og-no_display, continuous
 
     # FULL MODEL
     # this requires a subgrid, for plotting the residuals
@@ -415,9 +425,8 @@ gaussian_mixture_objects = dict()
                 axr = fig.add_subplot(gs[2, :], sharex=ax)
 
             pl.subplots_adjust(hspace=0)
-
-            ax.axhline(0, color='gray', linewidth=2)
-            axr.axhline(0, color='gray', linewidth=2)
+            ax.axhline(0, **axhline_kwargs)
+            axr.axhline(0, **axhline_kwargs)
 
             pl.subplots_adjust(wspace=0.15)
 
@@ -428,53 +437,55 @@ gaussian_mixture_objects = dict()
                     mask = D['Flag'] == b_ins.number_
                     if switch_errors:
                         ax.errorbar(D[mask]['BJD'], D[mask]['RV'], D[mask]['eRV'],
-                                c=colors[b_ins.number_-1], marker='o', label=b_ins.instrument_label,
-                                ls='')
+                                c=colors[b_ins.number_-1], label=b_ins.instrument_label,
+                                **errorbar_kwargs)
 
                         axr.errorbar(D[mask]['BJD'], D[mask]['residuals'], D[mask]['eRV'],
-                                c=colors[b_ins.number_-1], marker='o',
-                                ls='')
+                                c=colors[b_ins.number_-1],
+                                **errorbar_kwargs)
                     else:
                         ax.plot(D[mask]['BJD'], D[mask]['RV'],
                                 colors[b_ins.number_-1]+'o', label=b_ins.instrument_label)
 
                         axr.plot(D[mask]['BJD'], D[mask]['residuals'], colors[b_ins.number_-1]+'o')
+
         # We set unmodels for uncertainties
-        if True:
+        if len(DB_A):
             for b in DB_A:
                 if b.parameterisation == 0:
-                    kepmod = Keplerian_Model
+                    #kepmod = Keplerian_Model
                     unkepmod = unKeplerian_Model
                     un_model_name = "unKeplerian_Model"
                     chaos_names = ['Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude_Periastron']
                 if b.parameterisation == 1:
-                    kepmod = Keplerian_Model_1
+                    #kepmod = Keplerian_Model_1
                     unkepmod = unKeplerian_Model_1
                     un_model_name = "unKeplerian_Model_1"
                     chaos_names = ['lPeriod', 'Amp_sin', 'Amp_cos', 'Ecc_sin', 'Ecc_cos']
                 if b.parameterisation == 2:
-                    kepmod = Keplerian_Model_2
+                    #kepmod = Keplerian_Model_2
                     unkepmod = unKeplerian_Model_2
                     un_model_name = "unKeplerian_Model_2"
                     chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Eccentricity', 'Longitude_Periastron']
                 if b.parameterisation == 3:
-                    kepmod = Keplerian_Model_3
+                    #kepmod = Keplerian_Model_3
                     unkepmod = unKeplerian_Model_3
                     un_model_name = "unKeplerian_Model_3"
                     chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Ecc_sin', 'Ecc_cos']
 
         # Now we plot our line
-        DB_AC = deepcopy(DB_A)
+        if len(DB_A):
+            DB_AC = deepcopy(DB_A)
 
-        create_mod(DC, DB_AC, '_DM_AC', 2)
+            create_mod(DC, DB_AC, '_DM_AC', 2)
 
-        import temp_mod_02
-        DM_AC_mod = reload(temp_mod_02).my_model
+            import temp_mod_02
+            DM_AC_mod = reload(temp_mod_02).my_model
 
 
-        DC['RV'] = DM_AC_mod(ajuste)[0]
+            DC['RV'] = DM_AC_mod(ajuste)[0]
 
-        ax.plot(DC['BJD'], DC['RV'], color=rc.fg, ls='--')
+            ax.plot(DC['BJD'], DC['RV'], color=rc.fg, ls='--')
 
         if True and switch_histogram:
             nbins = 5
@@ -507,11 +518,11 @@ gaussian_mixture_objects = dict()
             ax.tick_params(axis="x", labelbottom=False)
 
             ax.set_title('Keplerian Model')
-            ax.set_ylabel(r'RVs $\frac{m}{s}$')
+            ax.set_ylabel(r'RVs ($\frac{m}{s}$)')
             ax.legend(fontsize=10)#, framealpha=0)
 
             axr.set_xlabel('BJD (days)')
-            axr.set_ylabel(r'Residuals $\frac{m}{s}$')
+            axr.set_ylabel(r'Residuals ($\frac{m}{s}$)')
 
             pl.savefig(saveplace+'{}.{}'.format('keplerian_model', plot_fmt),
                        bbox_inches='tight')
@@ -578,13 +589,15 @@ gaussian_mixture_objects = dict()
             for b_ins in NDB_A:
                 if b_ins.type_ == 'Instrumental':
                     mask = D_PF['Flag']==b_ins.number_
-                    
+
                     if switch_errors:
                         ax.errorbar(D_PF[mask]['BJD'], D_PF[mask]['RV_D'], yerr=D_PF[mask]['eRV'],
-                                    c=colors[b_ins.number_-1], marker='o', ls='', label=b_ins.instrument_label)
+                                    c=colors[b_ins.number_-1], label=b_ins.instrument_label,
+                                    **errorbar_kwargs)
 
                         axr.errorbar(D_PF[mask]['BJD'], D_PF[mask]['residuals'], yerr=D_PF[mask]['eRV'],
-                                c=colors[b_ins.number_-1], marker='o', ls='')
+                                c=colors[b_ins.number_-1],
+                                **errorbar_kwargs)
                     else:
                         ax.plot(D_PF[mask]['BJD'], D_PF[mask]['RV_D'],
                                 colors[b_ins.number_-1]+'o', label=b_ins.instrument_label)
@@ -683,7 +696,7 @@ gaussian_mixture_objects = dict()
                                             loc='upper right',
                                             framealpha=0.5)
 
-                        figs.savefig(saveplace+'sobol_{}.{}'.format(b.name_+name_tail, plot_fmt),
+                        figs.savefig(saveplace+f'sobol_{b.name_+name_tail}.{plot_fmt}',
                                    bbox_inches='tight')
                         pl.close(figs)
                 # Plot Histogram Model
@@ -724,11 +737,11 @@ gaussian_mixture_objects = dict()
                     ax.legend(fontsize=10)#, framealpha=0)
 
                     axr.set_xlabel('BJD (days)')
-                    axr.set_ylabel(r'Residuals $\frac{m}{s}$')
+                    axr.set_ylabel(r'Residuals ($\frac{m}{s}$)')
 
 
 
-            pl.savefig(saveplace+'{}.{}'.format(b.name_+name_tail, plot_fmt),
+            pl.savefig(saveplace+f'{b.name_+name_tail}.{plot_fmt}',
                        bbox_inches='tight')
 
             nb_ += 1
@@ -740,7 +753,7 @@ gaussian_mixture_objects = dict()
             if nb_ == len(DB_A):
                 pbar.close()
 
-    temp_file_folder = saveloc+'/models/temp/'
+    temp_file_folder = saveloc+'/temp/models/'
 
 
     with nullify_output():
@@ -765,11 +778,87 @@ gaussian_mixture_objects = dict()
     return chaos_thetas
 
 
+def plot_periodogram(my_data, options, tail_name=''):
+    from scipy.signal import lombscargle
+    if options is None:
+        options = {}
 
+    saveplace = options['saveloc'] + '/plots/'
+    plot_fmt = options['format']
+    x = my_data['BJD']
+    y = my_data['RV']
+    yerr = my_data['eRV']
 
+    # other params
+    Nfreq = 10000
+    periods = np.linspace(x.min(), x.max(), Nfreq)
+    ang_freqs = 2 * np.pi / periods
 
+    maxpoints = 5
+    ide = np.arange(maxpoints)+1
 
+    TITLE = 'Periodogram'
+    xaxis_label = 'Period (days)'
+    yaxis_label = 'Lomb-Scargle Power'
+    title_fontsize = 'large'
+    label_fontsize = 'medium'
+    line_style = '-'
+    line_color = rc.fg
+    hsize, vsize = 10, 8
+    dpi = 80
+    xlog = True
+    ylog = False
 
+    scatter_marker_style = 'o'
+    scatter_size = 40
+    scatter_color = '#FF0000'
+    scatter_alpha = 1
 
+    method = 0
+    t = np.ascontiguousarray(x.values)
+    mag = np.ascontiguousarray(y.values)
+    dmag = np.ascontiguousarray(yerr.values)
+
+    if method == 0:
+        power = lombscargle(t, mag - np.mean(mag), ang_freqs)
+        N = len(t)
+        power *= 2 / (N * np.std(mag) ** 2)
+
+    # Plot
+    fig, ax = pl.subplots(figsize=(hsize, vsize), dpi=dpi)
+    pl.title(TITLE, fontsize=title_fontsize)
+
+    idx = getExtremePoints(power, typeOfExtreme='max', maxPoints=maxpoints)
+
+    pl.plot(periods, power, ls=line_style, c=line_color)
+    # fap line
+
+    #ax.annotate('0.1% significance level', (3, 0.13))
+    #pl.plot(periods, np.ones_like(periods)*0.12, ls='--', c=line_color, alpha=0.5)
+
+    pl.scatter(periods[idx], power[idx],
+                marker=scatter_marker_style,
+                s=scatter_size, c=scatter_color,
+                alpha=scatter_alpha)
+
+    for i in idx:
+        ax.annotate(f' Max = {np.round(periods[i], 2)}', (periods[i]+10, power[i]))
+
+        ax.set_title(TITLE, fontsize=title_fontsize)
+        ax.set_xlabel(xaxis_label, fontsize=label_fontsize)
+        ax.set_ylabel(yaxis_label, fontsize=label_fontsize)
+
+        if xlog:
+            ax.set_xscale('log')
+        if ylog:
+            ax.set_yscale('log')
+
+    tabable = np.array([periods[idx][::-1], power[idx][::-1]])
+    taball = np.vstack([ide, tabable])
+    headers = ['Rank', 'Period', 'Power']
+
+    ax.table(cellText=taball.T, colLabels=headers, loc='top right')
+
+    pl.savefig(f'{saveplace}periodogram{tail_name}.{plot_fmt}')
 
 # blue verde rojo purp naran cyan brown blue green

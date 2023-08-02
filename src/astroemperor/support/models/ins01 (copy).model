@@ -1,4 +1,4 @@
-    # Instrumental Part, ins01.model
+    # Instrumental Part
 
     residuals = my_data['RV'] - model0
 
