@@ -1,7 +1,7 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.8.3
+# version 0.8.4
 # date 1 aug 2023
 
 # my coding convention

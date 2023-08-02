@@ -1,10 +1,10 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.8.3
+# version 0.8.5
 # date 1 aug 2023
 
-__version__ = '0.8.3'
+__version__ = '0.8.5'
 __name__ = 'astroemperor'
 __all__ = ['support']
 

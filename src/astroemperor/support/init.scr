@@ -4,4 +4,4 @@ import pickle
 import time
 import os
 
-from .utils import cps
+from astroemperor.utils import cps
