@@ -41,15 +41,15 @@ git clone https://github.com/ReddTea/astroEMPEROR.git
 
 
 # Easy Setup
-Download the tests folder and run python_file.py to make sure everything works!
+Download the tests folder and run emp_test.py to make sure everything works!
 
 ```sh
 ipython  # open python environment
-run python_file
+run emp_test
 ```
 or just
 ```sh
-python python_file.py
+python emp_test.py
 ```
 
 
@@ -63,13 +63,10 @@ import astroEMPEROR as emp
 import numpy as np
 
 sim = emp.Simulation()
-sim._set_engine__('emcee')
+sim.set_engine('emcee')
 setup = np.array([3, 50, 500])
-sim._data__('GJ876')  # Target folder name in /datafiles/
-sim._run_auto__(setup, 2, param=0, acc=1, moav=0)
-
-sim.save_chain([0])  # to save more chains, [0, 1, 2, ...]
-sim.save_posteriors([0])
+sim.load_data('51Peg')  # Target folder name in /datafiles/
+sim.run_auto(setup, k_start=0, k_end=2)
 
 ```
 
@@ -86,23 +83,27 @@ You will see chain plots, posterior plots, histograms, phasefolded curves, the c
   - Quite Flexible!
 
 # List of Commands
-I'll update this soon, promise.
+I'll update this soon, promise, in the meanwhile, there is a reference guide at the bottom. See the example file for the know-how.
 
 ## Autorun
 ```sh
-_run_auto__(setup, up_to_k, param=int, acc=int, moav=int)
+run_auto(setup, k_start=2, k_end=2, parameterisation=int, moav=int, accel=int)
 ```
 
 setup: Sets the number of temperatures, walkers and steps you will use, respectively
 
 up_to_k: Up to the k-th keplerian signal
 
-param: Sets the parameterisation to use for the keplerian model.
+parameterisation: Sets the parameterisation to use for the keplerian model.
 
-param = 0 sets the vanilla configuration, with [period, amplitude, phase, eccentricity and longitude of periastron (w)].
-param = 1 uses the Hou parameterisation, as seen on Sec. 2 in https://arxiv.org/pdf/1104.2612.pdf
-param = 2 uses the time of inferior conjunction instead of phase. [period, amplitude, t0, eccentricity, w]
-param = 3 uses both the time of inferior conjuction and Hou's parameterisation [per, amp, t0, sqrt(e)sin(w), sqrt(e)cos(w)]
+
+| parameterisation = | Description                                                                                                                          | Parameters                                                            |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| 0                  | Sets the vanilla configuration.                                                                                                      | period, amplitude, phase, eccentricity and longitude of periastron    |
+| 1                  | Sets the Hou parameterisation, as seen on Sec. 2 in https://arxiv.org/pdf/1104.2612.pdf                                              | period, A_s, A_c, e_s, e_c                                            |
+| 2                  | Uses the time of inferior conjunction instead of phase                                                                               | period, amplitude, t0, eccentricity, w                                |
+| 3                  | Uses both the time of inferior conjuction and Hou's parameterisation                                                                 | per, amp, t0, e_s, e_c                                                |
+
 
 acc: Sets the acceleration order. 0 for no acceleration, 1 for linear acceleration, 2 for linear plus quadratic...
 
@@ -110,42 +111,44 @@ moav: Sets the moving average order.
 
 ## conditions
 ```sh
-.conds.append([param_name, attribute, value])
+.add_condition([param_name, attribute, value])
 ```
 
 This modifies the corresponding parameter. It's equivalent to do in the proper part of the run:
 Parameter[param_name].attribute = value
 
 param_name: str with the name of the parameter.
+
 attribute: str with the name of any attribute of the Parameter object.
+
 value: The value you want to change it to.
 
 ## Others
 
 
-| Command           | Action                                                                                                                                                 | Input Type  | Default                                        |
-|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|------------------------------------------------|
-| Setup             | Sets the number of temperatures, walkers and steps you will use, respectively                                                                          | Array       | Input by user                                  |
-| cores__           | Sets the number of threads you are using.                                                                                                              | Int         | Default is maximum! **Let's up the tempo.**    |
-| *burn_out         | Deprecated! The steps for the burn-in phase.                                                                                                           | Int         | Default is half the steps for the chainlength. |
-| switch_constrain  | Constrains the search according to the results of the previous analyzed model.                                                                         | Boolean     | Default is False (True is recommended)         |
-| switch_staract    | Adds the star activity model, as linear correlations.                                                                                                  | Boolean     | Default is False (True is recommended)         |
-| *thin             | Deprecated. Thins the chain.                                                                                                                           | Int         | 1                                              |
-| betas             | Sets the beta factor for each temperature.                                                                                                             | Array       | None (inputs [1/sqrt{2}^i for i in ntemps])    |
-| Statistical Tools |                                                                                                                                                        |             |                                                |
-| bayes_factor      | Changes the in-chain comparison factor.                                                                                                                | float       | np.log(10000)                                  |
-| *model_comparison | Deprecated. Changes the posterior comparison between models with k signals, when this doesn't comply emperor stops running.                            | float       | 5.0                                            |
-| BIC               | This is the BIC used to compare models. Default is 5.                                                                                                  | float       | 5.0                                            |
-| AIC               | This is the AIC used to compare models. Default is 5.                                                                                                  | float       | 5.0                                            |
-| Model             |                                                                                                                                                        |             |                                                |
-| *MOAV             | Deprecated. Sets the Moving Average Order for the rednoise model (can be 0).                                                                           | Int         | 1                                              |
-| eccentricity_prargs | Sets the mean and sigma for the Prior Normal Distribution for eccentricity.                                                                                   | float       | [0, 0.1]                                       |
-| jitter_prargs     | Sets the mean and sigma for the Prior Normal Distribution for jitter.                                                                                           | float       | [5, 5]                                         |
-| starmass          | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           | float/False | False                                          |
-| *HILL             | Deprecated. Enables the fact that the Hill Stability Criteria has to comply as a prior (requires STARMASS)                                             | boolean     | False                                          |
-| Plotting          |                                                                                                                                                        |             |                                                |
-| plot_show         | Displays plots after run.                                                                                                                              | boolean     | False                                          |
-| plot_save         | Saves plots after run.                                                                                                                                 | boolean     | False                                          |
-| *CORNER           | Deprecated. Enables Corner plot.                                                                                                                       | boolean     | True                                           |
-| *HISTOGRAMS       | Deprecated. Enables Beautiful Histograms for the keplerian parameters.                                                                                 | boolean     | True                                           |
-| plot_fmt          | Choose the plotting format.                                                                                                                            | str         | 'png'                                          |
+| Command              | Action                                                                                                                                                 | Input Type  | Default                                        |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|------------------------------------------------|
+| set_engine           | Sets the sampling engine.                                                                                                                              | str         | Input by user                                  |
+| setup                | Sets the number of temperatures, walkers and steps you will use, respectively for MCMC runs.                                                           | Array       | Input by user                                  |
+| load_data            | Loads data from the read directory from the folder with this name.                                                                                     | str         | Input by user                                  |
+| switch_constrain     | Sets priors to the search according to the posterior of the previous run.                                                                              | Boolean     | Default is False (True is recommended)         |
+| constrain_method     | Method for the prior model. Gaussian Mixtures is default.                                                                                              | Str         | 'GM'                                           |
+| constrain_sigma      | Number of standard deviations used for the constrain if method is 'sigma'.                                                                             | Int         | 1                                              |
+| switch_SA            | Adds the star activity model, as linear correlations.                                                                                                  | Boolean     | Default is False                               |
+| ModelSelection       |                                                                                                                                                        |             |                                                |
+| set_criteria         | Selects the model comparison criteria that is being used.                                                                                              | str         | 'BIC'                                          |
+| set_tolerance        | Sets the tolerance for the criteria.                                                                                                                   | float       | 5.0                                            |
+| update()             | Pushes the changes for the model selection criteria.                                                                                                   | None        |                                                |
+| Utils                |                                                                                                                                                        |             |                                                |
+| read_loc             | Changes the load root folder.                                                                                                                          | str         | ''                                             |
+| save_loc             | Changes the save folder.                                                                                                                               | str         | ''                                             |
+| instrument_names     | Changes the names of the instruments for all prints and plots                                                                                          | list        | Filenames                                      |
+| debug_mode           | Adds some extra logging info.                                                                                                                          | Boolean     | False                                          |
+| Multiprocessing      |                                                                                                                                                        |             |                                                |
+| multiprocess_method  | Sets the multiprocessing method from 7 available options                                                                                               | str         | 1                                              |
+| cores__              | Sets the number of threads you are using.                                                                                                              | Int         | Default is maximum! **Let's up the tempo.**    |
+| Dynamics             |                                                                                                                                                        |             |                                                |
+| starmass             | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           | float/False | False                                          |
+| Plots                |                                                                                                                                                        |             |                                                |
+| save_plots_fmt       | Format for the plot outputs.                                                                                                                           | str         | 'pdf'                                          |
+
