@@ -15,3 +15,5 @@ reddemcee.egg-info
 
 # Ignore Private files
 Private
+
+temp*
