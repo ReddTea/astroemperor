@@ -4,6 +4,7 @@ PyAstronomy
 gatspy
 ipywidgets
 tabulate
+termcolor
 reddutils
 kepler.py
 emcee

@@ -17,3 +17,5 @@ reddemcee.egg-info
 Private
 
 temp*
+
+*.pyc
