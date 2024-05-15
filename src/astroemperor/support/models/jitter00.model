@@ -1,0 +1,5 @@
+    # Instrumental Part, jitter00.model
+    
+    err20 += mask{0} * theta[{1}][{0}-1] ** 2
+
+    # End jitter00.model

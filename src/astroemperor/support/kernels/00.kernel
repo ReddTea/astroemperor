@@ -1,0 +1,19 @@
+# START celerite2 GP, 00.kernel
+
+{0}
+gp_ = celerite2.GaussianProcess(kernel, mean=Y_)
+gp_.compute(X_, yerr=YERR_)
+
+def my_model(theta):
+    for a in A_:
+            theta = np.insert(theta, a, mod_fixed_[a])
+
+    model, err2 = my_model_support(theta)
+    gp_.mean = model
+    theta_gp = theta[{2}]
+{1}
+
+    gp_.compute(X_, diag=err2, quiet=True)
+
+    return gp_.predict(Y_, t=X_), err2
+

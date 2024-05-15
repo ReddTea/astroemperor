@@ -1,8 +1,6 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.8.4
-# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -33,43 +31,24 @@ class Parameter(object):
 
 
 class Parameter_Block(object):
-    def __init__(self, params, block_model=None, block_name=None, block_type=None, model_script='', display=True, math_display='', is_iterative=False, parameterisation=None, number=0, moav=0):
+    def __init__(self, params, attributes_dict: dict):
+        for attr in attributes_dict:
+            setattr(self, attr, attributes_dict[attr])
+
         self.list_ = np.array(params)
         self.ndim_ = len(self.list_)
 
-        self.model = block_model
-        self.name_ = block_name
-        self.type_ = block_type
-        self.display_on_data_ = display
-        self.number_ = number
-        self.bnumber_ = 0
-        self.is_iterative_ = is_iterative
-        self.slice = slice(None)
-        self.additional_priors = []
-        self.additional_priors_bool = False
-        self.dynamics_bool = False
-        self.model_script = model_script
-
-        self.additional_parameters = []
-
         self.int1 = 1
-        self.moav = moav
-        self.bool1 = 1
-        self.bool2 = 1
+        self.int2 = 1
+        self.bool1 = True
+        self.bool2 = True
 
-        self.C_ = []
-        self.A_ = []
-
-        self.gC_ = []
-        self.gA_ = []
-
-        empty_lists = ['extra_args', 'A_', 'C_', 'additional_priors']
+        empty_lists = ['extra_args', 'additional_priors', 'additional_parameters',
+                       'A_', 'C_', 'gC_', 'gA_']
 
         for attribute in empty_lists:
             setattr(self, attribute, [])
 
-        self.parameterisation = parameterisation
-        self.math_display_ = math_display
 
         self.b_fixed = self.get_attr('fixed')
         self.notfixed_bool_mask = [f is None for f in self.b_fixed]
@@ -137,6 +116,7 @@ class Parameter_Block(object):
         self.ndim_ = ndim
 
 
+    '''
     def calc_priors(self, theta):
         lp = 0.
         for i in range(len(self)):
@@ -164,7 +144,7 @@ class Parameter_Block(object):
                     return lp
 
         return lp
-
+    '''
 
     def get_PAE(self, theta, kplanets):
         ndim = len(self)
@@ -209,9 +189,9 @@ class ReddModel(object):
         self.bloques = bloques
         self.data = data
 
-        self.x = data['BJD'].values
-        self.y = data['RV'].values
-        self.yerr = data['eRV'].values
+        self.x = self.data['BJD'].values
+        self.y = self.data['RV'].values
+        self.yerr = self.data['eRV'].values
 
         self.bloques_model = []
         self.bloques_error = []
@@ -227,52 +207,8 @@ class ReddModel(object):
         #self.are_additional_priors = False
 
         self.model_script_no = 0
-
-
-    def evaluate_model(self, theta):
-        mod0 = np.zeros_like(self.y)
-        err20 = self.yerr ** 2
-
-        for a in self.A_:
-            theta = np.insert(theta, a, self.mod_fixed[a])
-
-        for b in self.bloques:
-            if b.moav:
-                b.model.fargs[4] = self.y - mod0
-
-            mod, ferr = b.model(theta[b.slice])
-            mod0 += mod
-            err20 += ferr
-
-        return mod0, err20  # returns model and errors ** 2
-
-
-    def evaluate_logprior(self, theta):
-        lp = 0.
-
-        for a in self.A_:
-            theta = np.insert(theta, a, self.mod_fixed[a])
-
-        for b in self:
-            lp += b.calc_priors(theta)
-            if lp == -np.inf:
-                return lp
-        return lp
-
-
-    def evaluate_ptform(self, theta, ptformargs):
-        for a in self.A_:
-            theta = np.insert(theta, a, self.mod_fixed[a])
-        x = np.array(theta)
-        for i in range(len(x)):
-            a, b = ptformargs[i]
-            x[i] =  a * (2. * x[i] - 1) + b
-        return x
-
-
-    def evaluate_loglikelihood(self, theta):
-        model, err2 = self.evaluate_model(theta)
-        return -0.5 * np.sum((self.y - model) ** 2 / err2 + np.log(err2)) + np.log(2*np.pi) * self.ndata
+        self.switch_plot = False
+        self.switch_AM = False
 
 
     def get_GMEstimates(self, chains):
@@ -301,9 +237,15 @@ class ReddModel(object):
             if b.type_ == 'Keplerian':
                 self.bloques_model.append(b)
                 self.kplan__ += 1
-            if b.type_ == 'Instrumental':
+            if b.type_ == 'Offset':
                 self.bloques_ins.append(b)
-                self.nins__ += 1
+                self.nins__ = b.number_
+            if b.type_ == 'StellarActivity':
+                self.bloques_ins.append(b)
+            if b.type_ == 'Acceleration':
+                self.bloques_ins.append(b)
+            if b.type_ == 'Jitter':
+                self.bloques_ins.append(b)
 
             b.refresh_block()
             b.slice = slice(nt, nt+len(b))
@@ -349,8 +291,9 @@ class ReddModel(object):
         # updates nsai
         self.cornums = []
         for b in self:
-            if b.type_ == 'Instrumental':
-                self.cornums.append(b.cornum)
+            if b.type_ == 'StellarActivity':
+                self.cornums = b.cornums
+
 
     def get_attr_param(self, call):
         return [b.get_attr(call) for b in self]
@@ -369,37 +312,169 @@ class ReddModel(object):
         self.data.to_csv(f'{saveloc}temp_data{tail}.csv')
 
         fname = f'{saveloc}/temp_model_{self.model_script_no}{tail}.py'
+
+        switch_GP = False
+        model_func_name = 'my_model'
+
+        for b in self:
+            if b.type_ == 'Celerite2':
+                switch_GP = True
+                model_func_name = 'my_model_support'
+                gp_slice = b.slice
+
+
         with open(fname, 'w') as f:
-            # data
+            # RV data
             f.write('''
+# BEGIN WRITE_MODEL FROM MODEL
 my_data = pd.read_csv('{}temp_data{}.csv')
 
 '''.format(saveloc, tail))
+            f.write(f'''
+X_ = my_data['BJD'].values
+Y_ = my_data['RV'].values
+YERR_ = my_data['eRV'].values
+ndat = len(X_)
+
+''')
+            # ASTROMETRY data
+            if self.switch_AM:
+                dw_am = self.data_wrapper['AM']
+                dw_am['df_gost'].to_csv(f'{saveloc}temp_am_data_gost.csv')
+                dw_am['df_hipgaia'].to_csv(f'{saveloc}temp_am_data_hipgaia.csv')
+                f.write(f'''
+# ASTROMETRY DATA
+df_gost = pd.read_csv('{saveloc}temp_am_data_gost.csv')
+df_hipgaia = pd.read_csv('{saveloc}temp_am_data_hipgaia.csv')
+
+RA_ = df_gost['RA'].values
+DEC_ = df_gost['DEC'].values
+gost_BJD = df_gost['BJD'].values
+gost_psi = df_gost['psi'].values
+gost_parf = df_gost['parf'].values
+gost_parx = df_gost['parx'].values
+
+gdr1_ref = {dw_am['gdr1_ref']}
+gdr2_ref = {dw_am['gdr2_ref']}
+gdr3_ref = {dw_am['gdr3_ref']}
+
+hipp_epoch = {dw_am['hipp_epoch']}
+gdr1_epoch = {dw_am['gdr1_epoch']}
+gdr2_epoch = {dw_am['gdr2_epoch']}
+gdr3_epoch = {dw_am['gdr3_epoch']}
+
+mask_hipp = (hipp_epoch <= gost_BJD) & (gost_BJD <= gdr1_epoch[0])
+mask_gdr1 = (gdr1_epoch[0] <= gost_BJD) & (gost_BJD <= gdr1_epoch[1])
+mask_gdr2 = (gdr2_epoch[0] <= gost_BJD) & (gost_BJD <= gdr2_epoch[1])
+mask_gdr3 = (gdr3_epoch[0] <= gost_BJD) & (gost_BJD <= gdr3_epoch[1])
+
+''')
+
+            # RV
+            if (np.array(self.get_attr_block('type_')) != 'Keplerian').any():
+                for n in range(self.nins__):
+                    f.write(f'''
+mask{n+1} = (my_data['Flag'] == {n+1}).values''')
+                    f.write(f'''
+ndat{n+1} = np.sum(mask{n+1})
+''')
 
             # model
-            f.write('''
-def my_model(theta):
+            if switch_GP:
+                f.write(f'''
+
+def {model_func_name}(theta):
+    model0 = np.zeros(ndat)
+    err20 = YERR_ ** 2
+
+''')
+            else:
+                f.write(f'''
+
+def {model_func_name}(theta):
     for a in A_:
         theta = np.insert(theta, a, mod_fixed_[a])
 
-    model0 = np.zeros_like(my_data['BJD'])
-    err20 = my_data['eRV'] ** 2
+    model0 = np.zeros(ndat)
+    err20 = YERR_ ** 2
 
 ''')
             for b in self:
                 if b.type_ == 'Keplerian':
                     f.write(open(get_support(f'models/{b.model_script}')).read().format(b.slice))
+
+                
                 elif b.type_ == 'Instrumental':
                     f.write(open(get_support(f'models/{b.model_script}')).read().format(b.ins_no,
                                                                b.slice,
                                                                b.moav))
+                
+
+                elif b.type_ == 'Offset':
+                    # offset
+                    for nin in range(self.nins__):
+                        f.write(open(get_support(f'models/{b.model_script}')).read().format(nin+1,
+                                                                b.slice))
+
+                elif b.type_ == 'StellarActivity':
+                    # sai
+                    for nin in range(self.nins__):
+                        f.write(open(get_support(f'models/{b.model_script}')).read().format(nin+1,
+                                                                b.slice))
+
                 elif b.type_ == 'Acceleration':
                     f.write(open(get_support(f'models/{b.model_script}')).read().format(b.slice))
+
+                elif b.type_ == 'MOAV':
+                    # moav
+                    f.write('''
+    # add residuals for moav
+    residuals = Y_ - model0
+
+''')
+                    if b.is_global:
+                        f.write(open(get_support(f'models/{b.model_script}')).read().format(nin+1,
+                                                                    b.slice, b.moav))
+
+                    else:
+                        for nin in range(self.nins__):
+                            f.write(open(get_support(f'models/{b.model_script}')).read().format(nin+1,
+                                                                    b.slice, b.moav))
+
+                elif b.type_ == 'Jitter':
+                    # jitter
+                    for nin in range(self.nins__):
+                        f.write(open(get_support(f'models/{b.model_script}')).read().format(nin+1,
+                                                                b.slice))
+
+
             f.write('''
     return model0, err20
 
 
 ''')
+            if switch_GP:
+                f.write('''
+
+''')
+                kernel_file0 = open('temp_kernel00', 'r')
+                kernel_string0 = kernel_file0.read()
+                kernel_file0.close()
+
+                kernel_file1 = open('temp_kernel01', 'r')
+                kernel_string1 = kernel_file1.read()
+                kernel_file1.close()
+
+
+                if self.switch_plot:
+                    f.write(open(get_support('kernels/00plot.kernel')).read())
+                else:
+                    f.write(open(get_support('kernels/00.kernel')).read().format(kernel_string0,
+                                                                                 kernel_string1,
+                                                                                 gp_slice))
+
+
+
         self.model_script_no += 1
         return fname
 

@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="astroemperor",
-    version="0.8.5",
+    version="0.8.8",
     author="ReddTea",
     author_email="redd@tea.com",
     description="PTMCMC sampler for exoplanet search",
@@ -25,7 +25,7 @@ setuptools.setup(
     #data_files=[(path1, [path1+'/exo_list.csv', path1+'/ss_list.csv'])],
     include_package_data=True,
     install_requires=['numpy', 'matplotlib>=3.5.1', 'PyAstronomy', 'gatspy',
-                      'ipywidgets', 'tabulate', 'reddutils', 'kepler.py',
+                      'ipywidgets', 'tabulate', 'termcolor', 'reddutils', 'kepler.py',
                       'emcee', 'arviz', 'corner', 'reddcolors',
                       'reddemcee'],
     python_requires=">=3.6",

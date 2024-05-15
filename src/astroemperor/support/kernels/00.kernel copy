@@ -1,0 +1,12 @@
+# START celerite2 GP, 00.kernel
+
+kernel = cterms.SHOTerm(S0=0.0, w0=1.0, Q=0.25)
+gp_ = celerite2.GaussianProcess(kernel, mean=Y_)
+gp_.compute(X_, yerr=YERR_)
+
+def my_model_gp(theta):
+    model, err2 = my_model(theta)
+    gp_.mean = model
+    gp_.compute(X_, diag=err2, quiet=True)
+    return gp_
+

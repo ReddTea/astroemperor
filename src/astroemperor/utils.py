@@ -1,8 +1,6 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.8.4
-# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -11,24 +9,22 @@
 # **DEL  : DELETE AT SOME POINT
 # **FIN  : Finish this
 
-import numpy as np
-import pandas as pd
-
-import sys, os
+import os
+import shutil
+import sys
 from contextlib import contextmanager
 
-from termcolor import colored
+import numpy as np
+import pandas as pd
 from sklearn.mixture import GaussianMixture
+from termcolor import colored
 
+from .globals import _OS_ROOT
 
-_ROOT = os.path.dirname(__file__)
 
 def get_support(path):
-    return os.path.join(_ROOT, 'support', path)
+    return os.path.join(_OS_ROOT, 'support', path)
 
-
-from functools import singledispatch
-import shutil
 
 class nuker(object):
     def __init__(self, loc=''):
@@ -92,6 +88,16 @@ class nuker(object):
             if type(self._target_list) == list:
                 for tg in self._target_list:
                     shutil.rmtree(f'{self._dr}{tg}')
+
+
+def sec_to_clock(seconds):
+    # Calculate hours, minutes, and seconds
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    remaining_seconds = int(seconds % 60)
+
+    # Format the result as hh:mm:ss
+    return f'{hours:02d}:{minutes:02d}:{remaining_seconds:02d}'
 
 
 def fold(x, y, yerr=None, per=None):
@@ -259,11 +265,17 @@ def plot_extreme(data, n=10):
     pl.show()
 
 
-def ensure_dir(name, loc=''):
-    dr = f'{loc}datalogs/{name}/run_1'
-    while os.path.exists(dr):
-        aux = int(dr.split('_')[-1]) + 1
-        dr = dr.split('_')[0] + '_' + str(aux)
+def ensure_dir(name, loc='', k=0, first=True):
+    dr0 = f'{loc}datalogs/{name}/run_1'
+    while os.path.exists(dr0):
+        aux = int(dr0.split('_')[-1]) + 1
+        dr0 = dr0.split('_')[0] + '_' + str(aux)
+    
+    if not first:
+        aux = int(dr0.split('_')[-1]) - 1
+        dr0 = dr0.split('_')[0] + '_' + str(aux)
+
+    dr = dr0 + f'/k{k}'
 
     os.makedirs(dr)
     os.makedirs(f'{dr}/plots')
@@ -272,7 +284,23 @@ def ensure_dir(name, loc=''):
     os.makedirs(f'{dr}/plots/traces')
     os.makedirs(f'{dr}/plots/models')
     os.makedirs(f'{dr}/plots/models/uncertainpy')
+    os.makedirs(f'{dr}/plots/posteriors')
+    os.makedirs(f'{dr}/plots/posteriors/scatter')
+    os.makedirs(f'{dr}/plots/posteriors/hexbin')
+    os.makedirs(f'{dr}/plots/posteriors/gaussian')
+    os.makedirs(f'{dr}/plots/posteriors/chains')
 
+    '''
+    os.makedirs(f'{dr}/maxlike/plots/models')
+    os.makedirs(f'{dr}/maxlike/plots/models/uncertainpy')
+    os.makedirs(f'{dr}/maxlike/plots/posteriors')
+    os.makedirs(f'{dr}/maxlike/plots/posteriors/scatter')
+    os.makedirs(f'{dr}/maxlike/plots/posteriors/hexs')
+    os.makedirs(f'{dr}/maxlike/plots/posteriors/gaussian')
+    os.makedirs(f'{dr}/maxlike/temp')
+    os.makedirs(f'{dr}/maxlike/temp/models')
+    '''
+    
     os.makedirs(f'{dr}/samples')
     os.makedirs(f'{dr}/samples/posteriors')
     os.makedirs(f'{dr}/samples/likelihoods')
@@ -329,6 +357,49 @@ def pos0_tested(setup, model_obj, max_repeats=100):
                     p0[t][n] = set_pos0(setup, model_obj)[t][n]
         repeat_number += 1
     return p0
+
+
+def parallel_func(func, foo, n_threads):
+    import multiprocessing as mp
+    pool = mp.Pool(processes=n_threads)
+    results = pool.map(func, foo)
+    pool.close()
+    pool.join()
+    return results
+
+
+def find_common_integer_sequence(numbers):
+    # Extract the integer part and convert to string
+    str_numbers = [str(int(number)) for number in numbers]
+
+    # Check the length of the shortest number to avoid index errors
+    min_length = min(len(num) for num in str_numbers)
+
+    # Find common sequence
+    common_sequence = ''
+    for i in range(min_length):
+        # Check if this character is the same in all numbers
+        if all(num[i] == str_numbers[0][i] for num in str_numbers):
+            common_sequence += str_numbers[0][i]
+        else:
+            break
+
+    # Convert the common sequence back to a number, filling with zeros
+    if common_sequence:
+        common_sequence = int(common_sequence + '0' * (len(str_numbers[0]) - len(common_sequence)))
+    else:
+        common_sequence = None
+
+    return common_sequence
+
+
+def find_confidence_intervals(sigma):
+    from scipy.stats import norm
+    if sigma <= 0:
+        raise ValueError('sigma must be greater than 0')
+    
+    p = np.diff(norm.cdf([-sigma, sigma]))[0]
+    return np.array([1-p, p]) * 100
 
 
 @contextmanager
@@ -494,23 +565,37 @@ class GM_Estimator:
             if sel_bic - comp_bic < self.BIC_Tolerance:
                 comp_bic = sel_bic
                 gm0 = gm
+            else:
+                break                
+
 
         self.gm_estimator = gm0
         return self.gm_estimator
 
 
-class DataWrapper(object):
+class DataWrapper1(object):
     def __init__(self, target_name, read_loc=''):
         self.target_name = target_name
         self.RV_PATH = f'{read_loc}datafiles/{self.target_name}/RV/'
+        self.AM_PATH = f'{read_loc}datafiles/{self.target_name}/AM/'
+        self.PM_PATH = f'{read_loc}datafiles/{self.target_name}/PM/'
 
-        empty_lists = ['ndata', 'ncols', 'nsai', 'data', 'RV_labels',
-                       'RV_sets', 'PM_sets']
-        for attribute in empty_lists:
+
+        RV_empty_lists = ['ndata', 'ncols', 'nsai', 'data', 'RV_labels',
+                          'RV_sets']
+        
+        for attribute in RV_empty_lists:
+            setattr(self, attribute, [])
+
+        AM_empty_lists = ['AM_labels','AM_sets',
+                          'df_gost', 'df_hipgaia', 'df_hip',
+                          ]
+
+        for attribute in AM_empty_lists:
             setattr(self, attribute, [])
 
 
-    def add_data__(self, filename):
+    def add_rv_data__(self, filename):
         data = np.loadtxt('{0}{1}'.format(self.RV_PATH, filename))
 
         ndat, ncol = data.shape
@@ -535,9 +620,11 @@ class DataWrapper(object):
 
         for nam in names:
             if nam[:3] == 'Sta':
-                if abs(df.mean()[nam]) > 1e-6:
-                    df[nam] -= df.mean()[nam]
-                    df[nam] = df[nam] / (df.max()[nam] - df.min()[nam])
+                #if abs(df.mean()[nam]) > 1e-6:
+                df[nam] -= df.mean()[nam]
+                df[nam] = (df[nam] - df.min()[nam]) /(df.max()[nam]-df.min()[nam]) * (df.max()['RV'] - df.min()['RV']) + df.min()['RV']
+                #df[nam] = df[nam] / (df.max()[nam] - df.min()[nam])
+
         # create another column containing flags for the instrument
         df.insert(loc=3, column='Flag', value=np.ones(ndat, int) * len(self.ndata))
         self.data.append(df)
@@ -546,18 +633,44 @@ class DataWrapper(object):
 
 
     def add_all__(self):
+        # rv
         my_files = list(np.sort(os.listdir(self.RV_PATH)))
         # mac os fix
         try:
             my_files.remove('.DS_Store')
         except:
             pass
-        x = ''.join('\n'+self.add_data__(file) for file in my_files)
+        x = ''.join('\n'+self.add_rv_data__(file) for file in my_files)
+
+        # am
+        self.AM_sets = list(np.sort(os.listdir(self.AM_PATH)))
+        if len(self.AM_sets) > 0:
+            for file in self.AM_sets:
+                identifier = file.split('_')[-1]
+                ff = self.AM_PATH+file
+
+                if identifier == 'gost.csv':
+                    self.df_gost = pd.read_csv(ff)
+
+                if identifier == 'hipgaia.hg123':
+                    self.df_hipgaia = pd.read_csv(ff, sep='\s+')
+
+                if identifier == 'hip2.abs':
+                    self.df_hip = pd.read_csv(ff, sep='\s+')
+
+                x = ''.join('\nReading data from {0}'.format(file))
+
+            self.make_readable()
+            self.get_epochs()
+
         return x+'\n'
 
 
     def get_data__(self, sortby='BJD'):
-        return pd.concat(self.data).sort_values(sortby)
+        asd = pd.concat(self.data).sort_values(sortby)
+        self.common_t = asd['BJD'].min()
+        asd['BJD'] -= self.common_t
+        return asd
 
 
     def get_metadata__(self):
@@ -568,6 +681,50 @@ class DataWrapper(object):
         holder = pd.concat(self.data).sort_values(sortby)
         x, y, yerr = holder.BJD, holder.RV, holder.eRV
         return [x, y, yerr]
+
+
+    def make_readable(self):
+        lists = ['df_gost', 'df_hipgaia', 'df_hip']
+
+        if len(self.df_gost) > 0:
+            A = 'ObservationTimeAtBarycentre[BarycentricJulianDateInTCB]'
+            B = 'scanAngle[rad]'
+            C = 'parallaxFactorAlongScan'
+            D = 'parallaxFactorAcrossScan'
+            column_mapping = {A: 'BJD',
+                              B: 'psi',
+                              C: 'parf',
+                              D: 'parx',
+                              }
+            self.df_gost = self.df_gost.rename(columns=column_mapping)
+
+
+    def get_epochs(self):
+        t = self.df_gost.BJD.values
+        self.hipp_epoch = self.time_all_2jd(1991.25, fmt='decimalyear')  # 2448348.75
+
+        self.gdr1_ref = 2457023.5  # self.time_all_2jd(2015, fmt='decimalyear')  # 2457023.5
+        self.gdr2_ref = 2457206  # self.time_all_2jd(2015.5, fmt='decimalyear')  # 2457206 hardcode?
+        self.gdr3_ref = 2457388.5  # self.time_all_2jd(2016, fmt='decimalyear')  # 2457388.5
+
+        self.gdr1_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2015-09-16 16:00:00')]
+        self.gdr2_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2016-05-23 11:35:00')]
+        self.gdr3_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2017-05-28 08:44:00')]
+
+        self.mask_hipp = (self.hipp_epoch <= t) & (t <= self.gdr1_epoch[0])
+        self.mask_gdr1 = (self.gdr1_epoch[0] <= t) & (t<= self.gdr1_epoch[1])
+        self.mask_gdr2 = (self.gdr2_epoch[0] <= t) & (t<= self.gdr2_epoch[1])
+        self.mask_gdr3 = (self.gdr3_epoch[0] <= t) & (t<= self.gdr3_epoch[1])
+
+        self.iref = self.hipp_epoch
+
+
+    def time_all_2jd(self, time_str, fmt='iso'):
+        t = AstroTime(time_str, format=fmt)
+        return t.to_value('jd')
 
 
 class ModelWrapper(object):
@@ -584,4 +741,473 @@ class ModelWrapper(object):
         return self.func(x, *self.fargs, **self.fkwargs)
 
 
-#
+from astropy.time import Time as AstroTime
+
+class SDataWrapper(object):
+    def __init__(self, target_name, read_loc=''):
+        self.target_name = target_name
+        self.modes = {'RV':{'PATH':f'{read_loc}datafiles/{self.target_name}/RV/',
+                            },
+                      'PM':{'PATH':f'{read_loc}datafiles/{self.target_name}/PM/',
+                            },
+                      'AM':{'PATH':f'{read_loc}datafiles/{self.target_name}/AM/',
+                            },
+                      }
+
+
+        RV_empty_lists = ['ndata', 'ncols', 'nsai', 'data', 'RV_labels',
+                          'RV_sets']
+        
+        PM_empty_lists = []
+
+        AM_empty_lists = ['AM_labels','AM_sets',
+                          'df_gost', 'df_hipgaia', 'df_hip',
+                          ]
+
+
+
+        for attribute in RV_empty_lists:
+            setattr(self, attribute, [])
+
+        for attribute in AM_empty_lists:
+            setattr(self, attribute, [])
+
+
+    def activate_modes(self):
+        for p in self:
+            if os.path.exists(p):
+                filenames = list(np.sort(os.listdir(p)))
+                if filenames > 0:
+                    pass
+
+    def add_rv_data__(self, filename):
+        data = np.loadtxt('{0}{1}'.format(self.RV_PATH, filename))
+
+        ndat, ncol = data.shape
+
+        self.ndata.append(ndat)
+        self.ncols.append(ncol)
+        self.RV_labels.append(filename)
+
+        names = ['BJD', 'RV', 'eRV']
+
+        # identify and name SAI
+        nsa = ncol - 3
+        if nsa > 0:
+            names.extend(f'Staract {len(self.ndata)} {j}' for j in range(nsa))
+        self.nsai.append(nsa)
+
+        df = pd.DataFrame(data, columns=names)
+
+        # substract RV
+        if abs(df.mean()['RV']) > 1e-6:
+            df['RV'] -= df.mean()['RV']
+
+        for nam in names:
+            if nam[:3] == 'Sta':
+                #if abs(df.mean()[nam]) > 1e-6:
+                df[nam] -= df.mean()[nam]
+                df[nam] = (df[nam] - df.min()[nam]) /(df.max()[nam]-df.min()[nam]) * (df.max()['RV'] - df.min()['RV']) + df.min()['RV']
+                #df[nam] = df[nam] / (df.max()[nam] - df.min()[nam])
+
+        # create another column containing flags for the instrument
+        df.insert(loc=3, column='Flag', value=np.ones(ndat, int) * len(self.ndata))
+        self.data.append(df)
+
+        return 'Reading data from {0}'.format(filename)
+
+
+    def add_all__(self):
+        # rv
+        my_files = list(np.sort(os.listdir(self.RV_PATH)))
+        # mac os fix
+        try:
+            my_files.remove('.DS_Store')
+        except:
+            pass
+        x = ''.join('\n'+self.add_rv_data__(file) for file in my_files)
+
+        # am
+        self.AM_sets = list(np.sort(os.listdir(self.AM_PATH)))
+        if len(self.AM_sets) > 0:
+            for file in self.AM_sets:
+                identifier = file.split('_')[-1]
+                ff = self.AM_PATH+file
+
+                if identifier == 'gost.csv':
+                    self.df_gost = pd.read_csv(ff)
+
+                if identifier == 'hipgaia.hg123':
+                    self.df_hipgaia = pd.read_csv(ff, sep='\s+')
+
+                if identifier == 'hip2.abs':
+                    self.df_hip = pd.read_csv(ff, sep='\s+')
+
+                x = ''.join('\nReading data from {0}'.format(file))
+
+            self.make_readable()
+            self.get_epochs()
+
+        return x+'\n'
+
+
+    def get_data__(self, sortby='BJD'):
+        asd = pd.concat(self.data).sort_values(sortby)
+        self.common_t = asd['BJD'].min()
+        asd['BJD'] -= self.common_t
+        return asd
+
+
+    def get_metadata__(self):
+        return [getattr(self, attribute) for attribute in ['ndata', 'ncols', 'nsai', 'RV_labels']]
+
+
+    def get_data_raw(self, sortby):
+        holder = pd.concat(self.data).sort_values(sortby)
+        x, y, yerr = holder.BJD, holder.RV, holder.eRV
+        return [x, y, yerr]
+
+
+    def make_readable(self):
+        lists = ['df_gost', 'df_hipgaia', 'df_hip']
+
+        if len(self.df_gost) > 0:
+            A = 'ObservationTimeAtBarycentre[BarycentricJulianDateInTCB]'
+            B = 'scanAngle[rad]'
+            C = 'parallaxFactorAlongScan'
+            D = 'parallaxFactorAcrossScan'
+            column_mapping = {A: 'BJD',
+                              B: 'psi',
+                              C: 'parf',
+                              D: 'parx',
+                              }
+            self.df_gost = self.df_gost.rename(columns=column_mapping)
+
+
+    def get_epochs(self):
+        t = self.df_gost.BJD.values
+        self.hipp_epoch = self.time_all_2jd(1991.25, fmt='decimalyear')  # 2448348.75
+
+        self.gdr1_ref = 2457023.5  # self.time_all_2jd(2015, fmt='decimalyear')  # 2457023.5
+        self.gdr2_ref = 2457206  # self.time_all_2jd(2015.5, fmt='decimalyear')  # 2457206 hardcode?
+        self.gdr3_ref = 2457388.5  # self.time_all_2jd(2016, fmt='decimalyear')  # 2457388.5
+
+        self.gdr1_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2015-09-16 16:00:00')]
+        self.gdr2_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2016-05-23 11:35:00')]
+        self.gdr3_epoch = [self.time_all_2jd('2014-07-25 10:30:00'),
+                           self.time_all_2jd('2017-05-28 08:44:00')]
+
+        self.mask_hipp = (self.hipp_epoch <= t) & (t <= self.gdr1_epoch[0])
+        self.mask_gdr1 = (self.gdr1_epoch[0] <= t) & (t<= self.gdr1_epoch[1])
+        self.mask_gdr2 = (self.gdr2_epoch[0] <= t) & (t<= self.gdr2_epoch[1])
+        self.mask_gdr3 = (self.gdr3_epoch[0] <= t) & (t<= self.gdr3_epoch[1])
+
+        self.iref = self.hipp_epoch
+
+
+    def time_all_2jd(self, time_str, fmt='iso'):
+        t = AstroTime(time_str, format=fmt)
+        return t.to_value('jd')
+
+
+    def __repr__(self):
+        return self.modes
+
+
+    def __getitem__(self, string):
+        return self.modes[string]
+
+'''
+amd = AMDataWrapper(sim.starname)
+amd.AM_PATH
+amd.filenames
+
+amd = AMDataWrapper(sim.starname)
+amd.AM_PATH
+
+'''
+
+#################
+
+'''
+
+from datetime import datetime
+import math
+
+def time_cal2jd(yr, mn, dy):
+    """
+    Convert Gregorian Calendar date to Julian Date.
+    
+    Input:
+        cal - Calendar date with day fraction in the format [year, month, day_fraction].
+    
+    Output:
+        JD - 2-part Julian Date.
+    """
+    y = yr
+    m = mn
+    
+    # Adjust months for dates in Jan/Feb
+    ind = mn <= 2
+    y[ind] -= 1
+    m[ind] += 12
+    
+    # Julian and Gregorian calendar switch dates
+    date1 = 4.5 + 31 * (10 + 12 * 1582)  # Last day of Julian calendar (1582.10.04 Noon)
+    date2 = 15.5 + 31 * (10 + 12 * 1582)  # First day of Gregorian calendar (1582.10.15 Noon)
+    
+    date = dy + 31 * (mn + 12 * yr)
+    
+    # Identify dates before and after the switch
+    ind1 = date <= date1
+    ind2 = date >= date2
+    
+    b = np.copy(y)
+    b[ind1] = -2
+    b[ind2] = np.trunc(y[ind2] / 400) - np.trunc(y[ind2] / 100)
+    
+    if not ind1.any() and not ind2.any():
+        print('Dates between October 5 & 15, 1582 do not exist!')
+    
+    # Compute Julian Date
+    jd = np.copy(y)
+    jd[y > 0] = (np.trunc(365.25 * y[y > 0]) +
+                 np.trunc(30.6001 * (m[y > 0] + 1)) +
+                 b[y > 0] + 1720996.5 + dy[y > 0])
+    
+    jd[y < 0] = (np.trunc(365.25 * y[y < 0] - 0.75) +
+                 np.trunc(30.6001 * (m[y < 0] + 1)) +
+                 b[y < 0] + 1720996.5 + dy[y < 0])
+    
+    # Return 2-part Julian Date
+    return np.vstack((jd // 1, jd % 1)).T
+
+
+def doy_to_jd(year, doy):
+    # Convert Day of Year to Julian Date for a given year
+    date = datetime(year, 1, 1) + timedelta(days=doy - 1)
+    return cal_to_jd(date.year, date.month, date.day)
+
+def time_yr2jd(yr):
+    iyr = math.floor(yr)
+    jd0 = cal_to_jd(iyr, 1, 1)
+    days = cal_to_jd(iyr + 1, 1, 1) - jd0
+    doy = (yr - iyr) * days + 1
+    return doy_to_jd(iyr, doy)
+
+def deg_to_mas(o1, o2):
+    do = o2 - o1 
+    do = do * 3.6e6
+    do = do * np.cos(o2*np.pi/180)
+    return do
+
+'''
+
+class DataWrapper(object):
+    def __init__(self, target_name, read_loc=''):
+        self.target_name = target_name
+        self.modes = {'RV':{'PATH':f'{read_loc}datafiles/{self.target_name}/RV/',
+                            'KEY':'RV',
+                            },
+                      'PM':{'PATH':f'{read_loc}datafiles/{self.target_name}/PM/',
+                            'KEY':'PM',
+                            },
+                      'AM':{'PATH':f'{read_loc}datafiles/{self.target_name}/AM/',
+                            'KEY':'AM',
+                            },
+                      }   
+
+        self.RV_empty_lists = ['ndata', 'ncols', 'nsai', 'data', 'RV_labels',
+                               'RV_sets']
+        
+        self.PM_empty_lists = []
+
+        self.AM_empty_lists = ['AM_labels','AM_sets',
+                               'df_gost', 'df_hipgaia', 'df_hip',
+                               ]
+
+        self.activate()
+
+
+    def activate(self):
+        for m in self:
+            p = m['PATH']
+            m['use'] = False
+            if os.path.exists(p):
+                # macos fix
+                filenames = [fn for fn in sorted(os.listdir(p)) if fn != '.DS_Store']
+
+                if len(filenames) > 0:
+                    m['use'] = True
+                    m['filenames'] = filenames
+                    for attribute in getattr(self, f"{m['KEY']}_empty_lists"):
+                        m[attribute] = []
+
+        for m in self:
+            if m['use']:
+                m['logger_msg'] = getattr(self, f"mk_{m['KEY']}")()
+        
+
+    def mk_RV(self):
+        m = self['RV']
+        str2prt = ''
+        for file in m['filenames']:
+            data = np.loadtxt('{0}{1}'.format(m['PATH'], file))
+            ndat, ncol = data.shape
+
+            m['ndata'].append(ndat)
+            m['ncols'].append(ncol)
+            m['RV_labels'].append(file)
+
+            names = ['BJD', 'RV', 'eRV']
+
+            # identify and name SAI
+            nsa = ncol - 3
+            if nsa > 0:
+                names.extend(f"Staract {len(m['ndata'])} {j}" for j in range(nsa))
+
+            m['nsai'].append(nsa)
+
+            # make dataframe
+            df = pd.DataFrame(data, columns=names)
+            
+            if abs(df.mean()['RV']) > 1e-6:
+                df['RV'] -= df.mean()['RV']
+
+            for nam in names:
+                if nam[:3] == 'Sta':
+                    #if abs(df.mean()[nam]) > 1e-6:
+                    df[nam] -= df.mean()[nam]
+                    df[nam] = (df[nam] - df.min()[nam]) /(df.max()[nam]-df.min()[nam]) * (df.max()['RV'] - df.min()['RV']) + df.min()['RV']
+                    #df[nam] = df[nam] / (df.max()[nam] - df.min()[nam])
+
+            # create another column containing flags for the instrument
+            df.insert(loc=3, column='Flag', value=np.ones(ndat, int) * len(m['ndata']))
+            
+            m['data'].append(df)
+            str2prt += 'Reading data from {0}\n'.format(file)
+
+        return str2prt
+
+
+    def mk_AM(self):
+        m = self['AM']
+        str2prt = ''
+        for file in m['filenames']:
+            identifier = file.split('_')[-1]
+            ff = m['PATH']+file
+
+            if identifier == 'gost.csv':
+                m['df_gost'] = pd.read_csv(ff)
+
+            elif identifier == 'hipgaia.hg123':
+                m['df_hipgaia'] = pd.read_csv(ff, sep='\s+')
+
+            elif identifier == 'hip2.abs':
+                m['df_hip'] = pd.read_csv(ff)
+
+            else:
+                print(f'File format not identified for {identifier}')
+
+            str2prt += 'Reading data from {0}\n'.format(file)
+
+
+        self.astrometry_human_r()
+        self.astrometry_epochs()
+
+        self.astro_gost()
+
+        return str2prt
+
+
+    def mk_PM(self):
+        pass
+
+
+    def get_data__(self, sortby='BJD'):
+        m = self['RV']
+        asd = pd.concat(m['data']).sort_values(sortby)
+        m['common_t'] = asd['BJD'].min()
+        asd['BJD'] -= m['common_t']
+        return asd
+
+
+    def astrometry_human_r(self):
+        m = self['AM']
+        if isinstance(m['df_gost'], pd.DataFrame):
+            A = 'ObservationTimeAtBarycentre[BarycentricJulianDateInTCB]'
+            B = 'scanAngle[rad]'
+            C = 'parallaxFactorAlongScan'
+            D = 'parallaxFactorAcrossScan'
+            column_mapping = {A: 'BJD',
+                              B: 'psi',
+                              C: 'parf',
+                              D: 'parx',
+                              'ra[rad]':'RA',
+                              'dec[rad]':'DEC',
+                              }
+            m['df_gost'] = m['df_gost'].rename(columns=column_mapping)
+
+
+    def astrometry_epochs(self):
+        m = self['AM']
+        m0 = m['df_gost']
+        if isinstance(m0, pd.DataFrame):
+            t = m0.BJD.values
+            m['hipp_epoch'] = self.time_all_2jd(1991.25, fmt='decimalyear')  # 2448348.75
+
+            m['gdr1_ref'] = 2457023.5  # self.time_all_2jd(2015, fmt='decimalyear')  # 2457023.5
+            m['gdr2_ref'] = 2457206  # self.time_all_2jd(2015.5, fmt='decimalyear')  # 2457206 hardcode?
+            m['gdr3_ref'] = 2457388.5  # self.time_all_2jd(2016, fmt='decimalyear')  # 2457388.5
+
+            m['gdr1_epoch'] = [self.time_all_2jd('2014-07-25 10:30:00'),
+                            self.time_all_2jd('2015-09-16 16:00:00')]
+            m['gdr2_epoch'] = [self.time_all_2jd('2014-07-25 10:30:00'),
+                            self.time_all_2jd('2016-05-23 11:35:00')]
+            m['gdr3_epoch'] = [self.time_all_2jd('2014-07-25 10:30:00'),
+                            self.time_all_2jd('2017-05-28 08:44:00')]
+
+            m['mask_hipp'] = (m['hipp_epoch'] <= t) & (t <= m['gdr1_epoch'][0])
+            m['mask_gdr1'] = (m['gdr1_epoch'][0] <= t) & (t<= m['gdr1_epoch'][1])
+            m['mask_gdr2'] = (m['gdr2_epoch'][0] <= t) & (t<= m['gdr2_epoch'][1])
+            m['mask_gdr3'] = (m['gdr3_epoch'][0] <= t) & (t<= m['gdr3_epoch'][1])
+
+            m['iref'] = m['hipp_epoch']
+
+
+    def astro_gost(self):
+        names = ['dra','ddec','parallax','pmra','pmdec']
+        dra = 1
+        ddec = 1
+
+        data = []
+
+        self['AM']['astro_gost'] = pd.DataFrame(data, columns=names)
+
+
+    def time_all_2jd(self, time_str, fmt='iso'):
+        t = AstroTime(time_str, format=fmt)
+        return t.to_value('jd')
+
+
+    def __repr__(self):
+        x = ''
+        for p in self:
+            x += f'{p}\n'
+        return x
+
+
+    def __getitem__(self, string):
+        return self.modes[string]
+
+
+    def __iter__(self):
+        for key in self.modes:
+            yield self.modes[key]
+
+
+#dw = minidw('HD209100')
+#for p in dw:
+#    print(p)

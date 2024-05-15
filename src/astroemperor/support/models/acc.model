@@ -1,1 +1,1 @@
-    model0 += np.polyval(np.concatenate([theta[{}], [0]]), my_data['BJD']-my_data['BJD'].values[0])
+    model0 += np.polyval(np.concatenate([theta[{}], [Y_[0]]]), (X_ - X_[0]))

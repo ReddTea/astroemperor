@@ -64,7 +64,7 @@ import numpy as np
 
 sim = emp.Simulation()
 sim.set_engine('emcee')
-setup = np.array([3, 50, 500])
+setup = np.array([3, 50, 250, 2])
 sim.load_data('51Peg')  # Target folder name in /datafiles/
 sim.run_auto(setup, k_start=0, k_end=2)
 
@@ -151,4 +151,3 @@ value: The value you want to change it to.
 | starmass             | Outputs the Minimum Mass and Semi-Major Axis. Should be put in solar masses.                                                                           | float/False | False                                          |
 | Plots                |                                                                                                                                                        |             |                                                |
 | save_plots_fmt       | Format for the plot outputs.                                                                                                                           | str         | 'pdf'                                          |
-

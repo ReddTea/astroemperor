@@ -1,0 +1,1181 @@
+def plot_KeplerianModel(my_data, my_model, res, common_t=0, options=None):
+    if options is None:
+        options = {}
+    if True:
+        saveloc = options['saveloc']
+        saveplace = saveloc + '/plots/models/'
+        unsaveplace = saveloc + '/plots/models/uncertainpy/'
+
+        plot_fmt = options['format']
+        switch_histogram = options['hist']
+        switch_uncertain = options['uncertain']
+        switch_errors = options['errors']
+        switch_periodogram = options['periodogram']
+        switch_celerite = options['celerite']
+        logger_level = options['logger_level']
+        gC = options['gC']
+
+        axhline_kwargs = options['axhline_kwargs']
+        errorbar_kwargs = options['errorbar_kwargs']
+
+        # FULL_MODEL
+        fm_figsize = (10, 8)
+
+        if options['paper_mode']:
+            fm_axhline_kwargs = {'color':'gray', 'linewidth':3}
+            fm_errorbar_kwargs = {'marker':'o', 'ls':'', 'alpha':0.8,
+                                'lw':2,
+                                'markersize':10,
+                                'markeredgewidth':1,
+                                'markeredgecolor':'k',
+                                }
+
+            # LINE
+            fm_model_line = {'ls':'--', 'lw':3}  # ?
+            # HIST
+            fm_hist = {'lw':2}  # 1
+            fm_hist_tick_fs = 0
+            # LEGEND
+            fm_legend_fs = 14 # 10
+
+            # FM_FRAME
+            fm_frame_lw = 3
+            # FM TICKS
+            fm_tick_xsize = 20
+            fm_tick_ysize = 20
+            # LABELS
+            fm_label_fs = 22
+            # title
+            fm_title_fs = 24
+
+            plot_fmt = 'pdf'
+            # PHASE
+
+
+        posterior_method = 'GM'
+        #c = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
+        c = ['C0', 'C1', 'C2', 'C4', 'C7', 'C8', 'C9']
+        colors = np.array([c,c,c,c,c]).flatten()
+
+        temp_file_names = []
+        temp_mod_names = []
+        temp_dat_names = []
+
+        if switch_uncertain:
+            import uncertainpy as un
+            import chaospy as cp
+            if logger_level is not None:
+                logging.getLogger("chaospy").setLevel(logger_level)
+                logging.getLogger("numpoly").setLevel(logger_level)
+
+
+    def create_mod(data_arg, blocks_arg, tail_x, mod_number=0):
+        x = ReddModel(data_arg, blocks_arg)
+        x.switch_plot = True
+
+        x.A_ = []
+        x.nins__ = my_model.nins__
+        #x.refresh__()  # needed to get nins
+
+        temp_script = f'temp_mod_0{mod_number}.py'
+        temp_file_names.append(temp_script)
+        temp_mod_names.append(f'{saveloc}/temp/temp_model_{x.model_script_no}{tail_x}.py')
+        temp_dat_names.append(f'{saveloc}/temp/temp_data{tail_x}.csv')
+
+        with open(temp_script, 'w') as f:
+            f.write(open(get_support('init.scr')).read())
+            # DEPENDENCIES
+            f.write('''
+import kepler
+''')
+            if switch_celerite:
+                f.write('''
+import celerite2
+import celerite2.terms as cterms
+''')
+            # CONSTANTS
+            f.write(f'''
+nan = np.nan
+A_ = []
+mod_fixed_ = []
+gaussian_mixture_objects = dict()
+
+cornums = {my_model.cornums}
+''')
+
+            f.write(open(x.write_model_(loc=saveloc, tail=tail_x)).read())
+
+    def dual_plot(data1, data2, cont1, cont2, args1, args2):
+        if True:
+            fig = pl.figure(figsize=fm_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            if switch_histogram:
+                ax = fig.add_subplot(gs[:2, :-1])
+                axr = fig.add_subplot(gs[2, :-1], sharex=ax)
+                axh = fig.add_subplot(gs[:2, 3], sharey=ax)
+                axrh = fig.add_subplot(gs[2, 3], sharey=axr)
+
+            else:
+                ax = fig.add_subplot(gs[:2, :])
+                axr = fig.add_subplot(gs[2, :], sharex=ax)
+
+            pl.subplots_adjust(hspace=0)
+            ax.axhline(0, **fm_axhline_kwargs)
+            axr.axhline(0, **fm_axhline_kwargs)
+
+            pl.subplots_adjust(wspace=0.15)
+
+        # First we plot the data
+        if True:
+            for n_ins in range(M0.nins__):
+                mask = D0['Flag'] == (n_ins + 1)
+                if switch_errors:
+                    ax.errorbar(D0[mask]['BJD'], D0[mask]['RV'], D0[mask]['eRV'],
+                                c=colors[n_ins], label=M0.instrument_names[n_ins],
+                                **fm_errorbar_kwargs)
+
+                    axr.errorbar(D0[mask]['BJD'], D0[mask]['residuals'], D0[mask]['eRV'],
+                                c=colors[n_ins],
+                                **fm_errorbar_kwargs)
+                else:
+                    ax.plot(D0[mask]['BJD'], D0[mask]['RV'],
+                            colors[n_ins]+'o', label=M0.instrument_names[n_ins])
+
+                    axr.plot(D0[mask]['BJD'], D0[mask]['residuals'], colors[n_ins]+'o')
+        
+        # We set unmodels for uncertainties
+        if len(B_kep):
+            for b in B_kep:
+                if b.parameterisation == 0:
+                    #kepmod = Keplerian_Model
+                    unkepmod = unKeplerian_Model
+                    un_model_name = "unKeplerian_Model"
+                    chaos_names = ['Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude_Periastron']
+                if b.parameterisation == 1:
+                    #kepmod = Keplerian_Model_1
+                    unkepmod = unKeplerian_Model_1
+                    un_model_name = "unKeplerian_Model_1"
+                    chaos_names = ['lPeriod', 'Amp_sin', 'Amp_cos', 'Ecc_sin', 'Ecc_cos']
+                if b.parameterisation == 2:
+                    #kepmod = Keplerian_Model_2
+                    unkepmod = unKeplerian_Model_2
+                    un_model_name = "unKeplerian_Model_2"
+                    chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Eccentricity', 'Longitude_Periastron']
+                if b.parameterisation == 3:
+                    #kepmod = Keplerian_Model_3
+                    unkepmod = unKeplerian_Model_3
+                    un_model_name = "unKeplerian_Model_3"
+                    chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Ecc_sin', 'Ecc_cos']
+
+        # Now we plot our line
+        if len(B_kep):
+            DB_AC = deepcopy(B_kep)
+
+            create_mod(DC, DB_AC, '_DM_AC', 2)
+
+            import temp_mod_02
+            DM_AC_mod = reload(temp_mod_02).my_model
+
+
+            DC['RV'] = DM_AC_mod(fit0)[0]
+
+            ax.plot(DC['BJD'], DC['RV'], color=rc.fg,
+                    ls=fm_model_line['ls'],
+                    lw=fm_model_line['lw'],)
+
+        if True and switch_histogram:
+            nbins = 5
+            while nbins < len(D0):
+                counts, bins = np.histogram(D0['RV'], bins=nbins)
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            nbins = 5
+            while nbins < len(D0):
+                counts, bins = np.histogram(D0['residuals'], bins=nbins)
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            # PLOT HISTOGRAMS
+            axh.hist(D0['RV'], bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            axrh.hist(D0['residuals'], bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            # HIDE TICKS
+            axh.tick_params(axis="x", labelbottom=False, labelsize=fm_tick_xsize)
+            axh.tick_params(axis="y", labelleft=False)
+
+            axrh.tick_params(axis="y", labelleft=False)
+            axrh.tick_params(axis="x", labelsize=fm_tick_xsize)
+            axrh.set_xlabel('Counts', fontsize=fm_label_fs)
+            
+        # Ticks and labels
+        if True:
+            ax.tick_params(axis="x", labelbottom=False)
+            axr.tick_params(axis="x", labelsize=fm_tick_xsize)
+
+            ax.tick_params(axis="y", labelsize=fm_tick_ysize)
+            axr.tick_params(axis="y", labelsize=fm_tick_ysize)
+
+            ax.set_title('Keplerian Model', fontsize=fm_title_fs)
+            ax.set_ylabel(r'RVs ($\frac{m}{s}$)', fontsize=fm_label_fs)
+            ax.legend(fontsize=fm_legend_fs)#, framealpha=0)
+
+            if common_t:
+                axr.set_xlabel(f'BJD (days) + {common_t}', fontsize=fm_label_fs)
+            else:
+                axr.set_xlabel(f'BJD (days)', fontsize=fm_label_fs)
+
+            axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
+
+
+        # SPINES
+        if True:
+            for spine in ax.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axr.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+            for spine in axh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axrh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+        fig.savefig(saveplace+'{}.{}'.format('keplerian_model', plot_fmt),
+                    bbox_inches='tight')
+        
+        pbar.update(1)
+
+        pass
+
+    if True:
+        common_t = common_t  # T0, add to time as str only
+
+        D0 = deepcopy(my_data)  # dont modify original data
+        fit0 = res
+        M0 = my_model
+
+        # Block selection
+        B_all = [b for b in M0]
+
+        B_kep = [b for b in M0 if b.display_on_data_==True]  # Keplerians
+        B_ins = [b for b in M0 if b.display_on_data_==False]  # Instrumental
+
+        pbar_tot = 1 + len(B_kep) * (1 + switch_uncertain)
+        pbar = tqdm(total=pbar_tot)
+
+        # data for continuous
+        # x_c = np.linspace(D0['BJD'].min(), D0['BJD'].max(), 5000)
+        # DC = pd.DataFrame({'BJD':x_c, 'RV':np.zeros_like(x_c), 'eRV':np.ones_like(x_c)})
+
+        ### MOVE DATA AROUND
+        # Get true residuals
+        create_mod(D0, B_all, '_B_all', 0)
+
+        import temp_mod_00
+        B_all_mod = reload(temp_mod_00).my_model
+        B_all_RV, B_all_ferr = B_all_mod(fit0)
+
+        # data gets cleaned from no display
+        D0['RV'] = B_all_RV
+        D0['eRV'] = np.sqrt(B_all_ferr)
+
+        # get the residuals
+        D0['residuals'] = D0['RV'] - B_all_RV
+
+        if B_kep:
+            create_mod(D0, B_kep, '_B_kep', 1)
+
+            import temp_mod_01
+            B_kep_mod = reload(temp_mod_01).my_model
+            B_kep_RV = B_kep_mod(fit0)[0]
+
+            D0['res+all_kep'] = D0['residuals'] + B_kep_RV
+
+
+    # FULL MODEL
+
+    if switch_periodogram:
+        plot_periodogram(D0, options)
+
+
+    # PHASEFOLD
+    for mode in range(True+switch_uncertain):
+        # add a tail to the name if uncertainties
+        if mode == 0:
+            name_head = ''
+            name_tail = ''
+        if mode == 1:
+            name_head = 'uncertainpy/'
+            name_tail = '_uncertainties'
+
+        chaos_thetas = []
+        nb_ = 0
+        for b in B_kep:
+            # make grid
+            if True:
+                fig = pl.figure(figsize=fm_figsize)
+                gs = gridspec.GridSpec(3, 4)
+
+                if switch_histogram:
+                    ax = fig.add_subplot(gs[:2, :-1])
+                    axr = fig.add_subplot(gs[2, :-1], sharex=ax)
+                    axh = fig.add_subplot(gs[:2, 3], sharey=ax)
+                    axrh = fig.add_subplot(gs[2, 3], sharey=axr)
+                else:
+                    ax = fig.add_subplot(gs[:2, :])
+                    axr = fig.add_subplot(gs[2, :], sharex=ax)
+
+                pl.subplots_adjust(hspace=0)
+
+                ax.axhline(0, **fm_axhline_kwargs)
+                axr.axhline(0, **fm_axhline_kwargs)
+
+            pl.subplots_adjust(wspace=0.15)
+
+
+            per = np.exp(b[0].value) if b.parameterisation == 1 else b[0].value
+
+
+            D_PF = deepcopy(D0)
+            TB = [deepcopy(b)]
+
+            if True:
+                create_mod(D_PF, TB, '_TB', 3)
+                import temp_mod_03
+                TM_mod = reload(temp_mod_03).my_model
+
+            D_PF['RV_TB'] = TM_mod(fit0)[0]
+            D_PF['RV_D'] = D_PF['residuals'].values + D_PF['RV_TB'].values
+            D_PF['eRV_D'] = TM_mod(fit0)[1]
+
+            D_PF = fold_dataframe(D_PF, per=per)
+
+            ## plot data per instrument
+            for n_ins in range(M0.nins__):
+                mask = D_PF['Flag'] == (n_ins + 1)
+
+                if switch_errors:
+                    ax.errorbar(D_PF[mask]['BJD'], D_PF[mask]['RV_D'], yerr=D_PF[mask]['eRV'],
+                                    c=colors[n_ins], label=M0.instrument_names[n_ins],
+                                    **fm_errorbar_kwargs)
+
+                    axr.errorbar(D_PF[mask]['BJD'], D_PF[mask]['residuals'], yerr=D_PF[mask]['eRV'],
+                                c=colors[n_ins],
+                                **fm_errorbar_kwargs)
+                else:
+                    ax.plot(D_PF[mask]['BJD'], D_PF[mask]['RV_D'],
+                                colors[n_ins]+'o', label=M0.instrument_names[n_ins])
+
+                    axr.plot(D_PF[mask]['BJD'], D_PF[mask]['residuals'],
+                                colors[n_ins]+'o')
+
+            ### create model line for the phasefold
+            xpf_c = np.linspace(D_PF['BJD'].min(), D_PF['BJD'].max(), 5000)
+            D_PFC = pd.DataFrame({'BJD':xpf_c,
+                                  'RV':np.zeros_like(xpf_c),
+                                  'eRV':np.ones_like(xpf_c)})
+
+            TB_C = [deepcopy(b)]
+
+            if True:
+                create_mod(D_PFC, TB_C, '_TB_C', 4)
+                import temp_mod_04
+                TM_C_mod = reload(temp_mod_04).my_model
+
+            D_PFC['RV'] = TM_C_mod(fit0)[0]
+
+
+            ## plot phasefold
+            if True:
+                # get uncertainties
+                if mode==1:
+                    un_model = un.Model(run=unkepmod,
+                                        labels=['BJD (days)', r'RVs $\frac{m}{s}$'],
+                                        interpolate=True,
+                                        logger_level=u'error',
+                                        #postprocess=func
+                                        )
+
+                    chaostheta = {}
+                    for i in range(len(b)):
+                        if posterior_method == 'GM':
+                            if b[i].fixed is None:
+                                chaos_holder = cp.Normal(mu=b[i].posterior.mixture_mean,
+                                                        sigma=b[i].posterior.mixture_sigma)
+                                
+                                chaostheta[chaos_names[i]] = cp.Trunc(chaos_holder, lower=b[i].limits[0],
+                                                                                    upper=b[i].limits[1])
+                            else:
+                                chaostheta[chaos_names[i]] = b[i].value_mean
+
+                    #chaos_thetas.append(chaostheta)
+
+                    parameters = un.Parameters(chaostheta)
+
+                    UQ = un.UncertaintyQuantification(model=un_model,
+                                                      parameters=parameters,
+                                                      logger_level=u'critical',
+                                                      logger_filename=unsaveplace+'uncertainpy.log')
+
+                    with nullify_output(suppress_stdout=True, suppress_stderr=True):
+                        undata = UQ.quantify(seed=10,
+                                             method='pc',
+                                             plot=None,
+                                             #plot='all',
+                                             pc_method='collocation',
+                                             logger_level=u'critical',
+                                             figure_folder=unsaveplace+'figures',
+                                             data_folder=unsaveplace+'data',
+                                             single=False)
+
+                    keplerian_data = un.Data('{}data/{}.h5'.format(unsaveplace,
+                                                                   un_model_name))
+
+                    untime = undata[un_model_name].time
+                    unmean = undata[un_model_name].mean
+                    unvariance = undata[un_model_name].variance
+                    unpercentile_5 = undata[un_model_name].percentile_5
+                    unpercentile_95 = undata[un_model_name].percentile_95
+                    unsensitivity = undata[un_model_name].sobol_first
+
+
+                resid = np.sum(D_PF[mask]['residuals'].values**2 / D_PF[mask]['eRV'].values**2)
+                # Plot model line
+                ax.plot(D_PFC['BJD'].values, D_PFC['RV'].values, color=rc.fg,
+                        ls=fm_model_line['ls'],
+                        lw=fm_model_line['lw'],
+                        #label=f'$\chi^2$ = {np.round(resid, 2)}'
+                        )
+
+                # plot uncertainties
+                if mode == 1:
+                    ax.fill_between(untime,
+                                    unpercentile_5,
+                                    unpercentile_95,
+                                    color=rc.fg,
+                                    alpha=0.5)
+
+
+                    if True:
+                        figs, axs = pl.subplots(figsize=(8, 6))
+                        for i in range(unsensitivity.shape[0]):
+                            axs.plot(untime, unsensitivity[i],
+                                       linewidth=1.5,
+                                       )
+                        axs.set_title('First-order Sobol indices')
+                        axs.set_xlabel(f'BJD (days)',
+                                       fontsize=fm_label_fs)
+                        axs.set_ylabel('First-order Sobol indices',
+                                       fontsize=fm_label_fs)
+                        axs.legend(parameters.get_from_uncertain(),
+                                            loc='upper right',
+                                            framealpha=0.5)
+
+                        figs.savefig(saveplace+f'{name_head}sobol_{b.name_+name_tail}.{plot_fmt}',
+                                   bbox_inches='tight')
+                        pl.close(figs)
+                # Plot Histogram Model
+                if switch_histogram:
+                    nbins = 5
+                    while nbins < len(D_PF):
+                        counts, bins = np.histogram(D_PF['RV_D'], bins=nbins)
+                        if (counts==0).any():
+                            break
+                        else:
+                            nbins += 1
+
+                    axh.hist(D_PF['RV_D'], bins=nbins-1, orientation='horizontal', ec=rc.fg,
+                             lw=fm_hist['lw'])
+
+                # Plot histogram residuals
+                if switch_histogram:
+                    nbins = 5
+                    while nbins < len(D_PF):
+                            counts, bins = np.histogram(D_PF['residuals'], bins=nbins)
+                            if (counts==0).any():
+                                break
+                            else:
+                                nbins += 1
+                    axrh.hist(D_PF['residuals'], bins=nbins-1, orientation='horizontal', ec=rc.fg,
+                              lw=fm_hist['lw'])
+
+                # Ticks and labels
+
+                if True:
+                    ax.tick_params(axis="x", labelbottom=False)
+                    axr.tick_params(axis="x", labelsize=fm_tick_xsize)
+
+                    ax.tick_params(axis="y", labelsize=fm_tick_ysize)
+                    axr.tick_params(axis="y", labelsize=fm_tick_ysize)
+                    
+                    if switch_histogram:
+                        # HIDE TICKS
+                        axh.tick_params(axis="x", labelbottom=False, labelsize=fm_tick_xsize)
+                        axh.tick_params(axis="y", labelleft=False)
+
+                        axrh.tick_params(axis="y", labelleft=False)
+                        axrh.tick_params(axis="x", labelsize=fm_tick_xsize)
+                        axrh.set_xlabel('Counts', fontsize=fm_label_fs)
+
+                                         
+                    ax.set_title('Keplerian Model', fontsize=fm_title_fs)
+                    ax.set_ylabel(r'RVs ($\frac{m}{s}$)', fontsize=fm_label_fs)
+                    ax.legend(fontsize=fm_legend_fs)#, framealpha=0)
+
+                    axr.set_xlabel(f'BJD (days)', fontsize=fm_label_fs)
+                    axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
+
+
+                # SPINES
+                if True:
+                    for spine in ax.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+                    for spine in axr.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+
+                    for spine in axh.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+                    for spine in axrh.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+
+            pl.savefig(saveplace+f'{name_head}{b.name_+name_tail}.{plot_fmt}',
+                        bbox_inches='tight')
+
+            nb_ += 1
+
+            pbar.update(1)
+
+
+            # print('MARKER 5')
+            if nb_ == len(B_kep):
+                pbar.close()
+
+    temp_file_folder = saveloc+'/temp/models/'
+
+
+    with nullify_output():
+        for file in list(set(temp_file_names)):
+            try:
+                os.system('mv {0} {1}{0}'.format(file, temp_file_folder))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+        for file in list(set(temp_mod_names)):
+            try:
+                os.system('mv {0} {1}{2}'.format(file, temp_file_folder, file.split('/')[-1]))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+        for file in list(set(temp_dat_names)):
+            try:
+                os.system('mv {0} {1}{2}'.format(file, temp_file_folder, file.split('/')[-1]))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+    return chaos_thetas
+
+
+
+def plot_KeplerianModel(my_data, my_model, res, common_t=0, options=None):
+    if options is None:
+        options = {}
+    if True:
+        saveloc = options['saveloc']
+        saveplace = saveloc + '/plots/models/'
+        unsaveplace = saveloc + '/plots/models/uncertainpy/'
+
+        plot_fmt = options['format']
+        switch_histogram = options['hist']
+        switch_uncertain = options['uncertain']
+        switch_errors = options['errors']
+        switch_periodogram = options['periodogram']
+        switch_celerite = options['celerite']
+        logger_level = options['logger_level']
+        gC = options['gC']
+
+        axhline_kwargs = options['axhline_kwargs']
+        errorbar_kwargs = options['errorbar_kwargs']
+
+        # FULL_MODEL
+        fm_figsize = (10, 8)
+
+        if options['paper_mode']:
+            fm_axhline_kwargs = {'color':'gray', 'linewidth':3}
+            fm_errorbar_kwargs = {'marker':'o', 'ls':'', 'alpha':0.8,
+                                'lw':2,
+                                'markersize':10,
+                                'markeredgewidth':1,
+                                'markeredgecolor':'k',
+                                }
+
+            # LINE
+            fm_model_line = {'ls':'--', 'lw':3}  # ?
+            # HIST
+            fm_hist = {'lw':2}  # 1
+            fm_hist_tick_fs = 0
+            # LEGEND
+            fm_legend_fs = 14 # 10
+
+            # FM_FRAME
+            fm_frame_lw = 3
+            # FM TICKS
+            fm_tick_xsize = 20
+            fm_tick_ysize = 20
+            # LABELS
+            fm_label_fs = 22
+            # title
+            fm_title_fs = 24
+
+            plot_fmt = 'pdf'
+            # PHASE
+
+
+        posterior_method = 'GM'
+        #c = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
+        c = ['C0', 'C1', 'C2', 'C4', 'C7', 'C8', 'C9']
+        colors = np.array([c,c,c,c,c]).flatten()
+
+        temp_file_names = []
+        temp_mod_names = []
+        temp_dat_names = []
+
+        if switch_uncertain:
+            import uncertainpy as un
+            import chaospy as cp
+            if logger_level is not None:
+                logging.getLogger("chaospy").setLevel(logger_level)
+                logging.getLogger("numpoly").setLevel(logger_level)
+
+
+    def create_mod(data_arg, blocks_arg, tail_x, mod_number=0):
+        x = ReddModel(data_arg, blocks_arg)
+        x.switch_plot = True
+
+        x.A_ = []
+        x.nins__ = my_model.nins__
+        #x.refresh__()  # needed to get nins
+
+        temp_script = f'temp_mod_0{mod_number}.py'
+        temp_file_names.append(temp_script)
+        temp_mod_names.append(f'{saveloc}/temp/temp_model_{x.model_script_no}{tail_x}.py')
+        temp_dat_names.append(f'{saveloc}/temp/temp_data{tail_x}.csv')
+
+        with open(temp_script, 'w') as f:
+            f.write(open(get_support('init.scr')).read())
+            # DEPENDENCIES
+            f.write('''
+import kepler
+''')
+            if switch_celerite:
+                f.write('''
+import celerite2
+import celerite2.terms as cterms
+''')
+            # CONSTANTS
+            f.write(f'''
+nan = np.nan
+A_ = []
+mod_fixed_ = []
+gaussian_mixture_objects = dict()
+
+cornums = {my_model.cornums}
+''')
+
+            f.write(open(x.write_model_(loc=saveloc, tail=tail_x)).read())
+
+    if True:
+        # find base for t
+        #common_t = find_common_integer_sequence(my_data['BJD'])
+        common_t = common_t  # my_data['BJD'].min()
+        #if common_t:
+        #    my_data['BJD'] -= common_t
+
+        ## COL
+        D = deepcopy(my_data)
+        ajuste = res
+        OGM = my_model
+
+        # Block selection
+        DB_all = [b for b in OGM]
+        DB_all_kep = [b for b in OGM if b.display_on_data_==True]  # Keplerians
+        DB_all_ins = [b for b in OGM if b.display_on_data_==False]  # Instrumental
+
+        # pbar
+        pbar_tot = 1 + len(DB_all_kep)
+        pbar = tqdm(total=pbar_tot)
+
+        # data for continuous
+        x_c = np.linspace(D['BJD'].min(), D['BJD'].max(), 5000)
+        DC = pd.DataFrame({'BJD':x_c, 'RV':np.zeros_like(x_c), 'eRV':np.ones_like(x_c)})
+
+        ### MOVE DATA AROUND
+        # Get models which I dont want to display with a line
+        # Substract them to the data
+        # NDM_A stands for No Display Model
+        create_mod(D, DB_all_ins, '_NDM_A', 0)
+        # this uses the original data
+        # outputs what is modeled outside keplerians
+
+
+        import temp_mod_00
+        NDM_A_mod = reload(temp_mod_00).my_model
+
+
+        ndm, ndferr = NDM_A_mod(ajuste)
+
+        # data gets cleaned from no display
+        D['RV'] -= ndm
+        D['eRV'] = np.sqrt(ndferr)
+
+        # get the residuals
+        D['residuals'] = D['RV'].values
+        if DB_all_kep:
+            create_mod(D, DB_all_kep, '_DM_A', 1)
+            # this uses the data with instrumental removed
+            # outputs what is modeled with keplerians
+
+            import temp_mod_01
+            DM_A_mod = reload(temp_mod_01).my_model
+
+
+            D['residuals'] -= DM_A_mod(ajuste)[0]
+
+            # Here we are done. We have 3 different datasets
+            # display, og-no_display, continuous
+
+    # FULL MODEL
+    # this requires a subgrid, for plotting the residuals
+
+    if True:
+        if True:
+            fig = pl.figure(figsize=fm_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            if switch_histogram:
+                ax = fig.add_subplot(gs[:2, :-1])
+                axr = fig.add_subplot(gs[2, :-1], sharex=ax)
+                axh = fig.add_subplot(gs[:2, 3], sharey=ax)
+                axrh = fig.add_subplot(gs[2, 3], sharey=axr)
+
+            else:
+                ax = fig.add_subplot(gs[:2, :])
+                axr = fig.add_subplot(gs[2, :], sharex=ax)
+
+            pl.subplots_adjust(hspace=0)
+            ax.axhline(0, **fm_axhline_kwargs)
+            axr.axhline(0, **fm_axhline_kwargs)
+
+            pl.subplots_adjust(wspace=0.15)
+
+        # First we plot the data
+        if True:
+            
+
+            for n_ins in range(OGM.nins__):
+                mask = D['Flag'] == (n_ins + 1)
+                if switch_errors:
+                    ax.errorbar(D[mask]['BJD'], D[mask]['RV'], D[mask]['eRV'],
+                                c=colors[n_ins], label=OGM.instrument_names[n_ins],
+                                **fm_errorbar_kwargs)
+
+                    axr.errorbar(D[mask]['BJD'], D[mask]['residuals'], D[mask]['eRV'],
+                                c=colors[n_ins],
+                                **fm_errorbar_kwargs)
+                else:
+                    ax.plot(D[mask]['BJD'], D[mask]['RV'],
+                            colors[n_ins]+'o', label=OGM.instrument_names[n_ins])
+
+                    axr.plot(D[mask]['BJD'], D[mask]['residuals'], colors[n_ins]+'o')
+                
+
+        if switch_periodogram:
+            plot_periodogram(D, options)
+
+
+        # We set unmodels for uncertainties
+        if len(DB_all_kep):
+            for b in DB_all_kep:
+                if b.parameterisation == 0:
+                    #kepmod = Keplerian_Model
+                    unkepmod = unKeplerian_Model
+                    un_model_name = "unKeplerian_Model"
+                    chaos_names = ['Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude_Periastron']
+                if b.parameterisation == 1:
+                    #kepmod = Keplerian_Model_1
+                    unkepmod = unKeplerian_Model_1
+                    un_model_name = "unKeplerian_Model_1"
+                    chaos_names = ['lPeriod', 'Amp_sin', 'Amp_cos', 'Ecc_sin', 'Ecc_cos']
+                if b.parameterisation == 2:
+                    #kepmod = Keplerian_Model_2
+                    unkepmod = unKeplerian_Model_2
+                    un_model_name = "unKeplerian_Model_2"
+                    chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Eccentricity', 'Longitude_Periastron']
+                if b.parameterisation == 3:
+                    #kepmod = Keplerian_Model_3
+                    unkepmod = unKeplerian_Model_3
+                    un_model_name = "unKeplerian_Model_3"
+                    chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Ecc_sin', 'Ecc_cos']
+
+        # Now we plot our line
+        if len(DB_all_kep):
+            DB_AC = deepcopy(DB_all_kep)
+
+            create_mod(DC, DB_AC, '_DM_AC', 2)
+
+            import temp_mod_02
+            DM_AC_mod = reload(temp_mod_02).my_model
+
+
+            DC['RV'] = DM_AC_mod(ajuste)[0]
+
+            ax.plot(DC['BJD'], DC['RV'], color=rc.fg,
+                    ls=fm_model_line['ls'],
+                    lw=fm_model_line['lw'],)
+
+        if True and switch_histogram:
+            nbins = 5
+            while nbins < len(D):
+                counts, bins = np.histogram(D['RV'], bins=nbins)
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            nbins = 5
+            while nbins < len(D):
+                counts, bins = np.histogram(D['residuals'], bins=nbins)
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            # PLOT HISTOGRAMS
+            axh.hist(D['RV'], bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            axrh.hist(D['residuals'], bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            # HIDE TICKS
+            axh.tick_params(axis="x", labelbottom=False, labelsize=fm_tick_xsize)
+            axh.tick_params(axis="y", labelleft=False)
+
+            axrh.tick_params(axis="y", labelleft=False)
+            axrh.tick_params(axis="x", labelsize=fm_tick_xsize)
+            axrh.set_xlabel('Counts', fontsize=fm_label_fs)
+            
+        # Ticks and labels
+        if True:
+            ax.tick_params(axis="x", labelbottom=False)
+            axr.tick_params(axis="x", labelsize=fm_tick_xsize)
+
+            ax.tick_params(axis="y", labelsize=fm_tick_ysize)
+            axr.tick_params(axis="y", labelsize=fm_tick_ysize)
+
+            ax.set_title('Keplerian Model', fontsize=fm_title_fs)
+            ax.set_ylabel(r'RVs ($\frac{m}{s}$)', fontsize=fm_label_fs)
+            ax.legend(fontsize=fm_legend_fs)#, framealpha=0)
+
+            if common_t:
+                axr.set_xlabel(f'BJD (days) + {common_t}', fontsize=fm_label_fs)
+            else:
+                axr.set_xlabel(f'BJD (days)', fontsize=fm_label_fs)
+
+            axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
+
+
+        # SPINES
+        if True:
+            for spine in ax.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axr.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+            for spine in axh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axrh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+        fig.savefig(saveplace+'{}.{}'.format('keplerian_model', plot_fmt),
+                    bbox_inches='tight')
+
+
+        pbar.update(1)
+
+
+    # PHASEFOLD
+    for mode in range(True+switch_uncertain):
+        # add a tail to the name if uncertainties
+        if mode == 0:
+            name_head = ''
+            name_tail = ''
+        if mode == 1:
+            name_head = 'uncertainpy/'
+            name_tail = '_uncertainties'
+            pbar_tot = len(DB_all_kep)
+            pbar = tqdm(total=pbar_tot)
+        chaos_thetas = []
+        nb_ = 0
+        for b in DB_all_kep:
+            # make grid
+            if True:
+                fig = pl.figure(figsize=fm_figsize)
+                gs = gridspec.GridSpec(3, 4)
+
+                if switch_histogram:
+                    ax = fig.add_subplot(gs[:2, :-1])
+                    axr = fig.add_subplot(gs[2, :-1], sharex=ax)
+                    axh = fig.add_subplot(gs[:2, 3], sharey=ax)
+                    axrh = fig.add_subplot(gs[2, 3], sharey=axr)
+                else:
+                    ax = fig.add_subplot(gs[:2, :])
+                    axr = fig.add_subplot(gs[2, :], sharex=ax)
+
+                pl.subplots_adjust(hspace=0)
+
+                ax.axhline(0, **fm_axhline_kwargs)
+                axr.axhline(0, **fm_axhline_kwargs)
+
+            pl.subplots_adjust(wspace=0.15)
+
+            # adjust params for different parameterisations
+            # now just in period for param 1
+            # Get PAE? ## RED
+            per = np.exp(b[0].value) if b.parameterisation == 1 else b[0].value
+            D_PF = deepcopy(D)
+
+            TB = [deepcopy(b)]
+
+            if True:
+                create_mod(D_PF, TB, '_TB', 3)
+                import temp_mod_03
+                TM_mod = reload(temp_mod_03).my_model
+
+            D_PF['RV_TB'] = TM_mod(ajuste)[0]
+            D_PF['RV_D'] = D_PF['residuals'].values + D_PF['RV_TB'].values
+            D_PF['eRV_D'] = TM_mod(ajuste)[1]
+
+            D_PF = fold_dataframe(D_PF, per=per)
+
+            ## plot data per instrument
+            for n_ins in range(OGM.nins__):
+                mask = D_PF['Flag'] == (n_ins + 1)
+
+                if switch_errors:
+                    ax.errorbar(D_PF[mask]['BJD'], D_PF[mask]['RV_D'], yerr=D_PF[mask]['eRV'],
+                                    c=colors[n_ins], label=OGM.instrument_names[n_ins],
+                                    **fm_errorbar_kwargs)
+
+                    axr.errorbar(D_PF[mask]['BJD'], D_PF[mask]['residuals'], yerr=D_PF[mask]['eRV'],
+                                c=colors[n_ins],
+                                **fm_errorbar_kwargs)
+                else:
+                    ax.plot(D_PF[mask]['BJD'], D_PF[mask]['RV_D'],
+                                colors[n_ins]+'o', label=OGM.instrument_names[n_ins])
+
+                    axr.plot(D_PF[mask]['BJD'], D_PF[mask]['residuals'],
+                                colors[n_ins]+'o')
+
+            ### create model line for the phasefold
+            xpf_c = np.linspace(D_PF['BJD'].min(), D_PF['BJD'].max(), 5000)
+            D_PFC = pd.DataFrame({'BJD':xpf_c,
+                                  'RV':np.zeros_like(xpf_c),
+                                  'eRV':np.ones_like(xpf_c)})
+
+            TB_C = [deepcopy(b)]
+
+            if True:
+                create_mod(D_PFC, TB_C, '_TB_C', 4)
+                import temp_mod_04
+                TM_C_mod = reload(temp_mod_04).my_model
+
+            D_PFC['RV'] = TM_C_mod(ajuste)[0]
+
+
+            ## plot phasefold
+            if True:
+                # get uncertainties
+                if mode==1:
+                    un_model = un.Model(run=unkepmod,
+                                        labels=['BJD (days)', r'RVs $\frac{m}{s}$'],
+                                        interpolate=True,
+                                        logger_level=u'error',
+                                        #postprocess=func
+                                        )
+
+                    chaostheta = {}
+                    for i in range(len(b)):
+                        if posterior_method == 'GM':
+                            if b[i].fixed is None:
+                                chaos_holder = cp.Normal(mu=b[i].posterior.mixture_mean,
+                                                        sigma=b[i].posterior.mixture_sigma)
+                                
+                                chaostheta[chaos_names[i]] = cp.Trunc(chaos_holder, lower=b[i].limits[0],
+                                                                                    upper=b[i].limits[1])
+                            else:
+                                chaostheta[chaos_names[i]] = b[i].value_mean
+
+                    #chaos_thetas.append(chaostheta)
+
+                    parameters = un.Parameters(chaostheta)
+
+                    UQ = un.UncertaintyQuantification(model=un_model,
+                                                      parameters=parameters,
+                                                      logger_level=u'critical',
+                                                      logger_filename=unsaveplace+'uncertainpy.log')
+
+                    with nullify_output(suppress_stdout=True, suppress_stderr=True):
+                        undata = UQ.quantify(seed=10,
+                                             method='pc',
+                                             plot=None,
+                                             #plot='all',
+                                             pc_method='collocation',
+                                             logger_level=u'critical',
+                                             figure_folder=unsaveplace+'figures',
+                                             data_folder=unsaveplace+'data',
+                                             single=False)
+
+                    keplerian_data = un.Data('{}data/{}.h5'.format(unsaveplace,
+                                                                   un_model_name))
+
+                    untime = undata[un_model_name].time
+                    unmean = undata[un_model_name].mean
+                    unvariance = undata[un_model_name].variance
+                    unpercentile_5 = undata[un_model_name].percentile_5
+                    unpercentile_95 = undata[un_model_name].percentile_95
+                    unsensitivity = undata[un_model_name].sobol_first
+
+
+                resid = np.sum(D_PF[mask]['residuals'].values**2 / D_PF[mask]['eRV'].values**2)
+                # Plot model line
+                ax.plot(D_PFC['BJD'].values, D_PFC['RV'].values, color=rc.fg,
+                        ls=fm_model_line['ls'],
+                        lw=fm_model_line['lw'],
+                        #label=f'$\chi^2$ = {np.round(resid, 2)}'
+                        )
+
+                # plot uncertainties
+                if mode == 1:
+                    ax.fill_between(untime,
+                                    unpercentile_5,
+                                    unpercentile_95,
+                                    color=rc.fg,
+                                    alpha=0.5)
+
+
+                    if True:
+                        figs, axs = pl.subplots(figsize=(8, 6))
+                        for i in range(unsensitivity.shape[0]):
+                            axs.plot(untime, unsensitivity[i],
+                                       linewidth=1.5,
+                                       )
+                        axs.set_title('First-order Sobol indices')
+                        axs.set_xlabel(f'BJD (days)',
+                                       fontsize=fm_label_fs)
+                        axs.set_ylabel('First-order Sobol indices',
+                                       fontsize=fm_label_fs)
+                        axs.legend(parameters.get_from_uncertain(),
+                                            loc='upper right',
+                                            framealpha=0.5)
+
+                        figs.savefig(saveplace+f'{name_head}sobol_{b.name_+name_tail}.{plot_fmt}',
+                                   bbox_inches='tight')
+                        pl.close(figs)
+                # Plot Histogram Model
+                if switch_histogram:
+                    nbins = 5
+                    while nbins < len(D_PF):
+                        counts, bins = np.histogram(D_PF['RV_D'], bins=nbins)
+                        if (counts==0).any():
+                            break
+                        else:
+                            nbins += 1
+
+                    axh.hist(D_PF['RV_D'], bins=nbins-1, orientation='horizontal', ec=rc.fg,
+                             lw=fm_hist['lw'])
+
+                # Plot histogram residuals
+                if switch_histogram:
+                    nbins = 5
+                    while nbins < len(D_PF):
+                            counts, bins = np.histogram(D_PF['residuals'], bins=nbins)
+                            if (counts==0).any():
+                                break
+                            else:
+                                nbins += 1
+                    axrh.hist(D_PF['residuals'], bins=nbins-1, orientation='horizontal', ec=rc.fg,
+                              lw=fm_hist['lw'])
+
+                # Ticks and labels
+
+                if True:
+                    ax.tick_params(axis="x", labelbottom=False)
+                    axr.tick_params(axis="x", labelsize=fm_tick_xsize)
+
+                    ax.tick_params(axis="y", labelsize=fm_tick_ysize)
+                    axr.tick_params(axis="y", labelsize=fm_tick_ysize)
+                    
+                    if switch_histogram:
+                        # HIDE TICKS
+                        axh.tick_params(axis="x", labelbottom=False, labelsize=fm_tick_xsize)
+                        axh.tick_params(axis="y", labelleft=False)
+
+                        axrh.tick_params(axis="y", labelleft=False)
+                        axrh.tick_params(axis="x", labelsize=fm_tick_xsize)
+                        axrh.set_xlabel('Counts', fontsize=fm_label_fs)
+
+                                         
+                    ax.set_title('Keplerian Model', fontsize=fm_title_fs)
+                    ax.set_ylabel(r'RVs ($\frac{m}{s}$)', fontsize=fm_label_fs)
+                    ax.legend(fontsize=fm_legend_fs)#, framealpha=0)
+
+                    axr.set_xlabel(f'BJD (days)', fontsize=fm_label_fs)
+                    axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
+
+
+                # SPINES
+                if True:
+                    for spine in ax.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+                    for spine in axr.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+
+                    for spine in axh.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+                    for spine in axrh.spines.values():
+                        spine.set_linewidth(fm_frame_lw)
+
+            pl.savefig(saveplace+f'{name_head}{b.name_+name_tail}.{plot_fmt}',
+                        bbox_inches='tight')
+
+            nb_ += 1
+
+            pbar.update(1)
+
+
+            # print('MARKER 5')
+            if nb_ == len(DB_all_kep):
+                pbar.close()
+
+    temp_file_folder = saveloc+'/temp/models/'
+
+
+    with nullify_output():
+        for file in list(set(temp_file_names)):
+            try:
+                os.system('mv {0} {1}{0}'.format(file, temp_file_folder))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+        for file in list(set(temp_mod_names)):
+            try:
+                os.system('mv {0} {1}{2}'.format(file, temp_file_folder, file.split('/')[-1]))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+        for file in list(set(temp_dat_names)):
+            try:
+                os.system('mv {0} {1}{2}'.format(file, temp_file_folder, file.split('/')[-1]))
+            except Warning:
+                print('Couldnt auto-delete temp files')
+
+    return chaos_thetas
+

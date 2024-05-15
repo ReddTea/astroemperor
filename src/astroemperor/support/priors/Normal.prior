@@ -1,6 +1,6 @@
 def Normal(x, limits, args):
     if limits[0] <= x <= limits[1]:
-        mu, var = args[0], args[1]**2
-        return - 0.5 * (np.log(2*np.pi*var) + (x - mu)**2/var)
+        mu, s = args[0], args[1]
+        return - 0.5 * ((x - mu)/s)**2 - np.log(s*np.sqrt(2*np.pi))
     else:
         return -np.inf

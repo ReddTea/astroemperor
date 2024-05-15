@@ -5,3 +5,6 @@ include src/astroemperor/support/pools/*.pool
 include src/astroemperor/support/priors/*.prior
 
 include src/astroemperor/support/*.scr
+
+exclude Private/
+exclude tests/datalogs/*

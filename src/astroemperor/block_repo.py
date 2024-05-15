@@ -1,8 +1,6 @@
 # @auto-fold regex /^\s*if/ /^\s*else/ /^\s*def/
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# version 0.8.4
-# date 1 aug 2023
 
 # my coding convention
 # **EVAL : evaluate the performance of this method
@@ -16,201 +14,166 @@ from .block import Parameter, Parameter_Block
 from .utils import ModelWrapper
 from .model_repo import *
 
+from .globals import _OS_ROOT
+
+## RED please re-do this import
+import sys
+sys.path.insert(1, _OS_ROOT)
+import param_repo as pr
+
+
+subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
+supscript_nums = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
 
 def mk_KeplerianBlock(my_data, parameterisation=0, number=1):
-    my_params = []
-    subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
-
+    Empty_Block = {'name_':f'KeplerianBlock {number}',
+                    'type_':'Keplerian',
+                    'is_iterative':True,
+                    'display_on_data_':True,
+                    'parameterisation':parameterisation,
+                    'number_':number,
+                    
+                    'bnumber_':0,
+                    'moav':0,
+                    'slice':None,
+                    'additional_priors_bool':None,
+                    'dynamics_bool':None,
+                    'astrometry_bool':False,
+                    }
+    
     if parameterisation == 0:
-        kepmod = Keplerian_Model
-        pnames = ['Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude']
-        punits = ['(Days)', r'($\frac{m}{s}$)', '(rad)', '', '(rad)']
-        math_display = f'K⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}'
-        b_script = 'kep00.model'
-        pis_circular = [False, False, True, False, True]
-        pis_hou = [False, False, False, False, False]
+        param_list = ['dPeriod', 'dAmplitude', 'dPhase', 'dEccentricity', 'dLongitude']
+        Kep_Block = {'model_script':'kep00.model',
+                    'math_display_':f'K⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    }
+        
+    if parameterisation == 1:
+        param_list = ['dlPeriod', 'dAmp_sin', 'dAmp_cos', 'dEcc_sin', 'dEcc_cos']
+        Kep_Block = {'model_script':'kep01.model',
+                    'math_display_':f'K⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    }
+        
+    if parameterisation == 2:
+        param_list = ['dPeriod', 'dAmplitude', 'dT_0', 'dEccentricity', 'dLongitude']
+        Kep_Block = {'model_script':'kep02.model',
+                    'math_display_':f'K⋅(cos(ν(t,P,T₀,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    }
 
-    elif parameterisation == 1:
-        kepmod = Keplerian_Model_1
-        pnames = ['lPeriod', 'Amp_sin', 'Amp_cos', 'Ecc_sin', 'Ecc_cos']
-        punits = ['(Days)', r'($\frac{m}{s}$)', '(rad)', '', '(rad)']
-        math_display = f'K⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}'
-        b_script = 'kep01.model'
-        pis_circular = [False, False, False, False, False]
-        pis_hou = [False, True, True, True, True]
+    if parameterisation == 3:
+        param_list = ['dPeriod', 'dAmplitude', 'dT_0', 'dEcc_sin', 'dEcc_cos']
+        Kep_Block = {'model_script':'kep03.model',
+                    'math_display_':f'K⋅(cos(ν(t,P,T₀,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    }
 
-    elif parameterisation == 2:
-        kepmod = Keplerian_Model_2
-        pnames = ['Period', 'Amplitude', 'T_0', 'Eccentricity', 'Longitude']
-        punits = ['(Days)', r'($\frac{m}{s}$)', '(Days)', '', '(rad)']
-        math_display = f'K⋅(cos(ν(t,P,T₀,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}'
-        b_script = 'kep02.model'
-        pis_circular = [False, False, False, False, True]
-        pis_hou = [False, False, False, False, False]
+    if parameterisation == 999:
+        param_list = ['dPeriod', 'dAmplitude', 'dM0', 'dEccentricity', 'dLongitude']
+        Kep_Block = {'model_script':'akep00.model',
+                    'math_display_':f'K⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    }
 
-    elif parameterisation == 3:
-        kepmod = Keplerian_Model_3
-        pnames = ['Period', 'Amplitude', 'T_0', 'Ecc_sin', 'Ecc_cos']
-        punits = ['(Days)', r'($\frac{m}{s}$)', '(Days)', '', '(rad)']
-        math_display = f'K⋅(cos(ν(t,P,T₀,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}'
-        b_script = 'kep03.model'
-        pis_circular = [False, False, False, False, False]
-        pis_hou = [False, False, False, True, True]
 
+    my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
     if number:
-        pnames = [pnam+' %i' % number for pnam in pnames]
+        for p in my_params:
+            p.name += f' {number}'
+            p.mininame += f' {number}'
+    block_attributes = {**Empty_Block, **Kep_Block}
 
-    bdim = len(pnames)
-
-    pvalues = [-np.inf for _ in range(bdim)]
-    ppriors = ['Uniform' for _ in range(bdim)]
-    plimits = [[None, None] for _ in range(bdim)]
-
-    ptypes = [None for _ in range(bdim)]
-    prargs = [None for _ in range(bdim)]
-    ptformargs = [None for _ in range(bdim)]
-    pfixed = [None for _ in range(bdim)]
-    psigma = [None for _ in range(bdim)]
-
-    pGM_parameter = [None for _ in range(bdim)]
-    pposterior = [None for _ in range(bdim)]
-
-    pstds = [None for _ in range(bdim)]
-
-    for i in range(bdim):
-        d0 = {'name':pnames[i], 'prior':ppriors[i], 'value':pvalues[i],
-                  'limits':plimits[i], 'unit':punits[i], 'prargs':prargs[i],
-                  'type':ptypes[i], 'ptformargs':ptformargs[i], 'fixed':pfixed[i],
-                  'sigma':psigma[i], 'GM_parameter':pGM_parameter[i],
-                  'posterior':pposterior[i], 'std':pstds[i],
-                  'is_circular':pis_circular[i],
-                  'is_hou':pis_hou[i]}
-
-        my_params.append(Parameter(d0))
-
-    b_mod = ModelWrapper(kepmod, [my_data.values[:, 0]])
-    b_name = f'KeplerianBlock {number}'
-
-    return Parameter_Block(my_params, block_model=b_mod,
-                           block_name=b_name, block_type='Keplerian',
-                           model_script=b_script,
-                           is_iterative=True,
-                           math_display=math_display, display=True,
-                           parameterisation=parameterisation, number=number)
+    return Parameter_Block(my_params, block_attributes)
 
 
-def mk_InstrumentBlock(my_data, number=1, moav=0, sa=False):
+def mk_OffsetBlock(my_data, nins=1):
     my_params = []
-    #subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
-    supscript_nums = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
-
-    pnames = ['Offset', 'Jitter']
-    punits = [r'($\frac{m}{s}$)', r'($\frac{m}{s}$)']
-    math_display = f'γ₀|{supscript_nums[number]}'
-    if number:
-        pnames = [pnam+' %i' % number for pnam in pnames]
-    if moav > 0:
-        for j in range(moav):
-            if number:
-                pnames.append(f'MACoefficient {number} Order {j + 1}')
-                pnames.append(f'MATimescale {number} Order {j+1}')
-
-                punits.append(r'($\frac{m}{s}$)')
-                punits.append('(Days)')
-            else:
-                pnames.extend((f'MACoefficient Order {j + 1}', f'MATimescale Order {j + 1}'))
-                punits.extend((r'($\frac{m}{s}$)', '(Days)'))
-        math_display = f'{math_display} + 𝛴ᵢ𝛴ₘ 𝛷ₘ⋅exp((t₍ᵢ₋ₘ₎-tᵢ)/𝜏ₘ)⋅𝜀(t₍ᵢ₋ₘ₎)'
-
-    if sa != 0:
-        for si in range(sa):
-            pnames.append(f'Staract {number} {si}')
-            punits.append('')
-    bdim = len(pnames)
-
-    pvalues = [-np.inf for _ in range(bdim)]
-    ppriors = ['Uniform' for _ in range(bdim)]
-    plimits = [[None, None] for _ in range(bdim)]
-
-    ptypes = [None for _ in range(bdim)]
-    prargs = [None for _ in range(bdim)]
-    ptformargs = [None for _ in range(bdim)]
-    pfixed = [None for _ in range(bdim)]
-    psigma = [None for _ in range(bdim)]
-
-    pGM_parameter = [None for _ in range(bdim)]
-    pposterior = [None for _ in range(bdim)]
-
-    pstds = [None for _ in range(bdim)]
-    pis_circular = [False for _ in range(bdim)]
-    pis_hou = [False for _ in range(bdim)]
-
-    for i in range(bdim):
-        d0 = {'name':pnames[i], 'prior':ppriors[i], 'value':pvalues[i],
-                  'limits':plimits[i], 'unit':punits[i], 'prargs':prargs[i],
-                  'type':ptypes[i], 'ptformargs':ptformargs[i], 'fixed':pfixed[i],
-                  'sigma':psigma[i], 'GM_parameter':pGM_parameter[i],
-                  'posterior':pposterior[i], 'std':pstds[i],
-                  'is_circular':pis_circular[i],
-                  'is_hou':pis_hou[i]}
-
-        my_params.append(Parameter(d0))
+    for i in range(nins):
+        offset_dict = pr.make_parameter(getattr(pr, 'dOffset'))
+        offset_dict['name'] += f' {i+1}'
+        offset_dict['mininame'] += f' {i+1}'
+        my_params.append(Parameter(offset_dict))
+    
+    block_attributes = {'name_':f'OffsetBlock',
+                        'type_':'Offset',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'offset00.model',
+                        'math_display_':'γ₀|ᵢ',
+                        }
 
 
-    if moav > 0:
-        insmod = Instrument_Moav_Model
-        b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3], moav,
-                             my_data.values[:, 0], my_data.values[:, 1]])
-        b_script = 'ins01.model'
-        if sa:
-            insmod = Instrument_Moav_SA_Model
-            b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3], moav,
-                                 my_data.values[:, 0], my_data.values[:, 4:],
-                                 my_data.shape[1]-4])
-            b_script = 'ins02.model'
-    else:
-        insmod = Instrument_Model
-        b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3]])
-        b_script = 'ins00.model'
-        if sa:
-            ###
-            insmod = Instrument_Model_SA
-            b_mod = ModelWrapper(insmod, [number, my_data.values[:, 3]])
-            b_script = 'ins03.model'
-            pass
-
-    b_name = f'InstrumentalBlock {number}'
-
-    return Parameter_Block(my_params, block_model=b_mod,
-                           block_name=b_name, block_type='Instrumental',
-                           model_script=b_script,
-                           is_iterative=False,
-                           math_display=math_display, display=False,
-                           parameterisation=None, number=number,
-                           moav=moav)
+    return Parameter_Block(my_params, block_attributes)
 
 
-def mk_AccelerationBlock(my_data, n=1):
+def mk_SAIBlock(my_data, nins=1, sa=False):
     my_params = []
-    subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
-    #supscript_nums = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
+    for i in range(nins):
+        for si in range(sa[i]):
+            d0 = {'name':f'Staract {i+1} {si+1}',
+                  'mininame':rf'SA_{i+1} {si+1}',
+                  
+                    'prior':'Uniform',
+                    'value':-np.inf,
+                    'limits':[None, None],
+                    'unit':'',
+                    'prargs':None,
+                    'type':None,
+                    'ptformargs':None,
+                    'fixed':None,
+                    'sigma':None,
+                    'GM_parameter':None,
+                    'posterior':None,
+                    'std':None,
+                    'is_circular':False,
+                    'is_hou':False}
+
+            my_params.append(Parameter(d0))
+
+
+    block_attributes = {'name_':f'StellarActivityBlock',
+                        'type_':'StellarActivity',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'sai00.model',
+                        'math_display_':'',
+                        }
+
+
+    return Parameter_Block(my_params, block_attributes)    
+
+
+def mk_AccelerationBlock(my_data, accel=1):
+    my_params = []
     punits = []
     acmod = Acceleration_Model
-    for i in range(n):
+    for i in range(accel):
         if i == 0:
             pnames = ['Acceleration']
-            punits.append(r'($\frac{m}{s^2}$)')
+            punits.append(r'($\frac{m}{s day}$)')
         else:
             pnames.append(f'Acceleration Order {str(i + 1)}')
-            punits.append(r'($\frac{m}{s^%s}$)' % str(i+2))
+            punits.append(r'($\frac{m}{s day^%s}$)' % str(i+1))
 
     bdim = len(pnames)
 
 
     pvalues = [-np.inf for _ in range(bdim)]
     ppriors = ['Uniform' for _ in range(bdim)]
-    yearly = 1/365.25
-    plimits = [[-yearly, yearly] for _ in range(bdim)]
+    daily = 1 # 1/365.25
+    plimits = [[-daily, daily] for _ in range(bdim)]
 
     ptypes = [None for _ in range(bdim)]
     prargs = [None for _ in range(bdim)]
@@ -242,15 +205,135 @@ def mk_AccelerationBlock(my_data, n=1):
 
 
     b_mod = ModelWrapper(acmod, [my_data.values[:, 0]])
-    b_name = f'AccelerationBlock o{n}'
+    b_name = f'AccelerationBlock o{accel}'
     b_script = 'acc.model'
 
-    return Parameter_Block(my_params, block_model=b_mod,
-                           block_name=b_name, block_type='Acceleration',
-                           model_script=b_script,
-                           is_iterative=False,
-                           math_display=math_display, display=False,
-                           parameterisation=None, number=n)
+    block_attributes = {'name_':b_name,
+                        'type_':'Acceleration',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':accel,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':b_script,
+                        'math_display_':math_display,
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
+
+
+def mk_MOAVBlock(my_data, nins=1, moav_args={}):
+    my_params = []
+    order = moav_args['order']
+    is_global = moav_args['global']
+    param_range = 1 if is_global else nins
+    for i in range(param_range):
+        for j in range(order):
+            MA_coef_dict = pr.make_parameter(getattr(pr, 'dMACoefficient'))
+            MA_coef_dict['name'] += f' {i+1} Order {j+1}'
+
+            MA_time_dict = pr.make_parameter(getattr(pr, 'dMATimescale'))
+            MA_time_dict['name'] += f' {i+1} Order {j+1}'
+
+
+            my_params.append(Parameter(MA_coef_dict))
+            my_params.append(Parameter(MA_time_dict))
+    
+    block_attributes = {'name_':f'MOAVBlock',
+                        'type_':'MOAV',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':order,
+                        'is_global':is_global,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'math_display_':'𝛴ᵢ𝛴ₘ 𝛷ₘ⋅exp((t₍ᵢ₋ₘ₎-tᵢ)/𝜏ₘ)⋅𝜀(t₍ᵢ₋ₘ₎)',
+                        }
+    if is_global:
+        block_attributes['model_script'] = 'moav01.model'
+    else:
+        block_attributes['model_script'] = 'moav00.model'
+
+
+    return Parameter_Block(my_params, block_attributes)    
+
+
+def mk_JitterBlock(my_data, nins=1):
+    my_params = []
+    for i in range(nins):
+        jitter_dict = pr.make_parameter(getattr(pr, 'dJitter'))
+        jitter_dict['name'] += f' {i+1}'
+        jitter_dict['mininame'] += rf'_{i+1}'
+
+        my_params.append(Parameter(jitter_dict))
+    
+    block_attributes = {'name_':f'JitterBlock',
+                        'type_':'Jitter',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'jitter00.model',
+                        'math_display_':'',
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
+
+
+def mk_CeleriteBlock(my_data, nins=1, my_kernel={}):
+    my_params = []
+
+    for current_term in my_kernel['terms']:
+        if current_term == 'RealTerm':
+        # real term
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRealTerm_a'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRealTerm_c'))))
+        elif current_term == 'RotationTerm':
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRotationTerm_sigma'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRotationTerm_period'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRotationTerm_Q0'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRotationTerm_dQ'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dRotationTerm_f'))))
+        elif current_term == 'Matern32Term':
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dMatern32Term_sigma'))))
+            my_params.append(Parameter(pr.make_parameter(getattr(pr, 'dMatern32Term_rho'))))
+        else:
+            print('ERROR: Current kernel not identified. -RT')
+        pass
+
+    block_attributes = {'name_':f'CeleriteBlock',
+                        'type_':'Celerite2',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'real_term00.model',
+                        'math_display_':'',
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
 
 
 def mk_AdditionalPriorsBlock(my_data):
@@ -260,11 +343,99 @@ def mk_AdditionalPriorsBlock(my_data):
     b_name = 'AdditionalPriorsBlock'
 
     math_display = ''
-    return Parameter_Block(my_params, block_model=b_mod,
-                           block_name=b_name, block_type='AdditionalPriors',
-                           is_iterative=False,
-                           math_display=math_display, display=False,
-                           parameterisation=None, number=None)
+
+    block_attributes = {'name_':f'AdditionalPrior',
+                        'type_':'AdditionalPriors',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'',
+                        'math_display_':'',
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
+
+
+def mk_AstrometryKeplerianBlock(my_data, parameterisation=0, number=1):
+    init_Block = mk_KeplerianBlock(my_data,
+                                   parameterisation=0,
+                                   number=number)
+                                   
+    Empty_Block = {'name_':f'AstrometryKeplerianBlock {number}',
+                    #'type_':'AstrometryKeplerian',
+                    'model_script':'akep00.model',
+                    'math_display_':f'K⋅sin(I)⋅(cos(ν(t,P,𝜙,e)+𝜔)+e⋅cos(𝜔))|{subscript_nums[number]}',
+                    'astrometry_bool':True,
+                    }
+    for change in Empty_Block:
+        setattr(init_Block, change, Empty_Block[change])
+
+    param_list = ['dInclination', 'dOmega']
+    my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
+
+    if number:
+        for p in my_params:
+            p.name += f' {number}'
+    
+    init_Block.list_ = np.append(init_Block.list_, my_params)
+
+    return init_Block
+
+
+def mk_AstrometryOffsetBlock(my_data, nins=1):
+    param_list = ['dOffset_ra', 'dOffset_de',
+                  'dOffset_pm_ra', 'dOffset_pm_de']
+
+    my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
+    
+    block_attributes = {'name_':f'AstrometryOffsetBlock',
+                        'type_':'AstrometryOffset',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'aoffset00.model',
+                        'math_display_':'γ₀|ᵢ',  # put proper utf8
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
+
+
+def mk_AstrometryJitterBlock(my_data, nins=1):
+    param_list = ['dJitterH', 'dJitterG']
+
+    my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
+    
+    block_attributes = {'name_':f'AstrometryJitterBlock',
+                        'type_':'AstrometryJitter',
+                        'is_iterative':False,
+                        'display_on_data_':False,
+                        'parameterisation':None,
+                        'number_':nins,
+                        
+                        'bnumber_':0,
+                        'moav':0,
+                        'slice':None,
+                        'additional_priors_bool':None,
+                        'dynamics_bool':None,
+                        'model_script':'ajitter00.model',
+                        'math_display_':'',
+                        }
+
+    return Parameter_Block(my_params, block_attributes)
 
 
 def SmartLimits(my_data, b, *args, **kwargs):
@@ -280,16 +451,23 @@ def SmartLimits(my_data, b, *args, **kwargs):
     if b.type_ == 'Keplerian':
         sig_limiter = my_data['RV'].std(ddof=0)
         per_limiter = my_data['BJD'].max() - my_data['BJD'].min()
-        amp_limiter = sig_limiter * np.sqrt(3)
+        amp_limiter = sig_limiter * np.sqrt(4)
         angle_limits = [0, 2*np.pi]
 
         ecc_limits, ecc_prargs = d['prargs']
 
         if b.parameterisation == 0:
-            lims = [[0.1, per_limiter], [0, amp_limiter], angle_limits,
+            lims = [[1.5, per_limiter], [1e-6, amp_limiter], angle_limits,
                        ecc_limits, angle_limits]
             priors = [uni, uni, uni, norm, uni]
             prargs = [None, None, None, ecc_prargs, None]
+
+            if b.astrometry_bool:
+                lims.extend([angle_limits, angle_limits])  # Ome
+                priors.extend([uni, uni])
+                prargs.extend([None, None])
+
+
 
         if b.parameterisation == 1:
             sqrta, sqrte = amp_limiter, 0.707  #(sqrt 0.5 ~ 0.707)
@@ -326,7 +504,6 @@ def SmartLimits(my_data, b, *args, **kwargs):
                       }
 
                 b.add_additional_parameters(d0)
-
 
         if b.parameterisation == 2:
             t0_limiter = [my_data['BJD'].min(), my_data['BJD'].min() + per_limiter]
@@ -376,9 +553,10 @@ def SmartLimits(my_data, b, *args, **kwargs):
                                    ['Longitude', uni, [0, 2*np.pi], []],
                                    ])
             '''
+            
         if d['starmass']:
             sma_minmass_add_additional(b, uni)
-
+        
             if d['dynamics']:
                 if not d['dynamics_already_included'] and d['kplan'] > 1:
                     d0 = {'name': 'Hill',
@@ -393,15 +571,7 @@ def SmartLimits(my_data, b, *args, **kwargs):
                         }
                     d['dynamics_already_included'] = True
                     b.add_additional_parameters(d0)
-        '''
-            if d['dynamics']:
-                if d['kplan'] > 1 and b.number_ == d['kplan']:
-                    prarg = [d['kplan'], d['starmass']]
-                    b.add_additional_priors([['Hill', 'Hill', [None, None], prarg]])
-                    b.dynamics_bool = True
-                else:
-                    b.dynamics_bool = False
-        '''
+
 
     elif b.type_ == 'Instrumental':
         jit_limits, jit_prargs = args
@@ -431,8 +601,130 @@ def SmartLimits(my_data, b, *args, **kwargs):
                 prargs.append(None)
 
 
+    elif b.type_ == 'Offset':
+        for nin in range(b.number_):
+            mask = my_data['Flag'] == (nin + 1)
+            jit_limiter = my_data[mask]['RV'].abs().max()
+            lims.append([-jit_limiter, jit_limiter])
+            priors.append(uni)
+            prargs.append(None)
+
+
+    elif b.type_ == 'StellarActivity':
+        for nin in range(b.number_):
+            lims.append([-1., 1.])
+            priors.append(uni)
+            prargs.append(None)            
+          
+
+    elif b.type_ == 'MOAV':
+        for nin in range(b.number_):
+            for _ in range(b.moav):
+                lims.append([0.0, 0.3])
+                lims.append([5, 25])
+               
+                priors.append(uni)
+                priors.append(uni)
+
+                prargs.append(None)
+                prargs.append(None)
+
+
+    elif b.type_ == 'Jitter':
+        jit_limits, jit_prargs = args
+        for nin in range(b.number_):
+            mask = my_data['Flag'] == (nin + 1)
+            jit_limiter = my_data[mask]['RV'].abs().max()
+            lims.append([1e-5, jit_limiter])
+            priors.append(norm)
+            prargs.append(jit_prargs)
+
+
+    elif b.type_ == 'Celerite2':
+        pc = 0
+        for i in range(len(d['terms'])):
+            current_term = d['terms'][i]
+            current_params = d['params'][i]
+
+            if current_term == 'RealTerm':
+
+                for param in current_params:
+                    if current_params[param] == None:
+                        lims.append([1e-5, 5])
+                        priors.append(uni)
+                        prargs.append(None)
+                    else:
+                        lims.append([np.nan, np.nan])
+                        priors.append('Fixed')
+                        prargs.append(None)
+                        b[pc].fixed = current_params[param]
+                    pc += 1
+            elif current_term == 'Matern32Term':
+
+                for param in current_params:
+                    if current_params[param] == None:
+                        lims.append([1e-5, 5])
+                        priors.append(uni)
+                        prargs.append(None)
+                    else:
+                        lims.append([np.nan, np.nan])
+                        priors.append('Fixed')
+                        prargs.append(None)
+                        b[pc].fixed = current_params[param]
+                    pc += 1
+
+            elif current_term == 'RotationTerm':
+                 for param in current_params:
+                    if current_params[param] == None:
+                        if param == 'f':
+                            lims.append([1e-5, 1])
+                        else:
+                            lims.append([1e-5, 5])
+                        priors.append(uni)
+                        prargs.append(None)
+                    else:
+                        lims.append([np.nan, np.nan])
+                        priors.append('Fixed')
+                        prargs.append(None)
+                        b[pc].fixed = current_params[param]
+                    pc += 1               
+
+
+    elif b.type_ == 'AstrometryKeplerian':
+        pass
+
+
+    elif b.type_ == 'AstrometryOffset':
+        #['dOffset_ra', 'dOffset_dec',
+        #          'dOffset_pm_ra', 'dOffset_pm_dec']
+        
+        off_lim = 1e6
+        for i in range(2):
+            lims.append([-off_lim, off_lim])
+            priors.append(uni)
+            prargs.append(None)
+
+        for i in range(2):
+            lims.append([-off_lim, off_lim])
+            priors.append(uni)
+            prargs.append(None)
+
+
+    elif b.type_ == 'AstrometryJitter':
+        # 'dJitterH', 'dJitterG'
+        
+        jit_lim = np.exp(12)
+        for i in range(2):
+            lims.append([-jit_lim, jit_lim])
+            priors.append(uni)
+            prargs.append(None)
+
+
+
     elif b.type_ != 'Acceleration':
         print(f'type_ {b.type_} not recognised. \nSmartLimits failed')
+
+
 
     b.set_attr('limits', lims, silent=True)
     b.set_attr('prior', priors, silent=True)

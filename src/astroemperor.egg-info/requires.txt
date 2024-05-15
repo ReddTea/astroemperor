@@ -1,0 +1,13 @@
+numpy
+matplotlib>=3.5.1
+PyAstronomy
+gatspy
+ipywidgets
+tabulate
+reddutils
+kepler.py
+emcee
+arviz
+corner
+reddcolors
+reddemcee

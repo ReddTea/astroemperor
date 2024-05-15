@@ -1,0 +1,17 @@
+    # Instrumental Part
+    # Moav Part
+    if {2} > 0:
+        theta_ma = theta[{1}]
+        t_ = X_
+        res_ = residuals
+        for i in range(ndat):
+            for c in range({2}):
+                if i > c:
+                    dt = abs(t_[i] - t_[i - 1 - c])
+                    macoef = theta_ma[2 * c]
+                    matime = theta_ma[2 * c + 1]
+                    MA = macoef * np.exp(-dt / matime) * res_[i - 1 - c]
+                    model0[i] += MA
+                    residuals[i] -= MA
+        
+    # End Instrumental Part
