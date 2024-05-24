@@ -11,7 +11,6 @@
 
 # sourcery skip: remove-redundant-if
 if True:
-
     import itertools
     import multiprocessing
     import os
@@ -502,6 +501,9 @@ class Simulation(object):
 
     def add_acceleration_block(self):
         ab = mk_AccelerationBlock(self.my_data, accel=self.acceleration)
+        kw = {}
+        
+        SmartLimits(self.my_data, ab, **kw)
         self.blocks__.append(ab)
 
         msg = '{} {}, {}'.format(colored(ab.type_, 'green', attrs=['bold']),
@@ -856,7 +858,15 @@ class Simulation(object):
 
                 k_start += 1
 
+                # make INIT POS
+                if True:
+                    for b in self:
+                        if b.type_ == 'Keplerian':
+                            for p in b:
+                                if p.fixed is None:
+                                    p.init_pos = p.value_range
 
+                # Apply Constrain method
                 if self.switch_constrain:
                     if self.constrain_method == 'sigma':
                         for b in self:
@@ -971,6 +981,7 @@ class Simulation(object):
             self.sampler.betas_history = self.sampler_metadata_dict['betas_history']
             self.sampler.ratios_history = self.sampler_metadata_dict['ratios_history']
 
+            # BURN-IN config
             if True:
                 if type(self.reddemcee_config['burnin']) == str:
                     if self.reddemcee_config['burnin'] == 'half':
@@ -989,6 +1000,7 @@ class Simulation(object):
                 else:
                     print('method not understood!! CODE 27')
                     self.reddemcee_discard = 0
+            # THIN config
             if True:
                 if type(self.reddemcee_config['thinby']) == str:
                     if self.reddemcee_config['thinby'] == 'half':
@@ -1201,6 +1213,21 @@ class Simulation(object):
                         p.value_low2, p.value_high2 = self.fit_low2[j], self.fit_high2[j]
                         p.value_low3, p.value_high3 = self.fit_low3[j], self.fit_high3[j]
 
+
+                        if p.value_low1 < p.value_max:
+                            a = p.value_low1
+                        else:
+                            a = p.value_max - p.sigma
+
+                        if p.value_high1 > p.value_max:
+                            b = p.value_high1
+                        else:
+                            b = p.value_max + p.sigma
+                        p.value_range = [a, b]
+
+                        #if b.type == 'Keplerian':
+                        #    p.init_pos = p.value_range
+
                         j += 1
                     else:
                         p.sigma = np.nan
@@ -1328,6 +1355,17 @@ class Simulation(object):
                             p.value_low1, p.value_high1 = np.percentile(ch, find_confidence_intervals(1))
                             p.value_low2, p.value_high2 = np.percentile(ch, find_confidence_intervals(2))
                             p.value_low3, p.value_high3 = np.percentile(ch, find_confidence_intervals(3))
+
+                            if p.value_low1 < p.value_max:
+                                a = p.value_low1
+                            else:
+                                a = p.value_max - p.sigma
+
+                            if p.value_high1 > p.value_max:
+                                b = p.value_high1
+                            else:
+                                b = p.value_max + p.sigma
+                            p.value_range = [a, b]
 
                             p.value_max_lk = ch[best_loc_like]
                             jj += 1
@@ -1592,7 +1630,41 @@ class Simulation(object):
                         fmt='%s',
                         delimiter='\t')
             
+        if True:
+            par_box_names = self.get_attr_param('name', flat=True)
+            max_length = max(len(item) for item in par_box_names)
+            par_box_names = [item.ljust(max_length) for item in par_box_names]
+            v0 = np.round(self.get_attr_param('value_range', flat=True), 8)[:, 0]
+            v1 = np.round(self.get_attr_param('value_max', flat=True), 8)
+            v2 = np.round(self.get_attr_param('value_range', flat=True), 8)[:, 1]
+
+            par_box = [par_box_names,
+                       v0,
+                       v1,
+                       v2,
+                       ]
+            pb_header = ['Parameter',
+                         'lower    ',
+                         'value    ',
+                         'higher   ']
+            np.savetxt(f'{self.saveplace}/param_minimal.dat',
+                        np.vstack([pb_header, np.array(par_box).T]),
+                        fmt='%s',
+                        delimiter='\t')
             
+            tex_box = [par_box_names,
+                       v1,
+                       np.round(v2-v1),
+                       np.round(v0-v1)]
+            
+            np.savetxt(f'{self.saveplace}/param_tex.dat',
+                        np.vstack([['Parameter',
+                                    'value    ',
+                                    '+        ',
+                                    '-        '],
+                                   np.array(tex_box).T]),
+                        fmt='%s',
+                        delimiter='\t')
         #######################
         # PLOT GM PER PARAMETER
 
@@ -2292,6 +2364,16 @@ def set_init():
                 for b in self.model:
                     for p in b:
                         if p.fixed == None:
+                            if p.init_pos[0] is None:
+                                b = p.limits[0]
+                            else:
+                                b = np.round(p.init_pos[0], 8)
+
+                            if p.init_pos[1] is None:
+                                a = p.limits[1]
+                            else:
+                                a = np.round(p.init_pos[1], 8)
+
                             r = 1
                             if p.is_hou:
                                 r = 0.707
@@ -2303,7 +2385,7 @@ def set_init():
         np.random.shuffle(pos[t, :, j])
         j += 1
 
-'''.format(p.limits[1], p.limits[0], r))
+'''.format(a, b, r))
 
                 if self.FPTS:
                     f.write('''
