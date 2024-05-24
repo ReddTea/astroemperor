@@ -8,3 +8,6 @@ include src/astroemperor/support/*.scr
 
 exclude Private/
 exclude tests/datalogs/*
+
+exclude temp_*
+exclude __pycache__
