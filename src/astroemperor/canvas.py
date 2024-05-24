@@ -974,7 +974,7 @@ cornums = {my_model.cornums}
             D_PF = fold_dataframe(D_PF, per=per)
 
             if True:
-                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}.{plot_fmt}')
+                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}')
                 # get uncertainties
                 '''
                 if mode==1:
