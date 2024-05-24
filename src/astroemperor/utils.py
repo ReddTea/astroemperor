@@ -402,6 +402,21 @@ def find_confidence_intervals(sigma):
     return np.array([1-p, p]) * 100
 
 
+def my_shell_env():
+    try:
+        #
+        shl = get_ipython().__class__.__name__
+        if shl == 'ZMQInteractiveShell':
+            return 'jupyter-notebook'
+        elif shl == 'TerminalInteractiveShell':
+            return 'ipython-terminal'
+        elif get_ipython().__class__.__module__ == 'google.colab._shell':
+            return 'google-colab'
+        
+    except NameError:
+        return 'python-terminal'
+
+
 @contextmanager
 def nullify_output(suppress_stdout=True, suppress_stderr=True, suppress_stdin=True):
     stdout = sys.stdout
