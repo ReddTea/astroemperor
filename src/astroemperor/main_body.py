@@ -110,6 +110,7 @@ class Simulation(object):
         # LOAD ATTRIBUTES
         self.time_init = time.time()
 
+
         self.logger = reddlog()
         self.cores__ = _CORES
         self.FPTS = False
@@ -118,6 +119,7 @@ class Simulation(object):
         self.switch_PM = False
 
         self.starmass = 1.
+        self.temp_script = 'temp_script.py'
 
         Nonethings = ['starname', 'betas', 'saveplace', 'ndim__', 'instrument_names']
         for c in Nonethings:
@@ -169,7 +171,7 @@ class Simulation(object):
 
         # constrain
         self.constrain_sigma = 3
-        self.constrain_method = 'sigma'  # 'sigma', 'GM'
+        self.constrain_method = 'sigma'  # 'sigma', 'GM', 'range'
 
         # posterior
         self.cherry = {'cherry':True,
@@ -312,7 +314,11 @@ class Simulation(object):
         self.parameter_histograms = False
         self.corner = (np.array(self.plot_trace['modes']) == 3).any()
 
-        self.save_chains = None #  [0]
+
+        self.save_backends = True
+
+        #self.save_samples = [0]
+        self.save_chains = None
         self.save_likelihoods = [0]
         self.save_posteriors = [0]
         self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
@@ -335,7 +341,7 @@ class Simulation(object):
             import dynesty
             self.engine__ = dynesty
             self.engine__args = 'dynamic'
-            self.general_dependencies.append('dynesty')
+            self.general_dependencies.append('import dynesty')
 
             self.dynesty_config['dlogz_init'] = 0.05
 
@@ -346,9 +352,11 @@ class Simulation(object):
         elif eng == 'reddemcee':
             import reddemcee
             self.engine__ = reddemcee
-            self.general_dependencies.extend(['reddemcee', 'emcee', 'logging'])
+            self.general_dependencies.extend(['import reddemcee',
+                                              'import emcee',
+                                              'import logging'])
             if self.FPTS:
-                self.general_dependencies.extend(['astroemperor.fpts as fpts'])
+                self.general_dependencies.extend(['import astroemperor.fpts as fpts'])
 
 
             self.reddemcee_config['burnin'] = 'half'
@@ -397,7 +405,7 @@ class Simulation(object):
 
 
     def add_keplerian_block(self):
-        self.model_dependencies.append('kepler')
+        self.model_dependencies.append('import kepler')
         self.kplanets__ += 1
         if self.switch_inclination:
             kb = mk_AstrometryKeplerianBlock(self.my_data,
@@ -531,8 +539,8 @@ class Simulation(object):
 
 
     def add_celerite_block(self):
-        self.model_dependencies.append('celerite2')
-        self.model_dependencies.append('celerite2.terms as cterms')
+        self.model_dependencies.append('import celerite2')
+        self.model_dependencies.append('import celerite2.terms as cterms')
         self.plot_keplerian_model['celerite'] = True
         self.write_kernel()
         self.write_kernel(in_func=True)
@@ -565,6 +573,8 @@ class Simulation(object):
             self.model.switch_AM = True
             self.model.data_wrapper = self.data_wrapper
 
+        if 'Beta' in self.get_attr_param('prior', flat=True):
+            self.model_dependencies.append('from scipy.stats import beta as betapdf')
 
         self.model_constants['A_'] = f'{self.model.A_}'
         self.model_constants['mod_fixed_'] = f'{self.model.mod_fixed}'
@@ -604,7 +614,6 @@ class Simulation(object):
             #for key in self.plot_all.keys():
             #    self.plot_all_list[pi][key] = self.plot_all[key]
 
-        self.temp_script = 'temp_script.py'
 
         if self.switch_first:
             self.logger('\n\n')
@@ -736,10 +745,8 @@ class Simulation(object):
                                          logp_args=[], logp_kwargs={},
                                          ntemps=ntemps, pool=None)
 
-            #self.sampler = [None for _ in range(ntemps)]
             with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
                 self.sampler_metadata_dict = pickle.load(sampler_metadata)
-            os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
 
             if not self.FPTS:
                 for t in range(ntemps):
@@ -782,7 +789,6 @@ class Simulation(object):
 
                 with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
                     self.sampler_metadata_dict = pickle.load(sampler_metadata)
-                os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
             else:
                 # SET SETUP
                 # SET SAMPLER
@@ -867,56 +873,32 @@ class Simulation(object):
                                     p.init_pos = p.value_range
 
                 # Apply Constrain method
-                if self.switch_constrain:
-                    if self.constrain_method == 'sigma':
-                        for b in self:
-                            if b.type_ == 'Keplerian':
-                                for p in b:
-                                    if p.fixed is None:
-                                        pval = p.value
-                                        psig = p.sigma
-
-                                        limf = pval - self.constrain_sigma*psig
-                                        limc = pval + self.constrain_sigma*psig
-
-
-                                        if limc > p.limits[1]:
-                                            limc = p.limits[1]
-
-                                        if psig / abs(pval) < 1e-5:
-                                            self.add_condition([p.name, 'fixed', pval])
-                                        elif (limf > p.limits[0] and limc < p.limits[1]):
-                                            self.add_condition([p.name, 'limits', [limf, limc]])
-                                        elif limf > p.limits[0]:
-                                            self.add_condition([p.name, 'limits', [limf, p.limits[1]]])
-                                        elif limc < p.limits[1]:
-                                            self.add_condition([p.name, 'limits', [p.limits[0], limc]])
-                    if self.constrain_method == 'GM':
-                        count = 0
-                        for b in self:
-                            if b.type_ == 'Keplerian':
-                                for p in b[b.C_]:
-                                    if p.GM_parameter.n_components == 1:
-                                        prarg0 = [p.GM_parameter.means[0], p.GM_parameter.sigmas[0]]
-
-                                        self.add_condition([p.name, 'prior', 'Normal'])
-                                        self.add_condition([p.name, 'prargs', prarg0])
-
-                                    elif p.GM_parameter.n_components > 1:
-                                        self.add_condition([p.name, 'prior', 'GaussianMixture'])
-                                        self.add_condition([p.name, 'prargs', [self.model.C_[count]]])
-                                    count += 1
+                self.apply_constrains()
 
                 if True:
+                    xx = ['auto_setup',
+                          'sampler', 
+                          'sampler_metadata_dict',
+                          'reddemcee_config',
+                          'my_data',
+                          #'model',  # problems
+                          #'saveplace'
+                          ]
+                    xx = []
+                    
+
+                    #switches
                     run_metadata = {}
+                    for xxi in xx:
+                        run_metadata[xxi] = getattr(self, xxi)
 
                     # to restore, we need
                     # my_data
                     # model? .evaluate_model?!?!?!
                     # ymod, ferr2, residuals
-
                     with open(f'{self.saveplace}/restore/run_pickle.pkl','wb') as md_save:
                         pickle.dump(run_metadata, md_save)
+                        # pickle.dump(self, md_save)
 
 
                 # if not continue, model selec
@@ -1038,9 +1020,6 @@ class Simulation(object):
                     raw_posts0 = pickle.load(y)
                 raw_posts = list(np.array([raw_posts0[i].flatten(order='F')[self.reddemcee_discard:] for i in range(ntemps)]))
 
-                os.system(f'mv sampler_flatchain.pkl {self.saveplace}/restore/sampler_flatchain.pkl')
-                os.system(f'mv sampler_flatlogl.pkl {self.saveplace}/restore/sampler_flatlogl.pkl')
-                os.system(f'mv sampler_flatlogp.pkl {self.saveplace}/restore/sampler_flatlogp.pkl')
 
             if self.cherry['cherry']:
                 for t in range(ntemps):
@@ -1160,6 +1139,10 @@ class Simulation(object):
             print('\n\n------------ Dynesty Summary -----------\n\n')
             print(str(results.summary()))
 
+        if self.engine__.__name__ == 'emcee':
+            
+            pass
+
         chains = raw_chain
         posts = raw_posts
         likes = raw_likes
@@ -1198,7 +1181,7 @@ class Simulation(object):
             j = 0  # delete this ap1
             for b in self:
                 for p in b:
-                    if p.fixed == None:
+                    if p.fixed is None:
                         p.value = self.ajuste[j]
                         p.sigma = self.sigmas[j]
                         p.sigma_frac_mean = 0
@@ -1240,7 +1223,7 @@ class Simulation(object):
                         p.value_low1, p.value_high1 = np.nan, np.nan
                         p.value_low2, p.value_high2 = np.nan, np.nan
                         p.value_low3, p.value_high3 = np.nan, np.nan
-
+                        p.value_range = [np.nan, np.nan]
 
         # Get extra info. Parameter transformation and planet signatures
         if True:
@@ -1876,7 +1859,7 @@ class Simulation(object):
                         self.plot_gaussian_mixtures['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
 
                         plot_GM_Estimator(p.GM_parameter,
-                                          options=self.plot_all_list[-2])
+                                          options=self.plot_gaussian_mixtures)
 
                         pbar.update(1)
                     for p in b.additional_parameters:
@@ -2011,6 +1994,85 @@ class Simulation(object):
         self.conds.append(cond)
 
 
+    def apply_constrains(self):
+        if self.switch_constrain:
+            if self.constrain_method == 'sigma':
+                for b in self:
+                    if (b.type_ == 'Keplerian' or
+                        b.type_ == 'Jitter'):
+                        for p in b:
+                            if p.fixed is None:
+                                pval = p.value
+                                psig = p.sigma
+
+                                limf = pval - self.constrain_sigma*psig
+                                limc = pval + self.constrain_sigma*psig
+
+                                if limc > p.limits[1]:
+                                    limc = p.limits[1]
+
+                                if (limf < p.limits[0] or
+                                    b.type_ == 'Jitter'):
+                                    limf = p.limits[0]
+
+                                if psig / abs(pval) < 1e-5:
+                                    self.add_condition([p.name, 'fixed', pval])
+                                else:
+                                    self.add_condition([p.name, 'limits', [limf, limc]])
+
+                                '''    
+                                elif (limf > p.limits[0] and limc < p.limits[1]):
+                                    self.add_condition([p.name, 'limits', [limf, limc]])
+                                elif limf > p.limits[0]:
+                                    self.add_condition([p.name, 'limits', [limf, p.limits[1]]])
+                                elif limc < p.limits[1]:
+                                    self.add_condition([p.name, 'limits', [p.limits[0], limc]])
+                                '''
+
+
+            elif self.constrain_method == 'GM':
+                count = 0
+                for b in self:
+                    if b.type_ == 'Keplerian':
+                        for p in b[b.C_]:
+                            if p.GM_parameter.n_components == 1:
+                                prarg0 = [p.GM_parameter.means[0], p.GM_parameter.sigmas[0]]
+
+                                self.add_condition([p.name, 'prior', 'Normal'])
+                                self.add_condition([p.name, 'prargs', prarg0])
+
+                            elif p.GM_parameter.n_components > 1:
+                                self.add_condition([p.name, 'prior', 'GaussianMixture'])
+                                self.add_condition([p.name, 'prargs', [self.model.C_[count]]])
+                            count += 1
+
+
+            elif self.constrain_method == 'range':
+                for b in self:
+                    if (b.type_ == 'Keplerian' or 
+                        b.type_ == 'Jitter'):
+                        for p in b[b.C_]:
+                            limf = getattr(p, f'value_low{self.constrain_sigma}')
+                            limc = getattr(p, f'value_high{self.constrain_sigma}')
+
+                            if limc > p.limits[1]:
+                                limc = p.limits[1]
+
+                            if (limf < p.limits[0] or
+                                b.type_ == 'Jitter'):
+                                limf = p.limits[0]
+
+                            rang = limc - limf
+
+                            if rang / abs(p.value) < 1e-5:
+                                self.add_condition([p.name, 'fixed', p.value])
+                            else:
+                                self.add_condition([p.name, 'limits', [limf, limc]])
+
+            else:
+                print(f'ERROR: Constrain method {self.constrain_method} not identified')
+
+
     def write_kernel(self, in_func=False):
         nterms = len(self.my_kernel['terms'])
         sumeq = '='
@@ -2098,12 +2160,12 @@ print('temp_script.py   : INIT | ', time.time()-debug_timer)
             ## DEPENDENCIES
             for d in self.general_dependencies:
                 f.write(f'''
-import {d}
+{d}
 ''')
             ## MODEL DEPENDENCIES
             for d in self.model_dependencies:
                 f.write(f'''
-import {d}
+{d}
 ''')
 
             ## LOGGER
@@ -2483,16 +2545,64 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
         return ''
 
 
-    def load_run(self):
+    def load_run(self, tg):
+        xx = ['auto_setup',
+              'sampler',
+              'sampler_metadata_dict',
+              'reddemcee_config',
+              'my_data',
+              'model',
+              #'saveplace',
+              ]
+        self.saveplace = tg
+        os.system(f'mv {self.saveplace}/temp/{self.temp_script} {self.temp_script}')
+        os.system(f'mv {self.saveplace}/restore/sampler_pickle.pkl sampler_pickle.pkl')
+        os.system(f'mv {self.saveplace}/restore/run_pickle.pkl run_pickle.pkl')
 
+        with open(f'run_pickle.pkl', 'rb') as run_metadata:
+                unpack = pickle.load(run_metadata)
+                for x in xx:
+                    print(f'--- {x} ---')
+                    setattr(self, x, unpack[x])
+
+        self.clean_run()
         pass
 
 
     def clean_run(self):
+        self.logger('Cleaning Run', center=True, c='green')
+        pbar = tqdm(total=3)
         if self.debug_mode:
             print(f'clean_run() : CLEANING.. | {time.time()-self.time_init}')
 
+        # move temp_script to /temp folder
         os.system(f'mv {self.temp_script} {self.saveplace}/temp/{self.temp_script}')
+        pbar.update(1)
+        # move ch, ll, lp to /restore folder
+        if self.engine__.__name__ == 'reddemcee':
+
+            if self.FPTS:
+                os.system(f'mv sampler_flatchain.pkl {self.saveplace}/restore/sampler_flatchain.pkl')
+                os.system(f'mv sampler_flatlogl.pkl {self.saveplace}/restore/sampler_flatlogl.pkl')
+                os.system(f'mv sampler_flatlogp.pkl {self.saveplace}/restore/sampler_flatlogp.pkl')
+
+                pbar.update(1)
+            else:
+                pbar.update(1)
+                pass
+
+            os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+            #os.system(f'mv run_pickle.pkl {self.saveplace}/restore/run_pickle.pkl')
+
+            # ALSO:
+            # mv run_pickle.pkl
+            pbar.update(1)
+            #os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+
+        if not self.save_backends:
+            os.system(f'rm {self.saveplace}/restore/backends/*.h5')
+
+        pbar.close()
         gc.collect()
         pass
 
