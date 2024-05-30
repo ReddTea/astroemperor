@@ -1205,6 +1205,21 @@ def make_block_plot(foo):
 
             pltd['figsize_xaxis'] = 20#10
         
+        else:
+            pltd['fs_supt'] = 24
+            pltd['fs_supylabel'] = 22
+            pltd['fs_xlabel'] = 14
+            pltd['figsize_xaxis'] = 10
+
+            pl_scatter_alpha = 0.7
+            pl_scatter_size = 10  #2
+            fm_frame_lw = 3
+            fm_tick_xsize = 20  #20
+            fm_tick_ysize = 20  #20
+            plt_vlines_lw = 2#2
+            pl_label_fs = 22#22
+
+
         # do the coloring
         cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
         colors = np.array([cor,cor,cor,cor,cor]).flatten()
