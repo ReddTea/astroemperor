@@ -1,0 +1,6 @@
+def Beta(x, limits, args):
+    if limits[0] <= x <= limits[1]:
+        a, b = args[0], args[1]
+        return np.log(betapdf.pdf(x, a, b))
+    else:
+        return -np.inf

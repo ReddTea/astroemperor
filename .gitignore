@@ -1,0 +1,25 @@
+# Ignore Mac system files
+.DS_store
+
+# Ignore pip dist folder
+dist
+
+# Ignore egg-info
+reddemcee.egg-info
+
+# Ignore files related to API keys
+.env
+
+# Ignore SASS config files
+.sass-cache
+
+# Ignore Private files
+Private
+
+temp*
+
+*.pyc
+
+datalogs*
+
+__pycache__

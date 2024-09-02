@@ -1,0 +1,47 @@
+    # Instrumental Part, ins02.model
+
+    residuals = my_data['RV'] - model0
+
+    #my_mask = (my_data['Flag'] == {0})
+
+    mod = theta[{1}][0] * mask{0}  # OFFSET
+
+    # STARACT Part
+
+    cornum_ins = cornums[{0}-1]
+    if cornum_ins:
+        theta_sa = theta[{1}][2+2*{2}:]
+        staract_locs = [5+j+np.sum(cornums[:{0}-1]) for j in range(cornum_ins)]
+        
+        for j in range(cornum_ins):
+            staract_values = my_data[mask{0}].iloc[:, int(staract_locs[j])].values
+            #norm_values = staract_values - np.mean(staract_values)
+            #norm_values /= np.sum(norm_values)
+
+            mod[mask{0}] += theta_sa[j] * staract_values
+
+
+    # Moav Part
+    if {2} > 0:
+        theta_ma = theta[{1}][2:2+2*{2}]
+        t_ = my_data['BJD'][mask{0}].values
+        res_ = residuals[mask{0}].values
+        mod_ = mod[mask{0}].values
+        for i in range(len(t_)):
+            for c in range({2}):
+                if i > c:
+                    dt = abs(t_[i] - t_[i - 1 - c])
+                    macoef = theta_ma[2 * c]
+                    matime = theta_ma[2 * c + 1]
+                    MA = macoef * np.exp(-dt / matime) * res_[i - 1 - c]
+                    mod_[i] += MA
+                    res_[i] -= MA
+        mod[mask{0}] = mod_
+        residuals[mask{0}] = res_
+
+    new_err = mask{0} * theta[{1}][1] ** 2
+
+    model0 += mod
+    err20 += new_err
+
+    # End Instrumental Part

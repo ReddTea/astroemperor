@@ -1,0 +1,5 @@
+def Uniform(x, limits, args):
+    if limits[0] <= x <= limits[1]:
+        return np.log(1 / (limits[1] - limits[0]))
+    else:
+        return -np.inf

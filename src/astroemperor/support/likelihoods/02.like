@@ -1,0 +1,5 @@
+def my_likelihood(theta):
+    my_model(theta)
+    return gp_.log_likelihood(Y_)
+
+# END CELERITE, 02.like

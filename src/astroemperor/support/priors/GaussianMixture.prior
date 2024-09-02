@@ -1,0 +1,5 @@
+def GaussianMixture(x, limits, args):
+        if limits[0] <= x <= limits[1]:
+            return gaussian_mixture_objects[args[0]].score_samples([[x]])
+        else:
+            return -np.inf

@@ -1,0 +1,5 @@
+uncertainpy doesnt work?
+
+In the library, data.py and parameters.py, replace collections.MutableMapping with collections.abc.MutableMapping
+prettyplot/prettyplot.py "lines.marker":None  to "lines.marker": ''
+

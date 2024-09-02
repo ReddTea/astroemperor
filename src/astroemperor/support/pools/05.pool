@@ -1,0 +1,3 @@
+from schwimmbad import SerialPool as Pool5
+
+mypool = Pool5()

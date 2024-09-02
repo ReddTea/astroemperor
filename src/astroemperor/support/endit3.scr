@@ -1,0 +1,68 @@
+def run_thing():
+    start = time.time()
+
+    state = p1
+    old_tau = np.inf
+    ac = np.empty(burnin0_runs)
+    tol_warn = 0
+    tol0 = 10
+
+    for i in range(burnin0_runs):
+      print(f'Memory free initial position: {i+1}/{burnin0_runs}')
+      state = sampler.run_mcmc(state, burnin0, nsteps, progress=True)
+
+      tau0 = sampler[0].get_autocorr_time(quiet=True, tol=tol_warn)
+      ac[i] = np.mean(tau0)
+
+      niter = sampler[0].iteration
+      converged = np.all(tau0 * tol0 < niter)
+      print(f'converge: {converged}')
+
+      converged &= np.all(np.abs(old_tau - tau0) / tau0 < 0.1)
+
+      print(f'ACi     : {ac[i]}')
+      print(f'tau     : {tau0}')
+      print(f'niter   : {niter}')
+      print(f'converge: {converged}')
+
+      # sampler.reset()
+
+      if converged:
+        print(f'CONVERGED! ')
+        #print(f'AC     : {ac}')
+        #for j in range(100):
+        #  p2 = state
+
+        #  for t in range(ntemps):
+        #    for n in range(nwalkers):
+        #      position_evaluated = p2[t][n]
+        #      if my_prior(position_evaluated) == -np.inf:
+        #        print(f'scramble init n = {j}')
+        #        state = sampler.run_mcmc(p2, 1, nsteps, progress=True)
+        #  else:
+        #    continue
+
+        break
+      
+      old_tau = tau0
+      
+    sampler.reset()
+    sampler.adaptative = False
+    sampler.run_mcmc(state, nsweeps, nsteps, progress=True)
+    
+    #print(f'sampler.time0: {sampler.time0}')
+
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')
+
+    sampler_metadata = {}
+
+    sampler_metadata['acceptance_fraction'] = sampler.get_attr('acceptance_fraction')
+    sampler_metadata['betas'] = sampler.betas
+    sampler_metadata['ts_ratios'] = sampler.ts_ratios
+    sampler_metadata['betas_history'] = sampler.betas_history
+    sampler_metadata['ts_ratios_history'] = sampler.ts_ratios_history
+    sampler_metadata['af_history'] = sampler.af_history
+
+    sampler_metadata['get_autocorr_time'] = sampler.get_func('get_autocorr_time', kwargs=dict([('quiet', True)]))

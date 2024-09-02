@@ -1,0 +1,5 @@
+def my_likelihood(theta):
+    model, err2 = my_model(theta)
+    return -0.5 * (np.sum((Y_ - model) ** 2 / err2 + np.log(err2))) - 0.5 * np.log(2*np.pi) * ndat
+    
+

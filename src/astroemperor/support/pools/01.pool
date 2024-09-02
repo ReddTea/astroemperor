@@ -1,0 +1,11 @@
+import multiprocessing
+try:
+    #multiprocessing.set_start_method('fork', force=True)
+    #print(multiprocessing.get_start_method())
+    pass
+except:
+    #print('\n FAILED \n multiprocessing.set_start_method(fork, force=True)\n')
+    pass
+from multiprocessing import Pool as Pool1
+
+mypool = Pool1({})

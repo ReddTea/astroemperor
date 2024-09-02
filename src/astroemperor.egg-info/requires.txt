@@ -1,0 +1,12 @@
+numpy
+matplotlib>=3.5.1
+ipywidgets
+tabulate
+termcolor
+reddutils
+kepler.py
+emcee
+arviz
+corner
+reddcolors
+reddemcee

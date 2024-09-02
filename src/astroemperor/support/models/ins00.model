@@ -1,0 +1,8 @@
+    my_mask = (my_data['Flag'] == {0})
+
+    mod = theta[{1}][0] * my_mask
+
+    new_err = my_mask * theta[{1}][1] ** 2
+
+    model0 += mod
+    err20 += new_err

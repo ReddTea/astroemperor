@@ -1,0 +1,4 @@
+    # Instrumental Part, ins00.model
+
+    model0 += theta[{1}][{0}-1] * mask{0}
+

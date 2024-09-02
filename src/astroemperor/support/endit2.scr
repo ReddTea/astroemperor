@@ -1,0 +1,61 @@
+def run_thing():
+    start = time.time()
+
+    state = p1
+    old_tau = np.inf
+    tol_warn = 0
+    tol0 = 10
+
+    if True:
+        print('Adaptation phase:')
+        state = sampler.run_mcmc(state, adapt_burnin, nsteps, progress=True)
+
+        tau0 = sampler[0].get_autocorr_time(quiet=True, tol=tol_warn)
+        ac = np.mean(tau0)
+        niter = sampler[0].iteration
+        converged = np.all(tau0 * tol0 < niter)
+        print(f'converge: {converged}')
+
+        converged &= np.all(np.abs(old_tau - tau0) / tau0 < 0.1)
+
+        print(f'ACi     : {ac}')
+        print(f'tau     : {tau0}')
+        print(f'niter   : {niter}')
+        print(f'converge: {converged}')
+
+        print(f'betas   : {sampler.betas}')
+      
+        old_tau = tau0
+      
+    if True:
+        sampler.adaptative = False
+        sampler.run_mcmc(state, nsweeps-adapt_burnin, nsteps, progress=True)
+
+        
+        tau0 = sampler[0].get_autocorr_time(quiet=True, tol=tol_warn)
+
+        ac = np.mean(tau0)
+        niter = sampler[0].iteration
+        converged = np.all(tau0 * tol0 < niter)
+        print(f'converge: {converged}')
+
+        converged &= np.all(np.abs(old_tau - tau0) / tau0 < 0.1)
+
+        print(f'ACi     : {ac}')
+        print(f'tau     : {tau0}')
+        print(f'converge: {converged}')
+        old_tau = tau0
+    
+
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')
+
+    sampler_metadata = {}
+
+    sampler_metadata['acceptance_fraction'] = sampler.get_attr('acceptance_fraction')
+    sampler_metadata['betas'] = sampler.betas
+    sampler_metadata['betas_history'] = sampler.betas_history
+    sampler_metadata['ts_ratios'] = sampler.ts_ratios
+    sampler_metadata['ts_ratios_history'] = sampler.ts_ratios_history
+    sampler_metadata['af_history'] = sampler.af_history

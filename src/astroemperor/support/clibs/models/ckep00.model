@@ -1,0 +1,3 @@
+    per, A, phase, ecc, w = theta[{}]
+    model0 += calc_rv0(X_, per, A, phase, ecc, w)
+

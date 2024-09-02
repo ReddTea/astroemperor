@@ -1,0 +1,41 @@
+pool_bool = {0}
+cpu_cores = {1}
+
+if pool_bool:
+    def run_thing():
+        start = time.time()
+
+        with dynesty.pool.Pool(cpu_cores, my_likelihood, my_prior) as pool:
+            sampler = dynesty.DynamicNestedSampler(pool.loglike, pool.prior_transform,
+                                           ndim, pool=pool)
+            sampler.run_nested({2})
+
+        end = time.time()
+        tts = end - start
+        print('It took '+str(np.round(tts, 3))+' seconds')
+
+        sampler_metadata = dict()
+
+        sampler_metadata['results'] = sampler.results
+
+        with open('sampler_pickle.pkl','wb') as md_save:
+            pickle.dump(sampler_metadata, md_save)
+else:
+    def run_thing():
+        start = time.time()
+
+        sampler.run_nested({2})
+        end = time.time()
+        tts = end - start
+        print('It took '+str(np.round(tts, 3))+' seconds')
+
+        sampler_metadata = dict()
+
+        sampler_metadata['results'] = sampler.results
+
+        with open('sampler_pickle.pkl','wb') as md_save:
+            pickle.dump(sampler_metadata, md_save)
+
+
+if __name__ == '__main__':
+    run_thing()
