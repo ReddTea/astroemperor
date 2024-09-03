@@ -129,7 +129,6 @@ class Simulation(object):
 
         self.init_default_config()
 
-
         self.starmass = 1.
 
         self.model_constants = {'nan':'np.nan',
@@ -576,18 +575,19 @@ class Simulation(object):
 
 
     def run(self, setup, progress=True):
-        ### assert errors!
         time_run_init = time.time()
-        # PRE-CLEAN
-        self.sampler = None
-        ###
-
-        self.debug_snapshot()
-
+        
+        ### assert errors!
         if self.constrain_method == 'GM':
             if not self.gaussian_mixtures_fit:
                 msg = 'Invalid constrain_method = GM with .gaussian_mixtures_fit = False'
-                raise SyntaxError(msg)
+                raise SyntaxError(msg)        
+        
+        # PRE-CLEAN
+        self.sampler = None
+
+        self.debug_snapshot()
+        self.debug_msg(f'run  : begin | {time.time()-self.time_init}')
 
         self.apply_conditions()
         self.saveplace = ensure_dir(self.starname, loc=self.save_loc, k=self.kplanets__, first=self.switch_first)
@@ -706,19 +706,15 @@ class Simulation(object):
 
             self.logger('\n')
 
-        if self.debug_mode:
-            print(f'run  : init sampler | {time.time()-self.time_init}')
+        self.debug_msg(f'run  : init sampler | {time.time()-self.time_init}')
 
         if self.engine__.__name__ == 'reddemcee':
             from emcee.backends import HDFBackend
             ntemps, nwalkers, nsweeps, nsteps = setup
-            if self.debug_mode:
-                print(f'run  : Write_script() | {time.time()-self.time_init}')
+            self.debug_msg(f'run  : Write_script() | {time.time()-self.time_init}')
             self.write_script()
 
-            if self.debug_mode:
-                #self.set_marker('begin run_script.py')
-                print(f'run  : os <run temp_script.py> | {time.time()-self.time_init}')
+            self.debug_msg(f'run  : os <run temp_script.py> | {time.time()-self.time_init}')
 
             self.logger('\n')
             self.logger('Generating Samples', center=True, c='green')
@@ -792,9 +788,7 @@ class Simulation(object):
 
 
     def run_auto(self, setup, k_start=0, k_end=10, progress=True):
-        if self.debug_mode:
-            #self.set_marker('begin autorun')
-            print(f'run_auto : INIT run_auto | {time.time()-self.time_init}')
+        self.debug_msg(f'run_auto : INIT run_auto | {time.time()-self.time_init}')
 
         self.auto_setup = setup
         if self.engine__.__name__ in ['emcee', 'dynesty', 'pymc3', 'reddemcee']:
@@ -911,30 +905,18 @@ class Simulation(object):
                     self.logger('\npresent BIC < past BIC - 5', c='blue')
                     self.logger(self.ModelSelection.msg, c='blue')
 
-                    self.logger('\n')
-                    self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('~~ Ending the run ~~', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('\n', center=True, c='magenta')
+                    self.logger.end_run_message()
                     break
 
                 if k_start > k_end:
-                    self.logger('\n')
-                    self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('~~ Run came to an end ~~', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                    self.logger('\n', center=True, c='magenta')
+                    self.logger.end_run_message()
                     break
 
                 
 
                 
                 # if passes:
-                self.logger('\n\n')
-                self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                self.logger('~~ Proceeding with the next run ! ~~', center=True, c='magenta', attrs=['bold', 'reverse'])
-                self.logger('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-                self.logger('\n\n')
+                self.logger.next_run_message()
                 if self.switch_RV:
                     self.add_keplerian_block()
                 self.update_model()
@@ -943,8 +925,7 @@ class Simulation(object):
     def postprocess(self):
         time_postprocess_init = time.time()
 
-        if self.debug_mode:
-            print(f'postprocess() : INIT | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : INIT | {time.time()-self.time_init}')
 
         if self.engine__.__name__ == 'reddemcee':
             ntemps, nwalkers, nsweeps, nsteps = self.auto_setup
@@ -1156,8 +1137,7 @@ class Simulation(object):
         ###########################################
         ###########################################
         # GET STATS
-        if self.debug_mode:
-            print(f'postprocess() : GET_STATS | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : GET_STATS | {time.time()-self.time_init}')
 
         if True:
             if self.switch_RV:
@@ -1327,8 +1307,7 @@ class Simulation(object):
                             jj += 1
 
         # SAVE STUFF??
-        if self.debug_mode:
-            print(f'postprocess() : SAVE STUFF | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : SAVE STUFF | {time.time()-self.time_init}')
 
 
         if self.save_chains is not None:
@@ -1338,8 +1317,7 @@ class Simulation(object):
 
         self.update_model()
 
-        if self.debug_mode:
-            print(f'postprocess() : gaussian_mixtures_fit() | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : gaussian_mixtures_fit() | {time.time()-self.time_init}')
 
         # SET GM
         if self.gaussian_mixtures_fit:
@@ -1348,8 +1326,7 @@ class Simulation(object):
             self.set_gaussian_mixtures(chains[0], extra_chains)
 
 
-        if self.debug_mode:
-            print(f'postprocess() : SET POSTERIORS | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : SET POSTERIORS | {time.time()-self.time_init}')
 
 
         # SET POSTERIORS
@@ -1396,8 +1373,7 @@ class Simulation(object):
 
                         pass
 
-        if self.debug_mode:
-            print(f'postprocess() : PRINT POSTERIORS | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : PRINT POSTERIORS | {time.time()-self.time_init}')
         # PRINT POSTERIORS
         if True:
             self.logger('\n\n')
@@ -1507,8 +1483,12 @@ class Simulation(object):
 
             if self.engine__.__name__ == 'reddemcee':
                 self.logger('\nBeta Detail                     :   ' + str(['{:.3f}'.format(x) for x in self.sampler.betas]))
+                self.logger('\nMean Logl Detail                :   ' + str(['{:.3f}'.format(np.mean(x)) for x in likes]))
+                self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}')
+
                 self.logger('\nTemperature Swap                :   ' + str(['{:.3f}'.format(x) for x in self.sampler.ratios]))
                 self.logger('\nMean Acceptance Fraction        :   ' + str(['{:.3f}'.format(x) for x in np.mean(self.acceptance_fraction, axis=1)]))
+                self.logger('\nAutocorrelation Time            :   ' + str(['{:.3f}'.format(x) for x in self.autocorr_time[0]]))
                 if self.switch_evidence:
                     x = [['The evidence is             :    ', '%.3f +- %.3f' % self.evidence]]
                     tab_2 = np.vstack([x, tab_2])
@@ -1592,8 +1572,7 @@ class Simulation(object):
 
         self.debug_snapshot()
 
-        if self.debug_mode:
-            print(f'postprocess() : run_plot_routines | {time.time()-self.time_init}')
+        self.debug_msg(f'postprocess() : run_plot_routines | {time.time()-self.time_init}')
 
         self.time_postprocess = time.time() - time_postprocess_init
 
@@ -1708,8 +1687,7 @@ class Simulation(object):
                 #(plot_name != 'plot_posteriors')):
                 #plot_name != 'plot_trace'
                 if plot_func['plot']:
-                    if self.debug_mode:
-                        print(f'run_plot_routines() : {plot_name} | {time.time()-self.time_init}')
+                    self.debug_msg(f'run_plot_routines() : {plot_name} | {time.time()-self.time_init}')
 
                     self.logger('\n')
                     self.logger(plot_func['nice_name'], center=True, c='green')                    
@@ -1731,51 +1709,11 @@ class Simulation(object):
 
         self.time_plot_trace = self.plot_all_list[7]['time_to_plot']
 
-        '''
-        if self.plot_posteriors['plot']:
-            if self.debug_mode:
-                print(f'postprocess() : PLOT posteriors | {time.time()-self.time_init}')
-            self.logger('\n')
-            self.logger('Plotting Posteriors', center=True, c='green')
-            self.logger('\n')
-            super_plots(chains=chains,
-                        posts=posts,
-                        options=self.plot_posteriors,
-                        my_model=self.model,
-                        ncores=self.cores__,
-                        )
-            #super_plots(chains, posts, self.plot_posteriors, self.model, ncores=self.cores__)
 
-        self.time_plot_posteriors = time.time() - time_plot_init
-        time_plot_init = time.time()
-        '''
-        
-        '''
-        if self.FPTS:
-            self.plot_trace['plot'] = False
-        
-        if self.plot_trace['plot']:
-            if self.debug_mode:
-                print(f'postprocess() : PLOT ARVIZ | {time.time()-self.time_init}')
-            self.logger('\n')
-            self.logger('Plotting Trace', center=True, c='green')
-
-
-            self.plot_trace['temps'] = 0
-            plot_trace(self.sampler[self.plot_trace['temps']],
-                                self.engine__.__name__,
-                                self.model, saveloc=self.saveplace,
-                                trace_modes=self.plot_trace['modes'],
-                                fmt=self.plot_trace['format'])
-        
-        self.time_plot_trace = time.time() - time_plot_init
-        time_plot_init = time.time()
-        '''
 
         if self.plot_all_list[-2]['plot']:
             if self.gaussian_mixtures_fit:
-                if self.debug_mode:
-                    print(f'postprocess() : PLOT GM | {time.time()-self.time_init}')
+                self.debug_msg(f'postprocess() : PLOT GM | {time.time()-self.time_init}')
 
                 self.logger('\n')
                 self.logger('Plotting Gaussian Mixtures', center=True, c='green')
@@ -1900,17 +1838,13 @@ class Simulation(object):
                         setattr(p, c[1], c[2])
                         if c not in applied:
                             applied.append(c)
-
                             msg = '\nCondition applied: Parameter {} attribute {} set to {}'.format(
                                         colored(c[0], attrs=['underline']),
                                         colored(c[1], attrs=['underline']),
                                         colored(c[2], attrs=['underline']))
-
                             self.logger(msg)
 
-                            #toprint = [colored(x, attrs=['bold', 'underline']) for x in c]
-                            #print('\nCondition applied: Parameter {} attribute {} set to {}'.format(*toprint))
-
+        self.logger.line()
         applied.sort()
         applied = [applied for applied,_ in itertools.groupby(applied)]
 
@@ -1985,8 +1919,7 @@ class Simulation(object):
         # clean dependencies
         self.general_dependencies = np.unique(self.general_dependencies).tolist()
         self.model_dependencies = np.unique(self.model_dependencies).tolist()
-        if self.debug_mode:
-            print(f'write_script() : INIT | {time.time()-self.time_init}')
+        self.debug_msg(f'write_script() : INIT | {time.time()-self.time_init}')
         self.dir_work = os.path.dirname(os.path.realpath(__file__))
         self.dir_save = self.saveplace
 
@@ -1994,8 +1927,7 @@ class Simulation(object):
 
         ## GENERAL NEW
         ## START SCRIPT
-        if self.debug_mode:
-            print(f'write_script() : open(temp_script.py, w) | {time.time()-self.time_init}')
+        self.debug_msg(f'write_script() : open(temp_script.py, w) | {time.time()-self.time_init}')
 
         with open(self.temp_script, 'w') as f:
             f.write(open(get_support('init.scr')).read())
@@ -2363,8 +2295,7 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
 
             # load just the model into emperor
 
-        if self.debug_mode:
-            print('write_script() : reloads into emp| ', time.time()-self.time_init)
+        self.debug_msg(f'write_script() : reloads into emp| {time.time()-self.time_init}')
 
         import temp_script
         temp_script = reload(temp_script)
@@ -2374,17 +2305,7 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
         self.temp_like_func = temp_script.my_likelihood
         self.temp_prior_func = temp_script.my_prior
 
-        if self.debug_mode:
-            print('write_script() : END | ', time.time()-self.time_init)
-
-
-    def set_marker(self, marker: str, ret: bool=False):
-        if self.debug_mode:
-            marker = f'%% {marker}'
-            print(marker)
-        if ret:
-            return marker
-        return ''
+        self.debug_msg(f'write_script() : END | {time.time()-self.time_init}')
 
 
     def load_run(self):
@@ -2393,8 +2314,7 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
 
 
     def clean_run(self):
-        if self.debug_mode:
-            print(f'clean_run() : CLEANING.. | {time.time()-self.time_init}')
+        self.debug_msg(f'clean_run() : CLEANING.. | {time.time()-self.time_init}')
 
         os.system(f'mv {self.temp_script} {self.saveplace}/temp/{self.temp_script}')
         gc.collect()
