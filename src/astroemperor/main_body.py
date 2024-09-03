@@ -11,7 +11,6 @@
 
 # sourcery skip: remove-redundant-if
 if True:
-
     import itertools
     import multiprocessing
     import os
@@ -104,8 +103,22 @@ class ModelSelectionObj:
 
 
 class Simulation(object):
-    def __init__(self, setup=None):
+    NONETHINGS = ['starname', 'betas', 'saveplace', 'ndim__', 'instrument_names']
+    SWITCHES_F = ['switch_RV', 'switch_SA', 'switch_constrain',
+                    'switch_dynamics', 'dynamics_already_included', 'debug_mode',
+                    'switch_celerite', 'switch_AM', 'switch_PM', 'switch_inclination',
+                    'FPTS', 'save_all', 'save_plots', 'use_c']
+    SWITCHES_T = ['switch_first', 'switch_evidence', 'gaussian_mixtures_fit', 'switch_jitter',
+                      'save_log', 'save_log_simple', 'save_backends']
+    EMPTYLISTS = ['blocks__', 'model', 'conds', 'general_dependencies', 'model_dependencies']
+    ZEROTHINGS = ['kplanets__', 'nins__','acceleration', 'keplerian_parameterisation']
+    EMPTYSTRINGS = ['save_loc', 'read_loc']
 
+    STATS_POSI = ['chi2', 'chi2_red', 'AIC', 'BIC',
+                        'DIC', 'HQIC', 'RMSE', 'RMSi', 'Weights']
+    STATS_NEGA = ['post_max', 'like_max', 'BayesFactor']
+
+    def __init__(self, setup=None):
         if setup is None:
             setup = []
         # LOAD ATTRIBUTES
@@ -113,40 +126,11 @@ class Simulation(object):
 
         self.logger = reddlog()
         self.cores__ = _CORES
-        self.FPTS = False
-        self.switch_AM = False
-        self.switch_inclination = False
-        self.switch_PM = False
+
+        self.init_default_config()
+
 
         self.starmass = 1.
-
-        Nonethings = ['starname', 'betas', 'saveplace', 'ndim__', 'instrument_names']
-        for c in Nonethings:
-            setattr(self, c, None)
-
-        switches_F = ['switch_RV', 'switch_SA', 'switch_constrain',
-                    'switch_dynamics', 'dynamics_already_included', 'debug_mode',
-                    'switch_celerite',
-                    'save_all', 'save_plots', '']
-        for switch in switches_F:
-            setattr(self, switch, False)
-
-        switches_T = ['switch_first', 'switch_evidence', 'gaussian_mixtures_fit', 'switch_jitter',
-                      'save_log', 'save_log_simple']
-        for switch in switches_T:
-            setattr(self, switch, True)
-
-        Emptylists = ['blocks__', 'model', 'conds', 'general_dependencies', 'model_dependencies']
-        for e in Emptylists:
-            setattr(self, e, [])
-
-        Zerothings = ['kplanets__', 'nins__','acceleration', 'keplerian_parameterisation']
-        for nu in Zerothings:
-            setattr(self, nu, 0)
-
-        EmptyStrings = ['save_loc', 'read_loc']
-        for e in EmptyStrings:
-            setattr(self, e, '')
 
         self.model_constants = {'nan':'np.nan',
                                 'gaussian_mixture_objects':'dict()',
@@ -181,15 +165,7 @@ class Simulation(object):
         self.posterior_dict = {'GM': 'Gaussian Mixtures',
                                'KDE': 'Kernel Density Estimation',
                                None: 'None'}
-        # stats
-        stats_names_posi = ['chi2', 'chi2_red', 'AIC', 'BIC',
-                            'DIC', 'HQIC', 'RMSE']
-        for stat in stats_names_posi:
-            setattr(self, stat, np.inf)
 
-        stats_names_nega = ['post_max', 'like_max', 'BayesFactor']
-        for stat in stats_names_nega:
-            setattr(self, stat, -np.inf)
 
         # celerite
 
@@ -214,13 +190,47 @@ class Simulation(object):
 
         # plots
 
+        self.init_plot_config()
+
+        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
+        self.logger('~~ Simulation Successfully Initialized ~~', center=True, save=False, c='green', attrs=['bold', 'reverse'])
+        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
+
+
+    def init_default_config(self):
+        for c in self.NONETHINGS:
+            setattr(self, c, None)
+
+        for switch in self.SWITCHES_F:
+            setattr(self, switch, False)
+
+        for switch in self.SWITCHES_T:
+            setattr(self, switch, True)
+
+        for e in self.EMPTYLISTS:
+            setattr(self, e, [])
+
+        for nu in self.ZEROTHINGS:
+            setattr(self, nu, 0)
+
+        for e in self.EMPTYSTRINGS:
+            setattr(self, e, '')
+
+        for stat in self.STATS_POSI:
+            setattr(self, stat, np.inf)
+
+        for stat in self.STATS_NEGA:
+            setattr(self, stat, -np.inf)
+
+
+    def init_plot_config(self):
         axhline_kwargs = {'color':'gray', 'linewidth':2}
         errorbar_kwargs = {'marker':'o', 'ls':'', 'alpha':1.0, 'lw':1}
         fonts_kwargs = {}
 
         self.plot_all = {'plot':True,
                          'saveloc':'',
-                         'paper_mode':False,
+                         'paper_mode':True,
                          'time_to_plot':0,
                          'logger_level':'ERROR',
                          'format':'png'
@@ -228,8 +238,7 @@ class Simulation(object):
                          }
 
         self.plot_posteriors = {'modes':[0, 1, 2, 3],
-                                'dtp':None,
-                                
+                                'dtp':None,    
                                 'fs_supt':20,
                                 'chain_alpha':0.2,
                                 'temps':None,
@@ -316,9 +325,6 @@ class Simulation(object):
         self.save_chains = None #  [0]
         self.save_likelihoods = [0]
         self.save_posteriors = [0]
-        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self.logger('~~ Simulation Successfully Initialized ~~', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
 
 
     def set_engine(self, eng):
