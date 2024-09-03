@@ -25,14 +25,13 @@ import param_repo as pr
 subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
 supscript_nums = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
 
-def mk_KeplerianBlock(my_data, parameterisation=0, number=1, use_c=False):
+def mk_KeplerianBlock(my_data, parameterisation=0, number=1):
     Empty_Block = {'name_':f'KeplerianBlock {number}',
                     'type_':'Keplerian',
                     'is_iterative':True,
                     'display_on_data_':True,
                     'parameterisation':parameterisation,
                     'number_':number,
-                    'use_c':use_c,
                     
                     'bnumber_':0,
                     'moav':0,
@@ -115,13 +114,28 @@ def mk_SAIBlock(my_data, nins=1, sa=False):
     my_params = []
     for i in range(nins):
         for si in range(sa[i]):
-            d0 = pr.make_parameter(getattr(pr, 'dStaract'))
-            d0['name'] += f' {i+1} {si+1}'
-            d0['mininame'] += f'_{i+1} {si+1}'
+            d0 = {'name':f'Staract {i+1} {si+1}',
+                  'mininame':rf'SA_{i+1} {si+1}',
+                  
+                    'prior':'Uniform',
+                    'value':-np.inf,
+                    'limits':[None, None],
+                    'unit':'',
+                    'prargs':None,
+                    'type':None,
+                    'ptformargs':None,
+                    'fixed':None,
+                    'sigma':None,
+                    'GM_parameter':None,
+                    'posterior':None,
+                    'std':None,
+                    'is_circular':False,
+                    'is_hou':False}
+
             my_params.append(Parameter(d0))
 
 
-    block_attributes = {'name_':'StellarActivityBlock',
+    block_attributes = {'name_':f'StellarActivityBlock',
                         'type_':'StellarActivity',
                         'is_iterative':False,
                         'display_on_data_':False,
@@ -142,26 +156,20 @@ def mk_SAIBlock(my_data, nins=1, sa=False):
 
 
 def mk_AccelerationBlock(my_data, accel=1):
-    acmod = Acceleration_Model
-    
     my_params = []
-    #punits = []
+    punits = []
+    acmod = Acceleration_Model
     for i in range(accel):
-        accel_dict = pr.make_parameter(getattr(pr, 'dAcceleration'))
         if i == 0:
-            accel_dict['name'] = 'Acceleration'
-            accel_dict['unit'] = r'($\frac{m}{s day}$)'
+            pnames = ['Acceleration']
+            punits.append(r'($\frac{m}{s day}$)')
         else:
-            accel_dict['name'] = f'Acceleration Order {str(i + 1)}'
-            accel_dict['unit'] = r'($\frac{m}{s day^%s}$)' % str(i + 1)
-            accel_dict['mininame'] += f' {i+1}'
+            pnames.append(f'Acceleration Order {str(i + 1)}')
+            punits.append(r'($\frac{m}{s day^%s}$)' % str(i+1))
 
-        my_params.append(Parameter(accel_dict))
-    
-    math_display = f'γ{subscript_nums[1]}'
-    for j in range(accel-1):
-        math_display += f' + γ{subscript_nums[2 + j]}'
-    '''
+    bdim = len(pnames)
+
+
     pvalues = [-np.inf for _ in range(bdim)]
     ppriors = ['Uniform' for _ in range(bdim)]
     daily = 1 # 1/365.25
@@ -180,7 +188,9 @@ def mk_AccelerationBlock(my_data, accel=1):
     pis_circular = [False for _ in range(bdim)]
     pis_hou = [False for _ in range(bdim)]
 
-    
+    math_display = f'γ{subscript_nums[1]}'
+    for j in range(bdim-1):
+        math_display += f' + γ{subscript_nums[2 + j]}'
     for i in range(bdim):
         d0 = {'name':pnames[i], 'prior':ppriors[i], 'value':pvalues[i],
                   'limits':plimits[i], 'unit':punits[i], 'prargs':prargs[i],
@@ -197,9 +207,8 @@ def mk_AccelerationBlock(my_data, accel=1):
     b_mod = ModelWrapper(acmod, [my_data.values[:, 0]])
     b_name = f'AccelerationBlock o{accel}'
     b_script = 'acc.model'
-    '''
 
-    block_attributes = {'name_':f'AccelerationBlock o{accel}',
+    block_attributes = {'name_':b_name,
                         'type_':'Acceleration',
                         'is_iterative':False,
                         'display_on_data_':False,
@@ -211,7 +220,7 @@ def mk_AccelerationBlock(my_data, accel=1):
                         'slice':None,
                         'additional_priors_bool':None,
                         'dynamics_bool':None,
-                        'model_script':'acc.model',
+                        'model_script':b_script,
                         'math_display_':math_display,
                         }
 
@@ -602,11 +611,10 @@ def SmartLimits(my_data, b, *args, **kwargs):
 
 
     elif b.type_ == 'StellarActivity':
-        for cornum in b.cornums:
-            for _ in range(cornum):
-                lims.append([-1., 1.])
-                priors.append(uni)
-                prargs.append(None)
+        for nin in range(b.number_):
+            lims.append([-1., 1.])
+            priors.append(uni)
+            prargs.append(None)            
           
 
     elif b.type_ == 'MOAV':
@@ -712,14 +720,8 @@ def SmartLimits(my_data, b, *args, **kwargs):
             prargs.append(None)
 
 
-    elif b.type_ == 'Acceleration':
-        for nin in range(b.number_):
-            daily = 1 # 1/365.25
-            lims.append([-daily, daily])
-            priors.append(uni)
-            prargs.append(None)
 
-    else:
+    elif b.type_ != 'Acceleration':
         print(f'type_ {b.type_} not recognised. \nSmartLimits failed')
 
 

@@ -152,7 +152,7 @@ def plot_GM_Estimator(estimator, options=None):
         np.median(xx[0]),
         np.median(yy[0]),
         alpha=0.0,
-        label=f'$\mu = {mu_display}$',
+        label=rf'$\mu = {mu_display}$',
     )
     ax.plot(np.median(xx[0]), np.median(yy[0]), alpha=0., label=r'$\sigma = {}$'.format(sig_display))
     if n_components > 1:
@@ -175,7 +175,7 @@ def plot_GM_Estimator(estimator, options=None):
     ax.set_xticks(xticks, minor=False)
     ax.set_yticks(yticks, minor=False)
     ax.legend(framealpha=0.)
-    # ax.set_title(plot_title+'{}'.format(plot_nm[2:]))
+    ax.set_title(plot_title+'{}'.format(plot_nm[2:]))
     ax.set_xlabel('{} {}'.format(plot_nm[2:], estimator.unit))
     ax.set_ylabel(plot_ylabel)
 
@@ -189,7 +189,7 @@ def plot_GM_Estimator(estimator, options=None):
 def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
     if True:
         trace_modes = options['modes']
-        saveplace = options['saveloc'] + '/plots/arviz/'
+        saveplace = options['saveloc'] + '/plots/traces/'
         fmt = options['format']
 
     if trace_modes is None:
@@ -366,7 +366,7 @@ def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
 def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
     if True:
         trace_modes = options['modes']
-        saveplace = options['saveloc'] + '/plots/arviz/'
+        saveplace = options['saveloc'] + '/plots/traces/'
         fmt = options['format']
         burnin = options['burnin']
         thin = options['thin']
@@ -411,9 +411,8 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                 vn_b = np.array(b.get_attr('name'))[b.C_]
                 circ_var_names = vn_b[np.array(b.get_attr('is_circular'))[b.C_]]
 
-                # TRACES
                 if dothis[0]:
-                    savefigname = saveplace + 'traces/' + f'{trace_mode_dic[0]} {b.name_}.{fmt}'
+                    savefigname = saveplace + f'{trace_mode_dic[0]} {b.name_}.{fmt}'
 
                     az.plot_trace(arviz_data,
                                   #compact=True,
@@ -436,10 +435,9 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     pl.savefig(savefigname)
                     pl.close()
 
-                # DENSITY INTERVALS
                 if dothis[2]:
 
-                    savefigname = saveplace + 'density_intervals/' + f'{trace_mode_dic[2]} {b.name_}.{fmt}'
+                    savefigname = saveplace + f'{trace_mode_dic[2]} {b.name_}.{fmt}'
                     axes = az.plot_density(
                             [arviz_data],
                             var_names=vn_b,
@@ -452,10 +450,9 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     pl.savefig(savefigname)
                     pl.close()
 
-                # CORNERPLOT
                 if dothis[3] and b.ndim_ > 2:
                     #pbar = tqdm(total=1)
-                    savefigname = saveplace + 'cornerplots/' + f'{trace_mode_dic[3]} {b.name_}.{fmt}'
+                    savefigname = saveplace + f'{trace_mode_dic[3]} {b.name_}.{fmt}'
                     az.plot_pair(arviz_data,
                                  var_names=vn_b,
                                  figsize=(3*len(vn_b), 3*len(vn_b)),
@@ -500,11 +497,10 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     #pbar.update(1)
                     #pbar.close()
 
-                # NORMALISED POSTERIORS
                 if dothis[1]:
                     for p in b[b.C_]:
                         fig, ax = pl.subplots(1, 1)
-                        savefigname = saveplace + 'normed_posteriors/'+ f'{trace_mode_dic[1]} {p.name}.{fmt}'
+                        savefigname = saveplace + f'{trace_mode_dic[1]} {p.name}.{fmt}'
                         fig.suptitle(p.name)
 
                         az.plot_dist(arviz_data.posterior[p.name].values,
@@ -528,18 +524,63 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                 if trace_mode == 0:
                     # trace
                     for b in my_model:
-                        try:
-                            vnb = np.array(b.get_attr('name'))[b.C_]
-                            fig, axes = dyplot.traceplot(res2,
-                                                        post_color=rc.fg,
-                                                        trace_color=rc.fg,
-                                                        labels=vnb,
-                                                        dims=b.slice_true)
-                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
-                            pl.savefig(savefigname)
-                        except:
-                            print('Dynesty dyplot failed!')
+                        vnb = np.array(b.get_attr('name'))[b.C_]
+                        fig, axes = dyplot.traceplot(res2,
+                                                    post_color=rc.fg,
+                                                    trace_color=rc.fg,
+                                                    labels=vnb,
+                                                    dims=b.slice_true)
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
+                        pl.savefig(savefigname)
+                '''
+                elif trace_mode == 1:
+                    arviz_data = az.from_emcee(sampler=sampler,
+                                                var_names=vn)
 
+                    for b in my_model:
+                        for p in b[b.C_]:
+                            fig, ax = pl.subplots(1, 1)
+                            fig.suptitle(p.name)
+
+                            az.plot_dist(arviz_data.posterior[p.name].values)
+
+                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {p.name}.{fmt}'
+                            pl.savefig(savefigname)
+                    
+                elif trace_mode == 2:
+                    arviz_data = az.from_emcee(sampler=sampler,
+                                                var_names=vn)
+
+                    for b in my_model:
+                        axes = az.plot_density(
+                            [arviz_data],
+                            var_names=np.array(b.get_attr('name'))[b.C_],
+                            shade=0.2,
+                            #hdi_markers='v'
+                            )
+
+                        fig = axes.flatten()[0].get_figure()
+                        fig.suptitle("94% High Density Intervals")
+
+                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
+                        pl.savefig(savefigname)
+                elif trace_mode == 3:
+                    arviz_data = az.from_emcee(sampler=sampler,
+                                                var_names=vn)
+
+                    ax = az.plot_pair(arviz_data,
+                            kind=["scatter", "kde"],
+                            marginals=True,
+                            marginal_kwargs={'color':rc.fg},
+                            point_estimate="median",
+                            scatter_kwargs={'color':rc.fg},
+                            point_estimate_kwargs={'color':'red'},
+                            point_estimate_marker_kwargs={'color':'red',
+                                                        's':90},
+                            )
+                    savefigname = saveplace + f'{trace_mode_dic[trace_mode]}.{fmt}'
+                    pl.savefig(savefigname)
+                '''
         else:
             print(f'Method is not yet implemented for {eng_name}')
             return None
@@ -576,12 +617,11 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
         switch_celerite = options['celerite']
         logger_level = options['logger_level']
         gC = options['gC']
-        use_c = options['use_c']
 
         # FULL_MODEL
         fm_figsize = (10, 8)
 
-        if True:
+        if options['paper_mode']:
             fm_axhline_kwargs = {'color':'gray', 'linewidth':3}
             fm_errorbar_kwargs = {'marker':'o', 'ls':'', 'alpha':0.8,
                                 'lw':2,
@@ -646,12 +686,7 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
         with open(temp_script, 'w') as f:
             f.write(open(get_support('init.scr')).read())
             # DEPENDENCIES
-            if use_c:
-                f.write(f'''
-from fast_kepler import calc_rv0
-''')
-            else:
-                f.write('''
+            f.write('''
 import kepler
 ''')
             if switch_celerite:
@@ -914,10 +949,8 @@ cornums = {my_model.cornums}
 
         '''
 
-
-    fm_model_line['lw'] = 2
     dual_plot(D, DB_all_kep, pbar, savename='KeplerianModel')
-    fm_model_line['lw'] = 3
+
 
     # PHASEFOLD
     for mode in range(True+switch_uncertain):
@@ -941,7 +974,7 @@ cornums = {my_model.cornums}
             D_PF = fold_dataframe(D_PF, per=per)
 
             if True:
-                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}')
+                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}.{plot_fmt}')
                 # get uncertainties
                 '''
                 if mode==1:
@@ -1172,21 +1205,6 @@ def make_block_plot(foo):
 
             pltd['figsize_xaxis'] = 20#10
         
-        else:
-            pltd['fs_supt'] = 24
-            pltd['fs_supylabel'] = 22
-            pltd['fs_xlabel'] = 14
-            pltd['figsize_xaxis'] = 10
-
-            pl_scatter_alpha = 0.7
-            pl_scatter_size = 10  #2
-            fm_frame_lw = 3
-            fm_tick_xsize = 20  #20
-            fm_tick_ysize = 20  #20
-            plt_vlines_lw = 2#2
-            pl_label_fs = 22#22
-
-
         # do the coloring
         cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
         colors = np.array([cor,cor,cor,cor,cor]).flatten()
@@ -1217,7 +1235,7 @@ def make_block_plot(foo):
                                                         b.ndim_*6 + elongatey)
                                                         )
             # fig.suptitle(f'Posteriors {b.name_}', fontsize=pltd['fs_supt'])
-            #fig.supylabel('Log Posterior', fontsize=pltd['fs_supylabel'])
+            fig.supylabel('Log Posterior', fontsize=pltd['fs_supylabel'])
 
             
             minl, maxl = min(lk0), max(lk0)
@@ -1237,6 +1255,7 @@ def make_block_plot(foo):
                         c=pltd['colors'][b.bnumber_-1],
                         alpha=pl_scatter_alpha,
                         s=pl_scatter_size)
+
 
                 if mode == 1:
                     cmap = mk_cmap([colors[b.bnumber_-1]], ncolors=100)
@@ -1326,13 +1345,9 @@ def make_block_plot(foo):
                     ax.set_ylabel(f'{param.name} {param.unit}',
                                   fontsize=pl_label_fs)
                     
-                    ax.set_xlabel(f'Steps',
-                                  fontsize=pl_label_fs)
-                    
-                    
-                    #fig.suptitle(f'Chains {b.name_}', fontsize=pltd['fs_supt'])
-                    #fig.supylabel('')
-                    #fig.supxlabel('Steps')
+                    fig.suptitle(f'Chains {b.name_}', fontsize=pltd['fs_supt'])
+                    fig.supylabel('')
+                    fig.supxlabel('Steps')
                     
                 else:
                     ax.vlines(_param_value_max,
@@ -1351,7 +1366,6 @@ def make_block_plot(foo):
                                     'lw':plt_vlines_lw})
                 
                     ax.set_xlabel(f'{param.name} {param.unit}', fontsize=pl_label_fs)
-                    ax.set_ylabel('Log P', fontsize=pl_label_fs)
 
                 ax.legend(framealpha=0., fontsize=pltd['fs_xlabel'], loc=1)
 
@@ -1423,7 +1437,7 @@ def super_plots(chains=[], posts=[], options={}, my_model=None, ncores=None):
     num_plots = len(plot_list)
 
 
-    # memory override
+
     ncores = 4
     tasks = []
     for i in range(num_plots):
@@ -1493,7 +1507,7 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
                                         figsize=(figsize_xaxis,
                                                 b.ndim_*6 + 1)
                                             )
-                    #fig.suptitle(f'Posteriors {b.name_}', fontsize=fs_supt)
+                    fig.suptitle(f'Posteriors {b.name_}', fontsize=fs_supt)
                     fig.supylabel('Norm Density', fontsize=fs_supylabel)
 
 
@@ -1617,9 +1631,10 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
     pass
 
 
-def plot_betas(betas=[], logls=[], Z=0, options={}, temps=1):
-    cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-    colors = np.array([cor,cor,cor,cor,cor]).flatten()
+def plot_betas(betas=[], logls=[], setup=[], Z=0, options={}):
+    cmap = matplotlib.colormaps['plasma']
+    colors = cmap(np.linspace(0, 0.85, setup[0]))
+
     if True:
         saveplace = options['saveloc']
 
@@ -1647,16 +1662,16 @@ def plot_betas(betas=[], logls=[], Z=0, options={}, temps=1):
     
     my_text = rf'Evidence: {np.round(Z[0], 3)} $\pm$ {np.round(Z[1], 3)}'
     if True:
+        bh = betas.reshape((setup[2], setup[0])).T
         fig, ax = pl.subplots()
-
-        for ti in range(temps):
-            bet = betas[ti]
-            ax.plot(bet, np.ones_like(bet)*logls[ti], colors[ti], alpha=0.7)
-            ax.plot(bet[-1], logls[ti], colors[ti]+'o')
+        for ti in range(setup[0]):
+            bet = bh[ti]
+            ax.plot(bet, np.ones_like(bet)*logls[ti], color=colors[ti], alpha=0.7)
+            ax.plot(bet[-1], logls[ti], color=colors[ti], marker='o')
 
         ylims = ax.get_ylim()
         
-        betas0 = [x[-1] for x in betas]
+        betas0 = [x[-1] for x in bh]
         ax.fill_between(betas0, logls,
                         y2=0,
                         color=rc.fg,
@@ -1664,6 +1679,7 @@ def plot_betas(betas=[], logls=[], Z=0, options={}, temps=1):
                         alpha=0.25)
         
         ax.set_ylim(ylims)
+
     if True:
         ax.scatter([], [], alpha=0, label=my_text)
         pl.legend(loc=4)
@@ -1674,14 +1690,13 @@ def plot_betas(betas=[], logls=[], Z=0, options={}, temps=1):
         pl.tight_layout()
         pl.savefig(saveplace+f'/plots/betas/beta_ladder.{ptfmt}',
                                     bbox_inches='tight')
-        #pl.show()
         pl.close()
 
     pbar.update(1)
     pbar.close()
 
 
-def plot_rates(bh=[], rh=[], ah=[],setup=[], options={}):
+def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
     if True:
         saveplace = options['saveloc']
         ptfmt = options['format']
@@ -1691,18 +1706,18 @@ def plot_rates(bh=[], rh=[], ah=[],setup=[], options={}):
         colors = cmap(np.linspace(0, 0.85, setup[0]))
 
     try:
-        os.makedirs(saveplace+f'/plots/betas')
+        os.makedirs(saveplace+f'/plots/betas/beta_ladder')
     except:
         pass
 
-    
     if True:
-        fig, axes = pl.subplots(3, 1, figsize=(9, 7), sharex=True)
+        fig, axes = pl.subplots(3, 1, figsize=(10, 7), sharex=True)
 
         bh1 = bh.reshape((setup[2], setup[0]))
         rh1 = rh.reshape((setup[2], setup[0]-1))
-        ah1 = np.append(np.zeros(setup[0]), ah).reshape((setup[2]+1, setup[0])) / setup[-1]
-        ah1 = np.diff(ah1, axis=0) / setup[3]
+        afh1 = np.append(np.zeros(setup[0]), afh).reshape((setup[2]+1, setup[0]))
+        afh1 = np.diff(afh1, axis=0) / setup[3]
+
         # plot temperature adaptation
         for t in range(setup[0]-1):
             bh_sel = bh1[:, t]
@@ -1711,15 +1726,14 @@ def plot_rates(bh=[], rh=[], ah=[],setup=[], options={}):
                          color=colors[t])
             axes[0].set_xscale('log')
             axes[0].set_yscale('log')
-
+        
         # plot acceptance rate
         for t in np.arange(setup[0]):
-            ah_sel = ah1[:, t]
-            axes[1].plot(np.arange(setup[2])*setup[3], ah_sel,
+            afh_sel = afh1[:, t]
+            axes[1].plot(np.arange(setup[2])*setup[3], afh_sel,
                          alpha=0.75,
                          color=colors[t])
 
-        # plot swap fraction
         for t in np.arange(setup[0]-1):
             r = rh1[:, t]
             axes[2].plot(np.arange(setup[2])*setup[3], r,
@@ -1727,12 +1741,12 @@ def plot_rates(bh=[], rh=[], ah=[],setup=[], options={}):
                          color=colors[t])
             
         if True:
-            axes[2].set_xlabel("N Step")
             axes[0].set_ylabel(r"$\beta^{-1}$")
             axes[1].set_ylabel(r"$\bar{A_{f}}$")
             axes[2].set_ylabel(r"$a_{frac}$")
-                
-            # fig.suptitle('Samples')
+
+            axes[2].set_xlabel("N Step")    
+            #fig.suptitle('Samples')
         
         pl.tight_layout()
         pl.savefig(saveplace+f'/plots/betas/rates.{ptfmt}',
@@ -1742,7 +1756,6 @@ def plot_rates(bh=[], rh=[], ah=[],setup=[], options={}):
         pbar.update(1)
     pbar.close()
     pass
-
 
 #plot_betas(sim.sampler.betas_history, elogl, sim.evidence, options=opts, temps=setup[0])
 
@@ -1793,28 +1806,4 @@ if sim.cherry['cherry']:
         lk[t] = lk[t][mask]
         pt[t] = pt[t][mask]
 
-        
-
-# plot betas
-
-reddemcee_dict = {'discard':3500,
-                  'thin':sim.reddemcee_thin,
-                  'flat':True}
-
-raw_likes0 = sim.sampler.get_func('get_blobs', kwargs=reddemcee_dict)
-raw_posts0 = sim.sampler.get_func('get_log_prob', kwargs=reddemcee_dict)
-
-
-llmeans = np.mean(raw_likes0, axis=1)
-lpmeans = np.mean(raw_posts0, axis=1)
-
-betas = sim.sampler.betas_history.reshape((sim.auto_setup[2],
-                                           sim.auto_setup[0])).T[::-1]
-
-logls = np.array([np.mean(llmeans[t]) for t in range(sim.auto_setup[0])])
-posts = np.array([np.mean(lpmeans[t]) for t in range(sim.auto_setup[0])])
-
-plot_betas(betas=betas[:-1], logls=logls[:-1],
-           Z=sim.evidence, options=sim.plot_all_list[-4],
-           temps=len(logls[:-1]))
 '''

@@ -1,2 +1,0 @@
-    per, A, tp, ecc, w = theta[{}]
-    model0 += fast_kepler.calc_rv1(X_, per, A, tp, ecc, w)

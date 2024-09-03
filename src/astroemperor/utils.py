@@ -548,70 +548,20 @@ class reddlog(object):
             self.terminal_width = pd.get_option('display.width')
         self.baddies_list = ["\x1b[", '0m', '1m', '4m', '7m', '31m', '32m']
 
-        self.start_message()
-
     def saveto(self, location):
         np.savetxt(f'{location}/log.dat', np.array([self.log]), fmt='%100s')
 
-
-    def block_message(self, btype, bname):
-        msg = '{} {}, {}'.format(colored(btype, 'green', attrs=['bold']),
-                                 colored('block added', 'green'),
-                                 colored(bname, 'green'))
-        msg = f'                              {msg}'
-        self(msg, center=True)
-
-
-    def start_message(self):
-        self('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self('~~ Simulation Successfully Initialized ~~', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-    
-
-    def end_run_message(self):
-        self.line()
-        self('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self('~~ End of the Run ~~', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self.line()
-
-
-    def next_run_message(self):
-        self.line()
-        self('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self('~~ Proceeding with the next run ! ~~', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self('   ', center=True, c='magenta', attrs=['bold', 'reverse'])
-        self.line()
-
-
-
-    def check(self, msg, cond):
-        box = colored('✘', attrs=['reverse'], color='red')
-        if cond:
-            box = colored('✔', attrs=['reverse'], color='green')
-        self('{}: {}'.format(msg, box), c='blue')
-
-
-    def line(self):
-        self('\n')
-
-    
     def help(self):
         print('Colors: grey, red, green, yellow, blue, magenta, cyan, white')
         print('On_Colors: on_<color>')
         print('Attrs: bold, dark, underline, blink, reverse, concealed')
 
 
-    def __call__(self, msg, center=False, save=True, c=None,
-                 oc=None, attrs=None, save_extra_n=False):
+    def __call__(self, msg, center=False, save=True, c=None, oc=None, attrs=None):
         if attrs is None:
             attrs = []
-        if 'reversed' in attrs:
-            self.line()
         if save:
             msg0 = msg
-            if save_extra_n:
-                msg0 += '\n'
             for b in self.baddies_list:
                 msg0 = msg0.replace(b, '')
 
@@ -620,7 +570,6 @@ class reddlog(object):
             msg = msg.center(self.terminal_width)
         if c:
             msg = colored(msg, c, oc, attrs)
-
         print(msg)
 
 '''
@@ -928,7 +877,6 @@ class SDataWrapper(object):
                 filenames = list(np.sort(os.listdir(p)))
                 if filenames > 0:
                     pass
-
 
     def add_rv_data__(self, filename):
         data = np.loadtxt('{0}{1}'.format(self.RV_PATH, filename))

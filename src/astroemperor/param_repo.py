@@ -15,14 +15,12 @@ import numpy as np
 def make_parameter(target):
     return {**dEmpty, **target}
 
-dEmpty = {'prior':'Uniform',
+dEmpty = { 'prior':'Uniform',
           'limits':[None, None],
-          'init_pos':[None, None],
           'value':-np.inf,
           'value_max':-np.inf,
           'value_mean':-np.inf,
           'value_median':-np.inf,
-          'value_range':[None, None],
           
           'fixed':None,
           'prargs':None,

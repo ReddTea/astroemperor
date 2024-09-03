@@ -102,11 +102,11 @@ class Parameter_Block(object):
                 self[i].display_prior = '~𝓝 ({}, {})'.format(*np.round(self[i].prargs, 3))
             elif self[i].prior == 'GaussianMixture':
                 gmparam = self[i].GM_parameter
-                self[i].display_prior = f'𝛴{subscript_nums[gmparam.n_components]}~𝓝 ({list(np.round(gmparam.means, 3))}, {list(np.round(gmparam.sigmas, 3))})'
+                self[
+                    i
+                ].display_prior = f'𝛴{subscript_nums[gmparam.n_components]}~𝓝 ({list(np.round(gmparam.means, 3))}, {list(np.round(gmparam.sigmas, 3))})'
             elif self[i].prior == 'Fixed':
                 self[i].display_prior = f'~𝛿 (x - {self[i].value})'
-            elif self[i].prior == 'Beta':
-                self[i].display_prior = '~𝛽 ({}, {})'.format(*np.round(self[i].prargs, 3))
             else:
                 self[i].display_prior = f'Method not built for {self[i].prior}'
 
@@ -401,10 +401,7 @@ def {model_func_name}(theta):
 ''')
             for b in self:
                 if b.type_ == 'Keplerian':
-                    location = f'models/{b.model_script}'
-                    if b.use_c:
-                        location = f'clibs/models/c{b.model_script}'
-                    f.write(open(get_support(location)).read().format(b.slice))
+                    f.write(open(get_support(f'models/{b.model_script}')).read().format(b.slice))
 
                 
                 elif b.type_ == 'Instrumental':
