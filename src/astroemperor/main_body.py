@@ -606,120 +606,17 @@ class Simulation(object):
 
         self.apply_conditions()
         self.saveplace = ensure_dir(self.starname, loc=self.save_loc, k=self.kplanets__, first=self.switch_first)
-        
 
+        # Merge general plot dict with each 
         for pi in range(len(self.plot_all_list)):
             self.plot_all_list[pi]['saveloc'] = self.saveplace
             self.plot_all_list[pi] = {**self.plot_all, **self.plot_all_list[pi]}
-            #for key in self.plot_all.keys():
-            #    self.plot_all_list[pi][key] = self.plot_all[key]
 
         self.temp_script = 'temp_script.py'
 
-        if self.switch_first:
-            self.logger('\n\n')
-            self.logger('~~ Setup Info ~~', center=True, c='blue', attrs=['reverse'])
-            self.logger('\nCurrent Engine is            '+colored(self.engine__.__name__+' '+self.engine__.__version__, attrs=['bold']), c='blue')
-            self.logger('\nNumber of cores is           '+colored(self.cores__, attrs=['bold']), c='blue')
-            self.logger('\nSave location is             '+colored(self.saveplace, attrs=['bold']), c='blue')
-
-            if self.switch_dynamics:
-                dyn_crit = 'Hill Stability'
-            else:
-                dyn_crit = 'None'
-            self.logger('\nDynamical Criteria is        '+colored(dyn_crit, attrs=['bold']), c='blue')
-            self.logger('\nPosterior fit method is      '+colored(self.posterior_dict[self.posterior_fit_method], attrs=['bold']), c='blue')
-            self.logger('\nLimits constrain method is   '+colored(self.constrain_method, attrs=['bold']), c='blue')
-            self.logger('\nModel Selection method is    '+colored(self.ModelSelection.criteria, attrs=['bold']), c='blue')
-
-            self.logger('\n')
-            self.logger('~~ Automatically Saving ~~', center=True, c='blue', attrs=['reverse'])
-
-            saving_ = ['save_log',
-                       'save_chains',
-                       'save_posteriors',
-                       'save_likelihoods',
-                       'plot_posteriors',
-                       'plot_keplerian_model',
-                       'plot_gaussian_mixtures',
-                       'parameter_histograms',
-                       'corner']
-            saving0_ = ['\nLogger       ',
-                        '\nSamples      ',
-                        '\nPosteriors   ',
-                        '\nLikelihoods  ',
-                        '\nPlots: Posteriors           ',
-                        '\nPlots: Keplerian Model      ',
-                        '\nPlots: Gaussian Mixture     ',
-                        '\nPlots: Parameter Histograms ',
-                        '\nPlots: Corner               ']
-            
-            
-            # self.plot_all_list
-            checks0 = [self.save_log,
-                       self.save_chains,
-                       self.save_posteriors,
-                       self.save_likelihoods,
-                       self.plot_all_list[0]['plot'],
-                       self.plot_all_list[2]['plot'],
-                       self.plot_all_list[6]['plot'],
-                       self.plot_all_list[1]['plot'],
-                       self.corner
-                       ]
-            checks_ = []
-            for thing in checks0:
-                if thing:
-                    checks_.append(colored('✔', attrs=['reverse'], color='green'))
-                else:
-                    checks_.append(colored('✘', attrs=['reverse'], color='red'))
-
-            self.logger('')
-            for i in range(4):
-                self.logger('{}: {}'.format(saving0_[i], checks_[i]), c='blue')
-            self.logger('')
-            for i in range(4, 8):
-                self.logger('{}: {}'.format(saving0_[i], checks_[i]), c='blue')
-
-
-            self.switch_first = False
-
         self.update_model()
 
-        # Print Pre-Run
-        if True:
-            self.logger('\n\n')
-            self.logger('~~ Pre-Run Info ~~', center=True, c='yellow', attrs=['bold', 'reverse'])
-            self.logger('\n\n')
-
-            tab_3 = np.array([])
-            switch_title = True
-
-            for b in self:
-                to_tab0 = b.get_attr(['name', 'display_prior', 'limits'])
-                to_tab0[2] = np.round(to_tab0[2], 3)
-                to_tab = list(zip(*to_tab0))
-
-                if switch_title:
-                    self.logger(tabulate(to_tab,
-                                          headers=['Parameter       ',
-                                                   'Prior   ',
-                                                   'Limits      ',
-                                                   ]))
-                    switch_title = False
-
-                else:
-                    self.logger(tabulate(to_tab,
-                                          headers=['                ',
-                                                   '        ',
-                                                   '            ',
-                                                   ]))
-
-            self.logger('\n\n')
-            for b in self:
-                self.logger('Math for {}:\n'.format(b.name_), c='yellow')
-                self.logger('{}'.format(b.math_display_), center=True, c='yellow')
-
-            self.logger('\n')
+        self.prerun_logger()
 
         self.debug_msg(f'run  : init sampler | {time.time()-self.time_init}')
 
@@ -746,22 +643,7 @@ class Simulation(object):
             
             # RESTORE SAMPLER
             self.load_sampler_meta(target_dir='', setup=setup)
-            #with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
-            #    self.sampler_metadata_dict = pickle.load(sampler_metadata)
 
-            #os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
-
-            #for attr, value in self.sampler_metadata_dict.items():
-            #    setattr(self.sampler, attr, value)
-
-            #self.betas = self.sampler.betas
-
-            #if not self.FPTS:
-            #    for t in range(ntemps):
-            #        loc_t = '{}emperor_backend_{}.h5'.format(self.saveplace+'/restore/backends/', t)
-            #        self.sampler[t] = HDFBackend(loc_t)
-            #else:
-            #    pass
 
         if self.engine__.__name__ == 'dynesty':
             # TRANSFORM TO PTFORMARGS
@@ -1596,17 +1478,19 @@ class Simulation(object):
 
         self.debug_snapshot()
 
+        # Time Table
         if True:
-            self.logger(f'\nTime RUN         :  {sec_to_clock(self.time_run)}')
-            self.logger(f'\nTime POSTPROCESS :  {sec_to_clock(self.time_postprocess)}')
-            self.logger(f'\nTime CALCULATE GM:  {sec_to_clock(self.time_calc_gm)}')
+            self.logger(f'\nTime Table')
+            self.logger(f'Time RUN             :  {sec_to_clock(self.time_run)}', save_extra_n=True)
+            self.logger(f'Time POSTPROCESS     :  {sec_to_clock(self.time_postprocess)}', save_extra_n=True)
+            self.logger(f'Time CALCULATE GM    :  {sec_to_clock(self.time_calc_gm)}', save_extra_n=True)
             
-            self.logger(f'\nTime Plot model      :  {sec_to_clock(self.time_plot_keplerian)}')
-            self.logger(f'\nTime Plot posteriors :  {sec_to_clock(self.time_plot_posteriors)}')
-            self.logger(f'\nTime Plot histograms :  {sec_to_clock(self.time_plot_histograms)}')
-            self.logger(f'\nTime Plot betas      :  {sec_to_clock(self.time_plot_betas)}')
-            self.logger(f'\nTime Plot arviz      :  {sec_to_clock(self.time_plot_trace)}')
-            self.logger(f'\nTime Plot GM         :  {sec_to_clock(self.time_plot_gm)}')
+            self.logger(f'Time Plot model      :  {sec_to_clock(self.time_plot_keplerian)}', save_extra_n=True)
+            self.logger(f'Time Plot posteriors :  {sec_to_clock(self.time_plot_posteriors)}', save_extra_n=True)
+            self.logger(f'Time Plot histograms :  {sec_to_clock(self.time_plot_histograms)}', save_extra_n=True)
+            self.logger(f'Time Plot betas      :  {sec_to_clock(self.time_plot_betas)}', save_extra_n=True)
+            self.logger(f'Time Plot arviz      :  {sec_to_clock(self.time_plot_trace)}', save_extra_n=True)
+            self.logger(f'Time Plot GM         :  {sec_to_clock(self.time_plot_gm)}', save_extra_n=True)
 
         # SAVE LOG
         if self.save_log:
@@ -1621,19 +1505,10 @@ class Simulation(object):
             np.savetxt(f'{self.saveplace}/best_fit.dat', simple_log.T, fmt='%s', delimiter='\t')
 
 
-
         self.clean_run()
 
 
     def run_plot_routines(self, chains, likes, posts):
-        if self.plot_keplerian_model['paper_mode']:
-            
-            #self.plot_keplerian_model['axhline_kwargs'] = {'color':'gray', 'linewidth':3}
-            #self.plot_keplerian_model['errorbar_kwargs'] = {'marker':'o', 'ls':'',
-            #                                                'alpha':1.0, 'lw':2, 'elinewidth':2}
-            pass
-        # PLOT Keplerian Model and uncertainties
-
         for pi in self.plot_all_list:
             if (pi['name'] == 'plot_posteriors' or
                 pi['name'] == 'plot_histograms'):
@@ -1807,6 +1682,92 @@ class Simulation(object):
         self.BayesFactor = self.like_max - self.evidence[0]
 
         self.HQIC = 2 * self.model.ndim__ * np.log(np.log(self.model.ndata)) - 2 * self.like_max
+
+
+    def prerun_logger(self):
+        if self.switch_first:
+            self.logger('~~ Setup Info ~~', center=True, c='blue', attrs=['reverse'])
+            self.logger('\nCurrent Engine is            '+colored(self.engine__.__name__+' '+self.engine__.__version__, attrs=['bold']), c='blue')
+            self.logger('Number of cores is           '+colored(self.cores__, attrs=['bold']), c='blue')
+            self.logger('Save location is             '+colored(self.saveplace, attrs=['bold']), c='blue')
+
+            if self.switch_dynamics:
+                dyn_crit = 'Hill Stability'
+            else:
+                dyn_crit = 'None'
+            self.logger('Dynamical Criteria is        '+colored(dyn_crit, attrs=['bold']), c='blue')
+            self.logger('Posterior fit method is      '+colored(self.posterior_dict[self.posterior_fit_method], attrs=['bold']), c='blue')
+            self.logger('Limits constrain method is   '+colored(self.constrain_method, attrs=['bold']), c='blue')
+            self.logger('Model Selection method is    '+colored(self.ModelSelection.criteria, attrs=['bold']), c='blue')
+
+            self.logger.line()
+            self.logger('~~ Automatically Saving ~~', center=True, c='blue', attrs=['reverse'])
+
+            
+            saving0_ = ['Logger       ',
+                        'Samples      ',
+                        'Posteriors   ',
+                        'Likelihoods  ',
+                        'Plots: Posteriors           ',
+                        'Plots: Keplerian Model      ',
+                        'Plots: Gaussian Mixture     ',
+                        'Plots: Parameter Histograms ',
+                        'Plots: Corner               ']
+            
+            
+            # self.plot_all_list
+            checks0 = [self.save_log,
+                       self.save_chains,
+                       self.save_posteriors,
+                       self.save_likelihoods,
+                       self.plot_all_list[0]['plot'],  # posteriors
+                       self.plot_all_list[2]['plot'],  # kep model
+                       self.plot_all_list[6]['plot'],  # GM
+                       self.plot_all_list[1]['plot'],  # histograms
+                       self.corner
+                       ]
+
+            for i in range(len(checks0)):
+                self.logger.check(saving0_[i], checks0[i])
+
+            self.switch_first = False
+
+
+        # Print Pre-Run
+        if True:
+            self.logger.line()
+            self.logger('~~ Pre-Run Info ~~', center=True, c='yellow', attrs=['bold', 'reverse'])
+            self.logger.line()
+
+            tab_3 = np.array([])
+            switch_title = True
+
+            for b in self:
+                to_tab0 = b.get_attr(['name', 'display_prior', 'limits'])
+                to_tab0[2] = np.round(to_tab0[2], 3)
+                to_tab = list(zip(*to_tab0))
+
+                if switch_title:
+                    self.logger(tabulate(to_tab,
+                                          headers=['Parameter       ',
+                                                   'Prior   ',
+                                                   'Limits      ',
+                                                   ]))
+                    switch_title = False
+
+                else:
+                    self.logger(tabulate(to_tab,
+                                          headers=['                ',
+                                                   '        ',
+                                                   '            ',
+                                                   ]))
+
+            self.logger.line()
+            for b in self:
+                self.logger('Math for {}:'.format(b.name_), c='yellow')
+                self.logger('{}'.format(b.math_display_), center=True, c='yellow')
+
+        pass
 
 
     def get_attr_param(self, call, flat=False, asarray=False):
