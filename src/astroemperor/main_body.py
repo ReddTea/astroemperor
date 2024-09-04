@@ -123,9 +123,12 @@ class Simulation(object):
             setup = []
         # LOAD ATTRIBUTES
         self.time_init = time.time()
+        self.cores__ = _CORES
+
+        self.rounder_display = 3
+        self.rounder_math = 8
 
         self.logger = reddlog()
-        self.cores__ = _CORES
 
         self.init_default_config()
 
@@ -178,11 +181,7 @@ class Simulation(object):
         # Writing stuff
         self.dynesty_config = {'dlogz_init':0.05,
                                 }
-        self.reddemcee_config = {'burnin':'half',
-                                'thinby':1,
-                                'logger_level':'CRITICAL',
-                                'iterations':1,
-                                }
+
 
         self.ModelSelection = ModelSelectionObj('BIC')
         self.evidence = 0, 0
@@ -336,14 +335,16 @@ class Simulation(object):
         elif eng == 'dynesty':
             import dynesty
             self.engine__ = dynesty
+            self.engine_config = {'setup':np.array([]),
+                                  'dlogz_init':0.05}
 
         elif eng == 'dynesty_dynamic':
             import dynesty
             self.engine__ = dynesty
             self.engine__args = 'dynamic'
             self.general_dependencies.append('dynesty')
-
-            self.dynesty_config['dlogz_init'] = 0.05
+            self.engine_config = {'setup':np.array([]),
+                                  'dlogz_init':0.05}
 
         elif eng == 'pymc3':
             import pymc3 as pm
@@ -357,10 +358,24 @@ class Simulation(object):
                 self.general_dependencies.extend(['astroemperor.fpts as fpts'])
 
 
-            self.reddemcee_config['burnin'] = 'half'
-            self.reddemcee_config['thinby'] = 1
-            self.reddemcee_config['logger_level'] = 'CRITICAL'
-            self.reddemcee_config['iterations'] = 1
+            self.engine_config = {'setup':np.array([5, 100, 500, 2]),
+                                  'ntemps':5,
+                                  'betas':None,
+                                  'adaptative':True,
+                                  'moves':None,
+                                  'config_adaptation_halflife':1000,
+                                  'config_adaptation_rate':100,
+                                  'config_adaptation_decay':0,
+                                  }
+
+            self.run_config = {'adapt_burnin':None,
+                               'discard':0.5,
+                               'thin':1,
+                               'logger_level':'CRITICAL',
+                               'burnin0':0,
+                               'burnin0_runs':1,
+                               }
+
 
         else:
             raise Exception(self.logger('Failed to set engine properly. Try a string!', center=True, c='red'))
@@ -574,7 +589,7 @@ class Simulation(object):
         self.model_constants['cornums'] = f'{self.cornums}'
 
 
-    def run(self, setup, progress=True):
+    def run(self, progress=True):
         time_run_init = time.time()
         
         ### assert errors!
@@ -710,16 +725,26 @@ class Simulation(object):
 
         if self.engine__.__name__ == 'reddemcee':
             from emcee.backends import HDFBackend
+            # Constants for run
+            setup = self.engine_config['setup']
             ntemps, nwalkers, nsweeps, nsteps = setup
+
+            # Assert
+            assert self.nins__ == len(self.instrument_names), f'instrument_names should have {self.nins__} items'
+            if self.engine_config['betas'] is not None:
+                assert len(self.engine_config['betas']) == setup[0], f'betas should have {setup[0]} items'
+            # Write Script            
             self.debug_msg(f'run  : Write_script() | {time.time()-self.time_init}')
             self.write_script()
-
             self.debug_msg(f'run  : os <run temp_script.py> | {time.time()-self.time_init}')
 
-            self.logger('\n')
-            self.logger('Generating Samples', center=True, c='green')
+            # Run Script
+            self.logger('Generating Samples', center=True, c='green', attrs=['reverse'])
+            self.logger.line()
 
             os.system(f'ipython {self.temp_script}')
+            
+            # Restore Sampler
             self.sampler = self.engine__.PTSampler(nwalkers, self.model.ndim__,
                                          self.temp_like_func,
                                          self.temp_prior_func,
@@ -727,10 +752,15 @@ class Simulation(object):
                                          logp_args=[], logp_kwargs={},
                                          ntemps=ntemps, pool=None)
 
-            #self.sampler = [None for _ in range(ntemps)]
             with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
                 self.sampler_metadata_dict = pickle.load(sampler_metadata)
+
             os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+
+            for attr, value in self.sampler_metadata_dict.items():
+                setattr(self.sampler, attr, value)
+
+            self.betas = self.sampler.betas
 
             if not self.FPTS:
                 for t in range(ntemps):
@@ -787,16 +817,25 @@ class Simulation(object):
         gc.collect()
 
 
-    def run_auto(self, setup, k_start=0, k_end=10, progress=True):
+    def run_auto(self, k_start=0, k_end=10, progress=True):
         self.debug_msg(f'run_auto : INIT run_auto | {time.time()-self.time_init}')
+        self.auto_setup = self.engine_config['setup']
 
-        self.auto_setup = setup
-        if self.engine__.__name__ in ['emcee', 'dynesty', 'pymc3', 'reddemcee']:
+        ## Assert this is a valid run
+        valid_engines = ['emcee', 'dynesty', 'pymc3', 'reddemcee']
+        assert self.engine__.__name__ in valid_engines, f'Selected engine not valid!'
+        assert k_start <= k_end, f'Invalid keplerian starting point: ({k_start}, {k_end})'
 
+        ## Add blocks
+        if True:
             if self.switch_RV:
                 self.add_offset_block()
                 if self.switch_SA and np.sum(self.cornums) > 0:
                     self.add_sai_block()
+
+                if self.switch_first and k_start > 0:
+                    for _ in range(k_start):
+                        self.add_keplerian_block()
 
             if self.acceleration:
                 self.add_acceleration_block()
@@ -815,26 +854,25 @@ class Simulation(object):
                 self.add_offset_am_block()
                 self.add_jitter_am_block()
 
-
-
+        # make the run
+        if True:
             while k_start <= k_end:
-                if self.switch_first and k_start > 0 and self.switch_RV:
-                    for _ in range(k_start):
-                        self.add_keplerian_block()
+                # Init Stat Holders
+                if True:
+                    oldlike_max = self.like_max
+                    oldpost_max = self.post_max
+                    oldchi2 = self.chi2
+                    oldAIC = self.AIC
+                    oldBIC = self.BIC
+                    oldDIC = self.DIC
+                    oldHQIC = self.HQIC
+                    oldRMSE = self.RMSE
+                    oldRMSi = self.RMSi
+                    oldWeights = self.Weights
+                    oldBayesFactor = self.BayesFactor
 
 
-                oldlike_max = self.like_max
-                oldpost_max = self.post_max
-                oldchi2 = self.chi2
-                oldAIC = self.AIC
-                oldBIC = self.BIC
-                oldDIC = self.DIC
-                oldHQIC = self.HQIC
-                oldRMSE = self.RMSE
-                oldBayesFactor = self.BayesFactor
-
-
-                self.run(self.auto_setup, progress=progress)
+                self.run(progress=progress)
                 self.postprocess()  # change values
                 #self.run_plot_routines()
 
@@ -928,65 +966,27 @@ class Simulation(object):
         self.debug_msg(f'postprocess() : INIT | {time.time()-self.time_init}')
 
         if self.engine__.__name__ == 'reddemcee':
-            ntemps, nwalkers, nsweeps, nsteps = self.auto_setup
+            ntemps, nwalkers, nsweeps, nsteps = self.engine_config['setup']
             niter = int(nsteps * nsweeps)
 
-            self.acceptance_fraction = self.sampler_metadata_dict['acceptance_fraction']
-            #self.autocorr_time = self.sampler_metadata_dict['get_autocorr_time']
-
-            self.sampler.betas = self.sampler_metadata_dict['betas']
-            self.betas = self.sampler.betas
-            
-            self.sampler.ratios = self.sampler_metadata_dict['ratios']
-
-            self.sampler.betas_history = self.sampler_metadata_dict['betas_history']
-            self.sampler.ratios_history = self.sampler_metadata_dict['ratios_history']
-            self.sampler.af_history = self.sampler_metadata_dict['af_history']
-
-
+            # BURN-IN config
             if True:
-                if type(self.reddemcee_config['burnin']) == str:
-                    if self.reddemcee_config['burnin'] == 'half':
-                        self.reddemcee_discard = niter // 2
-                    elif self.reddemcee_config['burnin'] == 'auto':
-                        print('method not yet implemented!! CODE 26')
-                        self.reddemcee_discard = 0
-                    else:
-                        self.reddemcee_discard = 0
-                elif type(self.reddemcee_config['burnin']) == int:
-                    self.reddemcee_discard = self.reddemcee_config['burnin']
+                self.reddemcee_discard = int(self.run_config['discard']*niter)
+                self.reddemcee_thin = self.run_config['thin']
 
-                elif type(self.reddemcee_config['burnin']) == float:
-                    self.reddemcee_discard = int(self.reddemcee_config['burnin'] * niter)
-
-                else:
-                    print('method not understood!! CODE 27')
-                    self.reddemcee_discard = 0
-            if True:
-                if type(self.reddemcee_config['thinby']) == str:
-                    if self.reddemcee_config['thinby'] == 'half':
-                        self.reddemcee_thin = 2
-
-                    elif self.reddemcee_config['thinby'] == 'auto':
-                        print('method not yet implemented!! CODE 28')
-                        self.reddemcee_thin = 1
-                    else:
-                        self.reddemcee_thin = 1
-                elif type(self.reddemcee_config['thinby']) == int:
-                    self.reddemcee_thin = self.reddemcee_config['thinby']
-
-                else:
-                    print('method not understood!! CODE 29')
-                    self.reddemcee_thin = 1
-
-            reddemcee_dict = {'discard':self.reddemcee_discard,
-                              'thin':self.reddemcee_thin,
-                              'flat':True}
+                reddemcee_dict = {'discard':self.reddemcee_discard,
+                                  'thin':self.reddemcee_thin,
+                                  'flat':True}
 
             if not self.FPTS:
                 raw_chain = self.sampler.get_func('get_chain', kwargs=reddemcee_dict)
                 raw_likes = self.sampler.get_func('get_blobs', kwargs=reddemcee_dict)
                 raw_posts = self.sampler.get_func('get_log_prob', kwargs=reddemcee_dict)
+
+                self.autocorr_time = self.sampler.get_autocorr_time(quiet=True,
+                                                    tol=0,
+                                                    discard=self.reddemcee_discard,
+                                                    thin=self.reddemcee_thin)
 
             else:
                 with open('sampler_flatchain.pkl', 'rb') as y:
@@ -1033,16 +1033,16 @@ class Simulation(object):
                     #self.evidence = np.mean(zaux), np.std(zaux)
                     self.evidence = zaux[0], zaux[1]
 
-            best_loc_post = np.argmax(raw_posts[0])
-            best_loc_like = np.argmax(raw_likes[0])
+            self.best_loc_post = np.argmax(raw_posts[0])
+            self.best_loc_like = np.argmax(raw_likes[0])
 
-            self.post_max = raw_posts[0][best_loc_post]
-            self.like_max = raw_likes[0][best_loc_post]
-            self.prior_max_post = self.post_max - raw_likes[0][best_loc_post]
+            self.post_max = raw_posts[0][self.best_loc_post]
+            self.like_max = raw_likes[0][self.best_loc_post]
+            self.prior_max_post = self.post_max - raw_likes[0][self.best_loc_post]
 
             self.sigmas = np.std(raw_chain[0], axis=0)
 
-            self.fit_max = raw_chain[0][best_loc_post]
+            self.fit_max = raw_chain[0][self.best_loc_post]
             self.fit_mean = np.mean(raw_chain[0], axis=0)
             self.fit_median = np.median(raw_chain[0], axis=0)
 
@@ -1050,7 +1050,7 @@ class Simulation(object):
             self.fit_low2, self.fit_high2 = np.percentile(raw_chain[0], find_confidence_intervals(2), axis=0)
             self.fit_low3, self.fit_high3 = np.percentile(raw_chain[0], find_confidence_intervals(3), axis=0)
 
-            self.fit_maxlike = raw_chain[0][best_loc_like]
+            self.fit_maxlike = raw_chain[0][self.best_loc_like]
 
             if self.use_fit == 'max_post':
                 self.ajuste = self.fit_max
@@ -1088,16 +1088,16 @@ class Simulation(object):
 
             ## FIN
             ###### THIS CAN BE SHARED
-            best_loc_post = np.argmax(raw_posts[0])
-            best_loc_like = np.argmax(raw_likes[0])
+            self.best_loc_post = np.argmax(raw_posts[0])
+            self.best_loc_like = np.argmax(raw_likes[0])
 
-            self.post_max = raw_posts[0][best_loc_post]
-            self.like_max = raw_likes[0][best_loc_post]
+            self.post_max = raw_posts[0][self.best_loc_post]
+            self.like_max = raw_likes[0][self.best_loc_post]
             self.prior_max_post = 0.0  # calculate properly
 
             self.sigmas = np.std(raw_chain[0], axis=0)
 
-            self.fit_max = raw_chain[0][best_loc_post]
+            self.fit_max = raw_chain[0][self.best_loc_post]
             self.fit_mean = np.mean(raw_chain[0], axis=0)
             self.fit_median = np.median(raw_chain[0], axis=0)
 
@@ -1105,7 +1105,7 @@ class Simulation(object):
             self.fit_low2, self.fit_high2 = np.percentile(raw_chain[0], find_confidence_intervals(2), axis=0)
             self.fit_low3, self.fit_high3 = np.percentile(raw_chain[0], find_confidence_intervals(3), axis=0)
 
-            self.fit_maxlike = raw_chain[0][best_loc_like]
+            self.fit_maxlike = raw_chain[0][self.best_loc_like]
 
 
             if self.use_fit == 'max_post':
@@ -1135,22 +1135,23 @@ class Simulation(object):
         self.dic_aux = np.var(-2 * likes[0])
 
         ###########################################
-        ###########################################
         # GET STATS
+        ###########################################
         self.debug_msg(f'postprocess() : GET_STATS | {time.time()-self.time_init}')
 
         if True:
             if self.switch_RV:
                 ## not ajuste, but whole
+                ## will fail with fixed stuff?
                 ymod, err2 = self.temp_model_func(self.ajuste)
                 residuals = self.my_data['RV'].values - ymod
 
+                res_table = self.my_data.values.T
+                res_table[1] = residuals
+
+
                 np.savetxt(f'{self.saveplace}/restore/residuals.dat',
-                            np.array([self.my_data['BJD'].values,
-                            residuals,
-                            self.my_data['eRV'].values,
-                            self.my_data['Flag'].values,
-                            ]))
+                            res_table)
 
                 self.calculate_statistics(residuals, err2)
 
@@ -1160,33 +1161,11 @@ class Simulation(object):
             j = 0  # delete this ap1
             for b in self:
                 for p in b:
-                    if p.fixed == None:
-                        p.value = self.ajuste[j]
-                        p.sigma = self.sigmas[j]
-                        p.sigma_frac_mean = 0
-
-                        p.value_max = self.fit_max[j]
-                        p.value_mean = self.fit_mean[j]
-                        p.value_median = self.fit_median[j]
-
-                        p.value_max_lk = self.fit_maxlike[j]
-
-                        p.value_low1, p.value_high1 = self.fit_low1[j], self.fit_high1[j]
-                        p.value_low2, p.value_high2 = self.fit_low2[j], self.fit_high2[j]
-                        p.value_low3, p.value_high3 = self.fit_low3[j], self.fit_high3[j]
-
+                    if p.fixed is None:
+                        self._update_p_free(p, j)
                         j += 1
                     else:
-                        p.sigma = np.nan
-                        p.value_max = p.value
-                        p.value_mean = p.value
-                        p.value_median = p.value
-
-                        p.value_max_lk = p.value
-
-                        p.value_low1, p.value_high1 = np.nan, np.nan
-                        p.value_low2, p.value_high2 = np.nan, np.nan
-                        p.value_low3, p.value_high3 = np.nan, np.nan
+                        self._update_p_fixed(p)
 
 
         # Get extra info. Parameter transformation and planet signatures
@@ -1291,19 +1270,7 @@ class Simulation(object):
                     for p in b.additional_parameters:
                         if p.has_posterior:
                             ch = extra_chains[jj]
-                            p.value = ch[best_loc_post]  # self.use_fit
-                            p.sigma = np.std(ch)
-                            p.sigma_frac_mean = 0
-
-                            p.value_max = ch[best_loc_post]
-                            p.value_mean = np.mean(ch)
-                            p.value_median = np.median(ch)
-
-                            p.value_low1, p.value_high1 = np.percentile(ch, find_confidence_intervals(1))
-                            p.value_low2, p.value_high2 = np.percentile(ch, find_confidence_intervals(2))
-                            p.value_low3, p.value_high3 = np.percentile(ch, find_confidence_intervals(3))
-
-                            p.value_max_lk = ch[best_loc_like]
+                            self._update_p_extra(p, ch)
                             jj += 1
 
         # SAVE STUFF??
@@ -1478,17 +1445,24 @@ class Simulation(object):
                      ['The Bayes Factor is         :    ', '{:.3f}'.format(self.BayesFactor)],
                      ['The chi2 is                 :    ', '{:.3f}'.format(self.chi2)],
                      ['The reduced chi2 is         :    ', '{:.3f}'.format(self.chi2_red)],
-                     ['The RMSE is                 :    ', '{:.3f}'.format(self.RMSE)]
+                     ['The RMSE is                 :    ', '{:.3f}'.format(self.RMSE)],
+                     ['The RMSi is                 :    ', f'{np.round(self.RMSi, 3)}'],
+                     ['The Weights are             :    ', f'{np.round(self.Weights, 3)}'],
                      ]
 
             if self.engine__.__name__ == 'reddemcee':
-                self.logger('\nBeta Detail                     :   ' + str(['{:.3f}'.format(x) for x in self.sampler.betas]))
-                self.logger('\nMean Logl Detail                :   ' + str(['{:.3f}'.format(np.mean(x)) for x in likes]))
-                self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}')
+                adapt_ts = self.engine_config['config_adaptation_halflife']
+                adapt_ra = self.engine_config['config_adaptation_rate']
+                adapt_sc = self.engine_config['config_adaptation_decay']
 
-                self.logger('\nTemperature Swap                :   ' + str(['{:.3f}'.format(x) for x in self.sampler.ratios]))
-                self.logger('\nMean Acceptance Fraction        :   ' + str(['{:.3f}'.format(x) for x in np.mean(self.acceptance_fraction, axis=1)]))
-                self.logger('\nAutocorrelation Time            :   ' + str(['{:.3f}'.format(x) for x in self.autocorr_time[0]]))
+                self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}')
+                self.logger('\nBeta Detail                     :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.sampler.betas) + ']', save_extra_n=True)
+                self.logger('\nMean Logl Detail                :   ' + '[' + ', '.join('{:.3f}'.format(np.mean(x)) for x in likes) + ']', save_extra_n=True)
+                self.logger('\nTemperature Swap                :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.sampler.ratios) + ']', save_extra_n=True)
+                self.logger('\nMean Acceptance Fraction        :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in np.mean(self.sampler.acceptance_fraction, axis=1)) + ']', save_extra_n=True)
+                self.logger('\nAutocorrelation Time            :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.autocorr_time[0]) + ']', save_extra_n=True)
+
+
                 if self.switch_evidence:
                     x = [['The evidence is             :    ', '%.3f +- %.3f' % self.evidence]]
                     tab_2 = np.vstack([x, tab_2])
@@ -1512,7 +1486,10 @@ class Simulation(object):
                                       'AIC ',
                                       'X²  ',
                                       'X²v ',
-                                      'RMSE'])
+                                      'RMSE',
+                                      'RMSi',
+                                      'Weights',
+                                      ])
                 
                 stats_log = np.vstack([stats_log,
                                        ['%.3f +- %.3f' % self.evidence,
@@ -1522,10 +1499,13 @@ class Simulation(object):
                                        '{:.3f}'.format(self.AIC),
                                        '{:.3f}'.format(self.chi2),
                                        '{:.3f}'.format(self.chi2_red),
-                                       '{:.3f}'.format(self.RMSE)],
+                                       '{:.3f}'.format(self.RMSE),
+                                       f'{np.round(self.RMSi, 3)}',
+                                       f'{np.round(self.Weights, 3)}',
+                                       ],
                                        ])
                                       
-                np.savetxt(f'{self.saveplace}/stats.dat', stats_log.T, fmt='%s', delimiter='\t')
+                np.savetxt(f'{self.saveplace}/tables/stats.dat', stats_log.T, fmt='%s', delimiter='\t')
 
         # SAVE CHAIN SUMMARY
         if True:
@@ -1561,12 +1541,54 @@ class Simulation(object):
                        '99.73    ',
                        ]
             
-            np.savetxt(f'{self.saveplace}/chain_summary.dat',
+            np.savetxt(f'{self.saveplace}/tables/chain_summary.dat',
                         np.vstack([cs_header, np.array(cs).T]),
                         fmt='%s',
                         delimiter='\t')
             
+        # SAVE TEX 
+        if True:
+            par_box_names = self.get_attr_param('name', flat=True)
             
+            v0 = np.array(self.get_attr_param('value_range', flat=True))[:, 0]
+            v1 = self.get_attr_param('value_max', flat=True)
+            v2 = np.array(self.get_attr_param('value_range', flat=True))[:, 1]
+
+            par_box = [par_box_names,
+                       v0,
+                       v1,
+                       v2,
+                       ]
+            
+            par_box = adjust_table_tex(par_box, rounder=8)
+
+            pb_header = ['Parameter',
+                         'lower    ',
+                         'value    ',
+                         'higher   ']
+            
+            df0 = pd.DataFrame(np.array(par_box).T, columns=pb_header)
+
+            df0.to_csv(f'{self.saveplace}/tables/param_minimal.dat',
+                       sep='\t',
+                       index=False)
+
+
+            df0['value    '] = np.round(v1, self.rounder_math)
+            df0['higher'] = np.round(v2-v1, self.rounder_math)
+            df0['lower'] = np.round(v1-v0, self.rounder_math)
+
+            df0['Value'] = df0.apply(lambda row: f"${row['value    ']}^{{+{row['higher']}}}_{{-{row['lower']}}}$", axis=1)
+
+
+            df_latex = df0[['Parameter', 'Value']]
+            
+            latex_table = df_latex.to_latex(index=False, escape=False)
+
+            with open(f'{self.saveplace}/tables/values.tex', 'w') as f:
+                f.write(latex_table)
+
+    
         #######################
         # PLOT GM PER PARAMETER
 
@@ -1776,6 +1798,12 @@ class Simulation(object):
         self.chi2_red = np.sum(residuals**2 / err2) / self.dof
         self.RMSE = np.sqrt(np.sum(residuals ** 2) / self.model.ndata)
 
+        FLAGS_ = self.my_data.Flag
+        self.RMSi = [np.sqrt(np.sum(residuals[FLAGS_==(i+1)] ** 2) / len(residuals[FLAGS_==(i+1)])) for i in range(self.nins__)]
+        self.Weights = [len(FLAGS_==(i+1)) / self.RMSi[i]**2 for i in range(self.nins__)]
+        self.Total_Weight = np.sum(self.Weights)
+        self.Weights = self.Weights / self.Total_Weight
+
         self.AIC = 2 * self.model.ndim__ - 2 * self.like_max
         self.BIC = np.log(self.model.ndata) * self.model.ndim__ - 2 * self.like_max
 
@@ -1953,11 +1981,8 @@ import {d}
             if self.engine__.__name__ == 'reddemcee':
                 f.write('''
 logging.getLogger('emcee').setLevel('{}')
-'''.format(self.reddemcee_config['logger_level']))
+'''.format(self.run_config['logger_level']))
 
-                f.write(f'''
-reddemcee_iter = {self.reddemcee_config['iterations']}
-''')
 
             ## CONSTANTS
             for c in self.model_constants:
@@ -2148,8 +2173,8 @@ ndim = {self.model.ndim__}
             ## BACKENDS
             if self.engine__.__name__ == 'reddemcee':
                 if not self.FPTS:
-                    if self.betas is not None:
-                        aux_betas_str = f'np.array({str(list(self.betas))})'
+                    if self.engine_config['betas'] is not None:
+                        aux_betas_str = f'np.array({str(list(self.engine_config["betas"]))})'
                     else:
                         aux_betas_str = 'None'
                     f.write(f'''
@@ -2168,11 +2193,12 @@ sampler = reddemcee.PTSampler(nwalkers,
                              pool=mypool,
                              backend=backends,
                              betas=betas,
-                             adaptative=True,
+                             adaptative={str(self.engine_config["adaptative"])},
+                             config_adaptation_halflife={self.engine_config["config_adaptation_halflife"]},
+                             config_adaptation_rate={self.engine_config["config_adaptation_rate"]},
+                             config_adaptation_decay={self.engine_config["config_adaptation_decay"]},
                              )
-sampler.config_adaptation_halflife = 1000
-sampler.config_adaptation_rate = 0.3
-sampler.select_decay = 0
+
 ''')
                 else:
                     f.write(f'''
@@ -2187,7 +2213,10 @@ sampler0 = reddemcee.PTSampler(nwalkers, ndim,
                              my_likelihood,
                              my_prior,
                              ntemps=ntemps,
-                             adaptative=True)
+                             adaptative={str(self.engine_config["adaptative"])},
+                             config_adaptation_halflife={self.engine_config["config_adaptation_halflife"]},
+                             config_adaptation_rate={self.engine_config["config_adaptation_rate"]},
+                             config_adaptation_decay={self.engine_config["config_adaptation_decay"]},
 ''')
             ## SETUP POS0
             if self.engine__.__name__ == 'reddemcee':
@@ -2279,16 +2308,22 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
 ''')
 
             if self.engine__.__name__ == 'reddemcee':
-                if self.FPTS:
-                    f.write(open(get_support('endit_fpts.scr')).read())
+                if not self.FPTS:
+                    if self.run_config['adapt_burnin']:
+                        f.write(f'''
+adapt_burnin = {self.run_config['adapt_burnin']}
+''')
+                        f.write(open(get_support('endit2.scr')).read())
+                    else:
+                        f.write(open(get_support('endit.scr')).read())
                 else:
-                    f.write(open(get_support('endit.scr')).read())
+                    f.write(open(get_support('endit_fpts.scr')).read())
 
             if self.engine__.__name__ == 'dynesty':
                 nested_dict = self.dynesty_config
                 nested_args = ''
-                for key in [*nested_dict]:
-                    nested_args += f'{key} = {nested_dict[key]}, '
+                for key in [*self.engine_config]:
+                    nested_args += f'{key} = {self.engine_config[key]}, '
 
                 f.write(open(get_support('endit_dyn.scr')).read().format(pool_bool, self.cores__, nested_args))
 
@@ -2308,9 +2343,16 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
         self.debug_msg(f'write_script() : END | {time.time()-self.time_init}')
 
 
-    def load_run(self):
+    def load_sampler_meta(self, target_dir=''):
+        if not target_dir:
+            target_dir = self.saveplace+'/restore/'
+        filename = f'{target_dir}sampler_pickle.pkl'
 
-        pass
+        with open(filename, 'rb') as sampler_metadata:
+            metadata_dict = pickle.load(sampler_metadata)
+
+        for attr, value in metadata_dict.items():
+            setattr(self.sampler, attr, value)
 
 
     def clean_run(self):
@@ -2318,6 +2360,87 @@ print('temp_script.py   : run __main__ | ', time.time()-debug_timer)
 
         os.system(f'mv {self.temp_script} {self.saveplace}/temp/{self.temp_script}')
         gc.collect()
+        pass
+
+
+    def _update_p_extra(self, p, ch):
+        p.value = ch[self.best_loc_post]  # self.use_fit
+        p.sigma = np.std(ch)
+        p.sigma_frac_mean = 0
+
+        p.value_max = ch[self.best_loc_post]
+        p.value_mean = np.mean(ch)
+        p.value_median = np.median(ch)
+
+        p.value_max_lk = ch[self.best_loc_like]
+
+        p.value_low1, p.value_high1 = hdi_of_samples(ch, 0.36)
+        p.value_low2, p.value_high2 = hdi_of_samples(ch, 0.90)
+        p.value_low3, p.value_high3 = hdi_of_samples(ch, 0.95)
+
+        if p.value_low1 < p.value_max:
+            a = p.value_low1
+        else:
+            a = p.value_max - p.sigma
+
+        if p.value_high1 > p.value_max:
+            b = p.value_high1
+        else:
+            b = p.value_max + p.sigma
+
+        if a < p.limits[0]:
+            a = p.limits[0]
+        if b > p.limits[1]:
+            b = p.limits[1]
+
+        p.value_range = [a, b]
+
+
+    def _update_p_free(self, p, j):
+        p.value = self.ajuste[j]
+        p.sigma = self.sigmas[j]
+        p.sigma_frac_mean = 0
+
+        p.value_max = self.fit_max[j]
+        p.value_mean = self.fit_mean[j]
+        p.value_median = self.fit_median[j]
+
+        p.value_max_lk = self.fit_maxlike[j]
+
+        p.value_low1, p.value_high1 = self.fit_low1[j], self.fit_high1[j]
+        p.value_low2, p.value_high2 = self.fit_low2[j], self.fit_high2[j]
+        p.value_low3, p.value_high3 = self.fit_low3[j], self.fit_high3[j]
+
+        if p.value_low1 < p.value_max:
+            a = p.value_low1
+        else:
+            a = p.value_max - p.sigma
+
+        if p.value_high1 > p.value_max:
+            b = p.value_high1
+        else:
+            b = p.value_max + p.sigma
+
+        if a < p.limits[0]:
+            a = p.limits[0]
+        if b > p.limits[1]:
+            b = p.limits[1]
+
+        p.value_range = [a, b]
+
+
+    def _update_p_fixed(self, p):
+        p.sigma = np.nan
+        p.value_max = p.value
+        p.value_mean = p.value
+        p.value_median = p.value
+
+        p.value_max_lk = p.value
+
+        p.value_low1, p.value_high1 = np.nan, np.nan
+        p.value_low2, p.value_high2 = np.nan, np.nan
+        p.value_low3, p.value_high3 = np.nan, np.nan
+        p.value_range = [np.nan, np.nan]        
         pass
 
 
