@@ -724,7 +724,7 @@ class Simulation(object):
         self.debug_msg(f'run  : init sampler | {time.time()-self.time_init}')
 
         if self.engine__.__name__ == 'reddemcee':
-            from emcee.backends import HDFBackend
+            
             # Constants for run
             setup = self.engine_config['setup']
             ntemps, nwalkers, nsweeps, nsteps = setup
@@ -744,30 +744,24 @@ class Simulation(object):
 
             os.system(f'ipython {self.temp_script}')
             
-            # Restore Sampler
-            self.sampler = self.engine__.PTSampler(nwalkers, self.model.ndim__,
-                                         self.temp_like_func,
-                                         self.temp_prior_func,
-                                         logl_args=[], logl_kwargs={},
-                                         logp_args=[], logp_kwargs={},
-                                         ntemps=ntemps, pool=None)
+            # RESTORE SAMPLER
+            self.load_sampler_meta(target_dir='', setup=setup)
+            #with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
+            #    self.sampler_metadata_dict = pickle.load(sampler_metadata)
 
-            with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
-                self.sampler_metadata_dict = pickle.load(sampler_metadata)
+            #os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
 
-            os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+            #for attr, value in self.sampler_metadata_dict.items():
+            #    setattr(self.sampler, attr, value)
 
-            for attr, value in self.sampler_metadata_dict.items():
-                setattr(self.sampler, attr, value)
+            #self.betas = self.sampler.betas
 
-            self.betas = self.sampler.betas
-
-            if not self.FPTS:
-                for t in range(ntemps):
-                    loc_t = '{}emperor_backend_{}.h5'.format(self.saveplace+'/restore/backends/', t)
-                    self.sampler[t] = HDFBackend(loc_t)
-            else:
-                pass
+            #if not self.FPTS:
+            #    for t in range(ntemps):
+            #        loc_t = '{}emperor_backend_{}.h5'.format(self.saveplace+'/restore/backends/', t)
+            #        self.sampler[t] = HDFBackend(loc_t)
+            #else:
+            #    pass
 
         if self.engine__.__name__ == 'dynesty':
             # TRANSFORM TO PTFORMARGS
@@ -2343,16 +2337,45 @@ adapt_burnin = {self.run_config['adapt_burnin']}
         self.debug_msg(f'write_script() : END | {time.time()-self.time_init}')
 
 
-    def load_sampler_meta(self, target_dir=''):
-        if not target_dir:
-            target_dir = self.saveplace+'/restore/'
-        filename = f'{target_dir}sampler_pickle.pkl'
+    def load_sampler_meta(self, target_dir='', setup=[]):
+        from emcee.backends import HDFBackend
 
-        with open(filename, 'rb') as sampler_metadata:
-            metadata_dict = pickle.load(sampler_metadata)
+        ntemps, nwalkers, nsweeps, nsteps = setup
 
-        for attr, value in metadata_dict.items():
+        # Restore Sampler
+        self.sampler = self.engine__.PTSampler(nwalkers, self.model.ndim__,
+                                     self.temp_like_func,
+                                     self.temp_prior_func,
+                                     logl_args=[], logl_kwargs={},
+                                     logp_args=[], logp_kwargs={},
+                                     ntemps=ntemps,
+                                     pool=None,
+                                     )
+        with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
+            self.sampler_metadata_dict = pickle.load(sampler_metadata)
+
+        for attr, value in self.sampler_metadata_dict.items():
             setattr(self.sampler, attr, value)
+
+        self.betas = self.sampler.betas
+
+        os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+        #if not target_dir:
+        #    target_dir = self.saveplace+'/restore/'
+        #filename = f'{target_dir}sampler_pickle.pkl'
+
+        #with open(filename, 'rb') as sampler_metadata:
+        #    metadata_dict = pickle.load(sampler_metadata)
+
+        #for attr, value in metadata_dict.items():
+        #    setattr(self.sampler, attr, value)
+
+        if not self.FPTS:
+            for t in range(ntemps):
+                loc_t = '{}emperor_backend_{}.h5'.format(self.saveplace+'/restore/backends/', t)
+                self.sampler[t] = HDFBackend(loc_t)
+        else:
+            print('Method not implemented yet!')
 
 
     def clean_run(self):
