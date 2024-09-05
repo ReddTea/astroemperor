@@ -366,7 +366,7 @@ def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
 def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
     if True:
         trace_modes = options['modes']
-        saveplace = options['saveloc'] + '/plots/traces/'
+        saveplace = options['saveloc'] + '/plots/arviz/'
         fmt = options['format']
         burnin = options['burnin']
         thin = options['thin']
@@ -411,8 +411,9 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                 vn_b = np.array(b.get_attr('name'))[b.C_]
                 circ_var_names = vn_b[np.array(b.get_attr('is_circular'))[b.C_]]
 
+                # TRACES
                 if dothis[0]:
-                    savefigname = saveplace + f'{trace_mode_dic[0]} {b.name_}.{fmt}'
+                    savefigname = saveplace + 'traces/' + f'{trace_mode_dic[0]} {b.name_}.{fmt}'
 
                     az.plot_trace(arviz_data,
                                   #compact=True,
@@ -435,9 +436,10 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     pl.savefig(savefigname)
                     pl.close()
 
+                # DENSITY INTERVALS
                 if dothis[2]:
 
-                    savefigname = saveplace + f'{trace_mode_dic[2]} {b.name_}.{fmt}'
+                    savefigname = saveplace + 'density_intervals/' + f'{trace_mode_dic[2]} {b.name_}.{fmt}'
                     axes = az.plot_density(
                             [arviz_data],
                             var_names=vn_b,
@@ -450,9 +452,10 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     pl.savefig(savefigname)
                     pl.close()
 
+                # CORNERPLOT
                 if dothis[3] and b.ndim_ > 2:
                     #pbar = tqdm(total=1)
-                    savefigname = saveplace + f'{trace_mode_dic[3]} {b.name_}.{fmt}'
+                    savefigname = saveplace + 'cornerplots/' + f'{trace_mode_dic[3]} {b.name_}.{fmt}'
                     az.plot_pair(arviz_data,
                                  var_names=vn_b,
                                  figsize=(3*len(vn_b), 3*len(vn_b)),
@@ -497,10 +500,11 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                     #pbar.update(1)
                     #pbar.close()
 
+                # NORMALISED POSTERIORS
                 if dothis[1]:
                     for p in b[b.C_]:
                         fig, ax = pl.subplots(1, 1)
-                        savefigname = saveplace + f'{trace_mode_dic[1]} {p.name}.{fmt}'
+                        savefigname = saveplace + 'normed_posteriors/'+ f'{trace_mode_dic[1]} {p.name}.{fmt}'
                         fig.suptitle(p.name)
 
                         az.plot_dist(arviz_data.posterior[p.name].values,
@@ -524,63 +528,18 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                 if trace_mode == 0:
                     # trace
                     for b in my_model:
-                        vnb = np.array(b.get_attr('name'))[b.C_]
-                        fig, axes = dyplot.traceplot(res2,
-                                                    post_color=rc.fg,
-                                                    trace_color=rc.fg,
-                                                    labels=vnb,
-                                                    dims=b.slice_true)
-                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
-                        pl.savefig(savefigname)
-                '''
-                elif trace_mode == 1:
-                    arviz_data = az.from_emcee(sampler=sampler,
-                                                var_names=vn)
-
-                    for b in my_model:
-                        for p in b[b.C_]:
-                            fig, ax = pl.subplots(1, 1)
-                            fig.suptitle(p.name)
-
-                            az.plot_dist(arviz_data.posterior[p.name].values)
-
-                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {p.name}.{fmt}'
+                        try:
+                            vnb = np.array(b.get_attr('name'))[b.C_]
+                            fig, axes = dyplot.traceplot(res2,
+                                                        post_color=rc.fg,
+                                                        trace_color=rc.fg,
+                                                        labels=vnb,
+                                                        dims=b.slice_true)
+                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
                             pl.savefig(savefigname)
-                    
-                elif trace_mode == 2:
-                    arviz_data = az.from_emcee(sampler=sampler,
-                                                var_names=vn)
+                        except:
+                            print('Dynesty dyplot failed!')
 
-                    for b in my_model:
-                        axes = az.plot_density(
-                            [arviz_data],
-                            var_names=np.array(b.get_attr('name'))[b.C_],
-                            shade=0.2,
-                            #hdi_markers='v'
-                            )
-
-                        fig = axes.flatten()[0].get_figure()
-                        fig.suptitle("94% High Density Intervals")
-
-                        savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
-                        pl.savefig(savefigname)
-                elif trace_mode == 3:
-                    arviz_data = az.from_emcee(sampler=sampler,
-                                                var_names=vn)
-
-                    ax = az.plot_pair(arviz_data,
-                            kind=["scatter", "kde"],
-                            marginals=True,
-                            marginal_kwargs={'color':rc.fg},
-                            point_estimate="median",
-                            scatter_kwargs={'color':rc.fg},
-                            point_estimate_kwargs={'color':'red'},
-                            point_estimate_marker_kwargs={'color':'red',
-                                                        's':90},
-                            )
-                    savefigname = saveplace + f'{trace_mode_dic[trace_mode]}.{fmt}'
-                    pl.savefig(savefigname)
-                '''
         else:
             print(f'Method is not yet implemented for {eng_name}')
             return None
@@ -617,11 +576,12 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
         switch_celerite = options['celerite']
         logger_level = options['logger_level']
         gC = options['gC']
+        use_c = options['use_c']
 
         # FULL_MODEL
         fm_figsize = (10, 8)
 
-        if options['paper_mode']:
+        if True:
             fm_axhline_kwargs = {'color':'gray', 'linewidth':3}
             fm_errorbar_kwargs = {'marker':'o', 'ls':'', 'alpha':0.8,
                                 'lw':2,
@@ -686,7 +646,12 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
         with open(temp_script, 'w') as f:
             f.write(open(get_support('init.scr')).read())
             # DEPENDENCIES
-            f.write('''
+            if use_c:
+                f.write(f'''
+from fast_kepler import calc_rv0
+''')
+            else:
+                f.write('''
 import kepler
 ''')
             if switch_celerite:
@@ -949,8 +914,10 @@ cornums = {my_model.cornums}
 
         '''
 
-    dual_plot(D, DB_all_kep, pbar, savename='KeplerianModel')
 
+    fm_model_line['lw'] = 2
+    dual_plot(D, DB_all_kep, pbar, savename='KeplerianModel')
+    fm_model_line['lw'] = 3
 
     # PHASEFOLD
     for mode in range(True+switch_uncertain):
@@ -974,7 +941,7 @@ cornums = {my_model.cornums}
             D_PF = fold_dataframe(D_PF, per=per)
 
             if True:
-                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}.{plot_fmt}')
+                dual_plot(D_PF, TB, pbar, savename=f'{name_head}{b.name_+name_tail}')
                 # get uncertainties
                 '''
                 if mode==1:
@@ -1205,6 +1172,21 @@ def make_block_plot(foo):
 
             pltd['figsize_xaxis'] = 20#10
         
+        else:
+            pltd['fs_supt'] = 24
+            pltd['fs_supylabel'] = 22
+            pltd['fs_xlabel'] = 14
+            pltd['figsize_xaxis'] = 10
+
+            pl_scatter_alpha = 0.7
+            pl_scatter_size = 10  #2
+            fm_frame_lw = 3
+            fm_tick_xsize = 20  #20
+            fm_tick_ysize = 20  #20
+            plt_vlines_lw = 2#2
+            pl_label_fs = 22#22
+
+
         # do the coloring
         cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
         colors = np.array([cor,cor,cor,cor,cor]).flatten()
@@ -1235,7 +1217,7 @@ def make_block_plot(foo):
                                                         b.ndim_*6 + elongatey)
                                                         )
             # fig.suptitle(f'Posteriors {b.name_}', fontsize=pltd['fs_supt'])
-            fig.supylabel('Log Posterior', fontsize=pltd['fs_supylabel'])
+            #fig.supylabel('Log Posterior', fontsize=pltd['fs_supylabel'])
 
             
             minl, maxl = min(lk0), max(lk0)
@@ -1255,7 +1237,6 @@ def make_block_plot(foo):
                         c=pltd['colors'][b.bnumber_-1],
                         alpha=pl_scatter_alpha,
                         s=pl_scatter_size)
-
 
                 if mode == 1:
                     cmap = mk_cmap([colors[b.bnumber_-1]], ncolors=100)
@@ -1345,9 +1326,13 @@ def make_block_plot(foo):
                     ax.set_ylabel(f'{param.name} {param.unit}',
                                   fontsize=pl_label_fs)
                     
-                    fig.suptitle(f'Chains {b.name_}', fontsize=pltd['fs_supt'])
-                    fig.supylabel('')
-                    fig.supxlabel('Steps')
+                    ax.set_xlabel(f'Steps',
+                                  fontsize=pl_label_fs)
+                    
+                    
+                    #fig.suptitle(f'Chains {b.name_}', fontsize=pltd['fs_supt'])
+                    #fig.supylabel('')
+                    #fig.supxlabel('Steps')
                     
                 else:
                     ax.vlines(_param_value_max,
@@ -1366,6 +1351,7 @@ def make_block_plot(foo):
                                     'lw':plt_vlines_lw})
                 
                     ax.set_xlabel(f'{param.name} {param.unit}', fontsize=pl_label_fs)
+                    ax.set_ylabel('Log P', fontsize=pl_label_fs)
 
                 ax.legend(framealpha=0., fontsize=pltd['fs_xlabel'], loc=1)
 
@@ -1706,7 +1692,7 @@ def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
         colors = cmap(np.linspace(0, 0.85, setup[0]))
 
     try:
-        os.makedirs(saveplace+f'/plots/betas/beta_ladder')
+        os.makedirs(saveplace+f'/plots/betas')
     except:
         pass
 
@@ -1743,7 +1729,7 @@ def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
         if True:
             axes[0].set_ylabel(r"$\beta^{-1}$")
             axes[1].set_ylabel(r"$\bar{A_{f}}$")
-            axes[2].set_ylabel(r"$a_{frac}$")
+            axes[2].set_ylabel(r"$T_{swap}$")
 
             axes[2].set_xlabel("N Step")    
             #fig.suptitle('Samples')

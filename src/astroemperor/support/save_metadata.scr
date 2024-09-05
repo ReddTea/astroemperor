@@ -1,0 +1,4 @@
+
+    with open('{}sampler_pickle.pkl','wb') as md_save:
+        pickle.dump(sampler_metadata, md_save)
+

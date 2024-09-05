@@ -39,7 +39,7 @@ if True:
     else:
         pass
 
-if False:
+if True:
     import tracemalloc
     tracemalloc.start()
 
@@ -190,10 +190,6 @@ class Simulation(object):
 
         self.init_plot_config()
 
-        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self.logger('~~ Simulation Successfully Initialized ~~', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-        self.logger('   ', center=True, save=False, c='green', attrs=['bold', 'reverse'])
-
 
     def init_default_config(self):
         for c in self.NONETHINGS:
@@ -259,6 +255,7 @@ class Simulation(object):
                                      'errors':True,
                                      'periodogram':True,
                                      'gC':0,
+                                     'use_c':False,
                                      'celerite':False,
                                      'axhline_kwargs':axhline_kwargs,
                                      'errorbar_kwargs':errorbar_kwargs,
@@ -855,40 +852,51 @@ class Simulation(object):
                                   'flat':True}
 
             if not self.FPTS:
-                raw_chain = self.sampler.get_func('get_chain', kwargs=reddemcee_dict)
-                raw_likes = self.sampler.get_func('get_blobs', kwargs=reddemcee_dict)
-                raw_posts = self.sampler.get_func('get_log_prob', kwargs=reddemcee_dict)
+                raw_chain0 = self.sampler.get_func('get_chain', kwargs=reddemcee_dict)
+                raw_likes0 = self.sampler.get_func('get_blobs', kwargs=reddemcee_dict)
+                raw_posts0 = self.sampler.get_func('get_log_prob', kwargs=reddemcee_dict)
 
                 self.autocorr_time = self.sampler.get_autocorr_time(quiet=True,
                                                     tol=0,
                                                     discard=self.reddemcee_discard,
                                                     thin=self.reddemcee_thin)
 
+
             else:
                 with open('sampler_flatchain.pkl', 'rb') as y:
                     raw_chain = pickle.load(y)
-                raw_chain = list(raw_chain[:, self.reddemcee_discard:])
+                raw_chain0 = list(raw_chain[:, self.reddemcee_discard:])
                 with open('sampler_flatlogl.pkl', 'rb') as y:
                     raw_likes0 = pickle.load(y)
-                raw_likes = list(np.array([raw_likes0[i].flatten(order='F')[self.reddemcee_discard:] for i in range(ntemps)]))
+                raw_likes0 = list(np.array([raw_likes0[i].flatten(order='F')[self.reddemcee_discard:] for i in range(ntemps)]))
                 with open('sampler_flatlogp.pkl', 'rb') as y:
                     raw_posts0 = pickle.load(y)
-                raw_posts = list(np.array([raw_posts0[i].flatten(order='F')[self.reddemcee_discard:] for i in range(ntemps)]))
+                raw_posts0 = list(np.array([raw_posts0[i].flatten(order='F')[self.reddemcee_discard:] for i in range(ntemps)]))
 
                 os.system(f'mv sampler_flatchain.pkl {self.saveplace}/restore/sampler_flatchain.pkl')
                 os.system(f'mv sampler_flatlogl.pkl {self.saveplace}/restore/sampler_flatlogl.pkl')
                 os.system(f'mv sampler_flatlogp.pkl {self.saveplace}/restore/sampler_flatlogp.pkl')
 
+
             if self.cherry['cherry']:
+                raw_chain = np.empty(ntemps, dtype=object)
+                raw_likes = np.empty(ntemps, dtype=object)
+                raw_posts = np.empty(ntemps, dtype=object)
+
                 for t in range(ntemps):
                     if self.cherry['median']:
-                        mask = raw_posts[t] > np.median(raw_posts[t])
+                        mask = raw_posts0[t] > np.median(raw_posts0[t])
                     elif self.cherry['diff']:
-                        mask = max(raw_posts[t]) - raw_posts[t] <= self.cherry['diff']
+                        mask = max(raw_posts0[t]) - raw_posts0[t] <= self.cherry['diff']
 
-                    raw_chain[t] = raw_chain[t][mask]
-                    raw_likes[t] = raw_likes[t][mask]
-                    raw_posts[t] = raw_posts[t][mask]
+                    raw_chain[t] = raw_chain0[t][mask]
+                    raw_likes[t] = raw_likes0[t][mask]
+                    raw_posts[t] = raw_posts0[t][mask]
+
+            else:
+                raw_chain = raw_chain0
+                raw_likes = raw_likes0
+                raw_posts = raw_posts0
 
             setup_info = 'Temperatures, Walkers, Sweeps, Steps   : '
             size_info = [len(raw_chain[t]) for t in range(ntemps)]
@@ -1219,72 +1227,55 @@ class Simulation(object):
         self.debug_msg(f'postprocess() : PRINT POSTERIORS | {time.time()-self.time_init}')
         # PRINT POSTERIORS
         if True:
-            self.logger('\n\n')
+            self.logger.line()
             self.logger('~~ Best Fit ~~', center=True, c='yellow', attrs=['bold', 'reverse'])
-            self.logger('\n\n')
+            self.logger.line()
 
 
             tab_3 = np.array([])
             switch_title = True
 
             for b in self:
-                to_tab0 = b.get_attr(['name', 'display_posterior', 'value_max',
-                                      'value_mean', 'sigma', 'limits'])
-
-                to_tab0[2] = np.round(to_tab0[2], 3)
-                to_tab0[3] = np.round(to_tab0[3], 3)
-                to_tab0[4] = np.round(to_tab0[4], 3)
-                to_tab0[5] = np.round(to_tab0[5], 3)
-
-
-                to_tab = list(zip(*to_tab0))
-                if switch_title:
-                    self.logger(tabulate(to_tab,
-                                          headers=['Parameter       ',
-                                                   'Posterior       ',
-                                                   'Value (max)',
-                                                   'Value (mean)',
-                                                   'Sigma',
-                                                   'Limits      ',
-                                                   ]))
-                    switch_title = False
-                else:
-                    self.logger(tabulate(to_tab,
-                                          headers=['                ',
-                                                   '                ',
-                                                   '           ',
-                                                   '           ',
-                                                   '     ',
-                                                   '           ',
-                                                   ]))
+                to_get = ['name',
+                          'value_max',
+                          'value_range',
+                          'display_prior',
+                          'limits']
+                
+                to_tab0 = b.get_attr(to_get)
 
                 if len(b.additional_parameters):
                     mask = [x.has_posterior for x in b.additional_parameters]
+                    for p in np.array(b.additional_parameters)[mask]:
+                        p.display_prior = ''
+                        for j in range(len(to_get)):
+                            to_tab0[j] += [getattr(p, to_get[j])]
 
-                    pnames = [p.display_name for p in np.array(b.additional_parameters)[mask]]
-                    #pdisp = [p.limits for p in np.array(b.additional_parameters)[mask]]
-                    pdisp = [p.display_posterior for p in np.array(b.additional_parameters)[mask]]
-                    pvalmax = [p.value_max for p in np.array(b.additional_parameters)[mask]]
-                    pvalmean = [p.value_mean for p in np.array(b.additional_parameters)[mask]]
-                    psig = [p.sigma for p in np.array(b.additional_parameters)[mask]]
-                    plims = [p.limits for p in np.array(b.additional_parameters)[mask]]
+                to_tab0[2] = (np.array(to_tab0[2]).T - np.array(to_tab0[1])).T
 
-                    to_tab1 = [pnames, pdisp, pvalmax, pvalmean, psig, plims]
+                to_tab0 = adjust_table_tex(to_tab0, rounder=self.rounder_display)
 
-                    to_tab1[2] = np.round(to_tab1[2], 3)
-                    to_tab1[3] = np.round(to_tab1[3], 3)
-                    to_tab1[4] = np.round(to_tab1[4], 3)
-                    to_tab1[5] = np.round(to_tab1[5], 3)
 
-                    to_tab = list(zip(*to_tab1))
-                    self.logger(tabulate(to_tab,
-                                          headers=['                ',
-                                                   '                ',
-                                                   '           ',
-                                                   '           ',
-                                                   '     ',
-                                                   '           ',
-                                                   ]))
+                to_tab = list(zip(*to_tab0))
+
+                df0 = pd.DataFrame(to_tab, columns=to_get)
+
+
+                if switch_title:
+                    headers1 = ['Parameter',
+                                'Value (max)',
+                                'Range (-+ sig)',
+                                'Prior',
+                                'Limits',
+                                ]
+                    switch_title = False
+                else:
+                    headers1 = [' ' * len(s) for s in headers1]
+
+                self.logger(tabulate(df0,
+                                     headers=headers1,
+                                     showindex=False))
+
 
         # PRINT STATS
         if True:
@@ -1330,12 +1321,18 @@ class Simulation(object):
                 adapt_ts = self.engine_config['config_adaptation_halflife']
                 adapt_ra = self.engine_config['config_adaptation_rate']
                 adapt_sc = self.engine_config['config_adaptation_decay']
+                #af = np.mean(self.sampler.acceptance_fraction, axis=1)
+
+                # should go on ln909? very beg of postprocess
+                reddemcee_adapt = self.run_config['adapt_burnin']
+                af = self.sampler.get_acceptance_fraction(nsteps=self.engine_config['setup'][-1],
+                                                          discard=reddemcee_adapt)
 
                 self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}')
-                self.logger('\nBeta Detail                     :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.sampler.betas) + ']', save_extra_n=True)
+                self.logger('\nBeta Detail                     :   ' + '[' + ', '.join('{:.4}'.format(x) for x in self.sampler.betas) + ']', save_extra_n=True)
                 self.logger('\nMean Logl Detail                :   ' + '[' + ', '.join('{:.3f}'.format(np.mean(x)) for x in likes) + ']', save_extra_n=True)
                 self.logger('\nTemperature Swap                :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.sampler.ratios) + ']', save_extra_n=True)
-                self.logger('\nMean Acceptance Fraction        :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in np.mean(self.sampler.acceptance_fraction, axis=1)) + ']', save_extra_n=True)
+                self.logger('\nMean Acceptance Fraction        :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in af) + ']', save_extra_n=True)
                 self.logger('\nAutocorrelation Time            :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.autocorr_time[0]) + ']', save_extra_n=True)
 
 
@@ -1914,12 +1911,10 @@ class Simulation(object):
 
         with open(self.temp_script, 'w') as f:
             f.write(open(get_support('init.scr')).read())
-            if self.debug_mode:
-                f.write(f'''
-import time
+            self.debug_script(f,
+f'''import time
 debug_timer = {self.time_init}
-print('temp_script.py   : INIT | ', time.time()-debug_timer)
-''')
+print('temp_script.py   : INIT | ', time.time()-debug_timer)''')
 
             ## DEPENDENCIES
             for d in self.general_dependencies:
@@ -2282,7 +2277,10 @@ adapt_burnin = {self.run_config['adapt_burnin']}
 
                 f.write(open(get_support('endit_dyn.scr')).read().format(pool_bool, self.cores__, nested_args))
 
-
+            # SAVE PICKLE
+            f.write(open(get_support('save_metadata.scr')).read().format(f'{self.saveplace}/restore/'))
+            # __NAME__==
+            f.write(open(get_support('run_main.scr')).read())
             # load just the model into emperor
 
         self.debug_msg(f'write_script() : reloads into emp| {time.time()-self.time_init}')
@@ -2303,6 +2301,10 @@ adapt_burnin = {self.run_config['adapt_burnin']}
 
         ntemps, nwalkers, nsweeps, nsteps = setup
 
+        restore_path = f'{self.saveplace}/restore/'
+        #os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+        
+
         # Restore Sampler
         self.sampler = self.engine__.PTSampler(nwalkers, self.model.ndim__,
                                      self.temp_like_func,
@@ -2312,7 +2314,10 @@ adapt_burnin = {self.run_config['adapt_burnin']}
                                      ntemps=ntemps,
                                      pool=None,
                                      )
-        with open('sampler_pickle.pkl', 'rb') as sampler_metadata:
+        
+        
+
+        with open(f'{restore_path}sampler_pickle.pkl', 'rb') as sampler_metadata:
             self.sampler_metadata_dict = pickle.load(sampler_metadata)
 
         for attr, value in self.sampler_metadata_dict.items():
@@ -2320,7 +2325,7 @@ adapt_burnin = {self.run_config['adapt_burnin']}
 
         self.betas = self.sampler.betas
 
-        os.system(f'mv sampler_pickle.pkl {self.saveplace}/restore/sampler_pickle.pkl')
+        
         #if not target_dir:
         #    target_dir = self.saveplace+'/restore/'
         #filename = f'{target_dir}sampler_pickle.pkl'
@@ -2426,6 +2431,13 @@ adapt_burnin = {self.run_config['adapt_burnin']}
         p.value_low3, p.value_high3 = np.nan, np.nan
         p.value_range = [np.nan, np.nan]        
         pass
+
+
+    def debug_script(self, f, msg):
+        if self.debug_mode:
+            f.write(f'''
+{msg}
+''')
 
 
     def debug_snapshot(self):
