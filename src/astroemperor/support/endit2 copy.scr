@@ -7,10 +7,6 @@ def run_thing():
     tol0 = 10
 
     if True:
-        #for t in range(ntemps):
-        #    sampler[t]._moves = [emcee.moves.StretchMove(a=1.0)]
-        #    sampler[t]._weights = [1.0]
-
         print('Adaptation Sampling:')
         state = sampler.run_mcmc(state, adapt_burnin, nsteps, progress=True)
 
@@ -31,32 +27,9 @@ def run_thing():
         old_tau = tau0
 
     if True:
-        
-        # MOVES
-
-        # KDE MOVE
-        #sampler[0]._moves = [emcee.moves.KDEMove()]
-        #sampler[0]._weights = [1.0]
-
-        # DE MOVE
-        #sampler[0]._moves = [emcee.moves.DEMove(), emcee.moves.DESnookerMove()]
-        #sampler[0]._weights = [0.8, 0.2]
-
-        # ALPHA
-        # emcee.moves.StretchMove(a=2.0) #, **kwargs)
-        #sampler[0]._moves = [emcee.moves.StretchMove(a=1.5)]
-        #sampler[0]._weights = [1.0]
-
-        # WALK MOVE
-        sampler[0]._moves = [emcee.moves.WalkMove()]
-        sampler[0]._weights = [1.0]
-
-        
-        
-
-        sampler.adaptative = False
         print('Converged Sampling:')
 
+        sampler.adaptative = False
         sampler.run_mcmc(state, nsweeps-adapt_burnin, nsteps, progress=True)
 
         

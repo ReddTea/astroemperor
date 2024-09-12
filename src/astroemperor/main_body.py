@@ -28,7 +28,7 @@ if True:
 
 
     from .block import ReddModel
-    from .canvas import plot_GM_Estimator, plot_trace, plot_trace2, plot_KeplerianModel, super_plots, plot_histograms, plot_betas, plot_rates
+    from .canvas import plot_GM_Estimator, plot_beta_density, plot_trace2, plot_KeplerianModel, super_plots, plot_histograms, plot_betas, plot_rates
     from .globals import _PLATFORM_SYSTEM, _CORES, _TERMINAL_WIDTH, _OS_ROOT
     from .utils import *
     from .block_repo import *
@@ -277,11 +277,17 @@ class Simulation(object):
         self.plot_rates = {'title_fs':24,
                            'xaxis_fs':18,
                            'yaxis_fs':18,
+                           'window':1,
                            'name':'plot_rates',
                            'function':plot_rates,
                            'nice_name':'Plotting Temperature Rates',
                            
                            }
+
+        self.plot_beta_density = {'name':'plot_beta_density',
+                                  'function':plot_beta_density,
+                                  'nice_name':'Plotting Beta Density',
+                                  }
 
         self.plot_trace = {'modes':[0, 1, 2, 3],
                            'temps':None,
@@ -308,7 +314,8 @@ class Simulation(object):
                               self.plot_histograms,
                               self.plot_keplerian_model,
                               self.plot_periodogram,
-                              self.plot_betas,
+                              self.plot_betas,  # 4
+                              self.plot_beta_density,
                               self.plot_rates,
                               self.plot_gaussian_mixtures,
                               self.plot_trace,
@@ -907,14 +914,7 @@ class Simulation(object):
                     #self.evidence = self.sampler.
                     self.evidence = self.sampler_metadata_dict['thermodynamic_integration']
                 else:
-                    largo_aux = niter // 10
-                    largo_aux = 1000#largo_aux if largo_aux > 100 else 100
-
-                    #zaux = self.sampler.get_Z(discard=self.reddemcee_discard,
-                    #                        coef=3, largo=largo_aux)[0]
-                    
                     zaux = self.sampler.thermodynamic_integration(discard=self.reddemcee_discard)
-                    #self.evidence = np.mean(zaux), np.std(zaux)
                     self.evidence = zaux[0], zaux[1]
 
             self.best_loc_post = np.argmax(raw_posts[0])
@@ -1477,7 +1477,7 @@ class Simulation(object):
 
         # Time Table
         if True:
-            self.logger(f'\nTime Table')
+            self.logger(f'\nTime Table', save_extra_n=True)
             self.logger(f'Time RUN             :  {sec_to_clock(self.time_run)}', save_extra_n=True)
             self.logger(f'Time POSTPROCESS     :  {sec_to_clock(self.time_postprocess)}', save_extra_n=True)
             self.logger(f'Time CALCULATE GM    :  {sec_to_clock(self.time_calc_gm)}', save_extra_n=True)
@@ -1562,6 +1562,7 @@ class Simulation(object):
                           'eng_name':self.engine__.__name__,
                           'my_model':self.model,
                           },
+            'plot_beta_density':{'betas':self.sampler.betas},
 
                           }
 
@@ -1593,13 +1594,14 @@ class Simulation(object):
         self.time_plot_histograms = self.plot_all_list[1]['time_to_plot']
         self.time_plot_keplerian = self.plot_all_list[2]['time_to_plot']
         self.time_plot_betas = self.plot_all_list[4]['time_to_plot']
-        self.time_plot_rates = self.plot_all_list[5]['time_to_plot']
+        # 5 plot_beta_density
+        self.time_plot_rates = self.plot_all_list[6]['time_to_plot']
+        # 7 plot_gaussian_mixtures
+        self.time_plot_trace = self.plot_all_list[8]['time_to_plot']
 
-        self.time_plot_trace = self.plot_all_list[7]['time_to_plot']
 
 
-
-        if self.plot_all_list[-2]['plot']:
+        if self.plot_all_list[7]['plot']:
             if self.gaussian_mixtures_fit:
                 self.debug_msg(f'postprocess() : PLOT GM | {time.time()-self.time_init}')
 
@@ -1608,19 +1610,19 @@ class Simulation(object):
                 pbar_tot = self.model.ndim__
                 pbar = tqdm(total=pbar_tot)
                 for b in self:
-                    self.plot_gaussian_mixtures['fill_cor'] = b.bnumber_-1
+                    self.plot_all_list[7]['fill_cor'] = b.bnumber_-1
                     for p in b[b.C_]:
-                        self.plot_gaussian_mixtures['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
+                        self.plot_all_list[7]['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
 
                         plot_GM_Estimator(p.GM_parameter,
-                                          options=self.plot_all_list[-2])
+                                          options=self.plot_all_list[7])
 
                         pbar.update(1)
                     for p in b.additional_parameters:
                         if p.has_posterior:
-                            self.plot_gaussian_mixtures['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
+                            self.plot_all_list[7]['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
                             plot_GM_Estimator(p.GM_parameter,
-                                            options=self.plot_gaussian_mixtures)
+                                            options=self.plot_all_list[7])
                 pbar.close()
 
         self.time_plot_gm = time.time() - time_plot_init
@@ -1719,7 +1721,7 @@ class Simulation(object):
                        self.save_likelihoods,
                        self.plot_all_list[0]['plot'],  # posteriors
                        self.plot_all_list[2]['plot'],  # kep model
-                       self.plot_all_list[6]['plot'],  # GM
+                       self.plot_all_list[7]['plot'],  # GM
                        self.plot_all_list[1]['plot'],  # histograms
                        self.corner
                        ]
@@ -2323,7 +2325,7 @@ adapt_burnin = {self.run_config['adapt_burnin']}
         for attr, value in self.sampler_metadata_dict.items():
             setattr(self.sampler, attr, value)
 
-        self.betas = self.sampler.betas
+        self.engine_config["betas"] = self.sampler.betas
 
         
         #if not target_dir:

@@ -1690,7 +1690,7 @@ def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
 
         cmap = matplotlib.colormaps['plasma']
         colors = cmap(np.linspace(0, 0.85, setup[0]))
-
+        window = options['window']
     try:
         os.makedirs(saveplace+f'/plots/betas')
     except:
@@ -1701,8 +1701,15 @@ def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
 
         bh1 = bh.reshape((setup[2], setup[0]))
         rh1 = rh.reshape((setup[2], setup[0]-1))
+        tempsm1 = setup[0]-1
+        #rh1 = np.append(np.zeros(tempsm1*(window-1)), rh).reshape((setup[2]+(window-1), tempsm1))
+        rh1 = running(rh1, window)
+
+
         afh1 = np.append(np.zeros(setup[0]), afh).reshape((setup[2]+1, setup[0]))
         afh1 = np.diff(afh1, axis=0) / setup[3]
+
+        afh1 = running(afh1, window)
 
         # plot temperature adaptation
         for t in range(setup[0]-1):
@@ -1743,6 +1750,33 @@ def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
     pbar.close()
     pass
 
+
+def plot_beta_density(betas=[], options={}):
+    if True:
+        saveplace = options['saveloc']
+        ptfmt = options['format']
+
+    fig, axes = pl.subplots(figsize=(4, 3))
+    y = -1/np.diff(np.log(betas))
+    max_index = np.argmax(y)
+    x_position = (betas[max_index] + betas[max_index + 1]) / 2
+    
+    pl.step(betas[:-1], y,
+            color=rc.fg,
+            where='post',
+            )
+    pl.axvline(x=x_position, color='r', linestyle='--',
+               label=fr'$\beta={x_position:.3f}$')
+    
+    
+    pl.gca().invert_xaxis()
+    axes.set_xscale('log')
+    axes.set_xlabel(r"$\beta$")
+    axes.set_ylabel(r"$\eta(\beta)$")
+    pl.legend()
+    pl.savefig(saveplace+f'/plots/betas/density.{ptfmt}',
+                                        bbox_inches='tight')
+    pl.close()
 #plot_betas(sim.sampler.betas_history, elogl, sim.evidence, options=opts, temps=setup[0])
 
 

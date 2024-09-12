@@ -460,6 +460,15 @@ def hdi_of_chain(chain, cred_mass=0.9):
     return hdi
 
 
+def running(arr, window_size):
+    """Calculate running average of the last n values."""
+    averages = np.zeros_like(arr)
+    for i in range(arr.shape[0]):
+        start_idx = max(0, i - window_size + 1)  # Start of the window (avoid negative index)
+        averages[i] = np.mean(arr[start_idx:i + 1], axis=0)  # Average of the last `window_size` points
+    return averages
+
+
 def my_shell_env():
     try:
         #
