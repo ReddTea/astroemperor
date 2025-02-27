@@ -1,0 +1,15 @@
+# Astrometry
+
+def my_likelihood_RV(theta):
+    model, err2 = my_model(theta)
+    return -0.5 * (np.sum((Y_ - model) ** 2 / err2 + np.log(err2))) - 0.5 * np.log(2*np.pi) * ndat
+
+
+def my_likelihood(theta):
+    ll1 = my_likelihood_RV
+
+    ll2 = 0
+    return ll1 + ll2
+    
+    
+

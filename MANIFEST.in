@@ -1,13 +1,16 @@
+include src/astroemperor/support/deadtime/*.csv
+include src/astroemperor/support/kernels/*.kernel
 include src/astroemperor/support/likelihoods/*.like
 include src/astroemperor/support/models/*.model
 include src/astroemperor/support/PAE/*.pae
 include src/astroemperor/support/pools/*.pool
 include src/astroemperor/support/priors/*.prior
-
 include src/astroemperor/support/*.scr
 
 exclude Private/
 exclude tests/datalogs/*
+exclude site/
 
 exclude temp_*
+exclude .DS_Store
 exclude __pycache__

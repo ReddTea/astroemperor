@@ -3,9 +3,9 @@
 # -*- coding: utf-8 -*-
 
 # Metadata about the package
-__version__ = '0.8.6'
+__version__ = '0.9'
 __name__ = 'astroemperor'
 
-from .main_body import Simulation
+from .emp import Simulation
 
 __all__ = ['Simulation']

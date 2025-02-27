@@ -1,0 +1,14 @@
+    # Stellar Activity Part, sai00.model
+
+    cornum_ins = cornums[{0}-1]
+    if cornum_ins:
+        m = int(np.sum(cornums[:{0}-1]))
+        theta_sa = theta[{1}][m:m+cornum_ins]
+        staract_locs = [5+j+m for j in range(cornum_ins)]
+
+        for j in range(cornum_ins):
+            staract_values = my_data[mask{0}].iloc[:, int(staract_locs[j])].values
+            model0[mask{0}] += theta_sa[j] * staract_values
+
+
+    # End sai00.model

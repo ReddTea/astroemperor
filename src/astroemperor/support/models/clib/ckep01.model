@@ -1,0 +1,8 @@
+    per, A, phase, S, C = theta[{}]
+    ecc = S ** 2 + C ** 2
+    w = np.arccos(C / (ecc ** 0.5))  # longitude of periastron
+    if S < 0:
+        w = 2 * np.pi - np.arccos(C / (ecc ** 0.5))
+        
+    model0 += calc_rv0(X_, per, A, phase, ecc, w)
+

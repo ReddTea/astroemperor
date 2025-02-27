@@ -1,0 +1,7 @@
+    # Instrumental Part, offset01.model
+
+    ivar = 1/err20
+    A = np.sum(ivar)
+    B = np.sum(2*dRv*ivar)
+    C = np.sum(dRv**2*ivar)    # gamma = -B/2/A
+

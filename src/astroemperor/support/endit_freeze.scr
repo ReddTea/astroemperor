@@ -1,0 +1,59 @@
+def run_thing():
+    start = time.time()
+    state = p1
+
+    old_tau = np.inf
+    tol_warn = 0
+    tol0 = 10
+
+    tau_diff_to_converge = 0.1
+
+    for i in range(adaptation_batches):
+        print('Adaptation Burn-in:')
+        state = sampler.run_mcmc(state, nsweeps=adaptation_nsweeps, nsteps=nsteps, progress=progress)
+
+        tau0 = sampler.get_autocorr_time(quiet=True,
+                                         tol=tol_warn,
+                                         #discard=0,
+                                         )[0]
+        ac = np.mean(tau0)
+        niter = sampler.backend[0].iteration
+        converged = np.all(tau0 * tol0 < niter)
+        print(f'converge: {converged}')
+        converged &= np.all(np.abs(old_tau - tau0) / tau0 < tau_diff_to_converge)
+
+        print(f'ACi     : {ac}')
+        print(f'tau     : {tau0}')
+        print(f'niter   : {niter}')
+        print(f'converge: {converged}')
+        print(f'betas   : {sampler.betas}')
+
+        old_tau = tau0
+
+        if converged:
+            print('CONVERGED! ')
+            break
+        
+    sampler.config_adaptation_halflife = 0
+    print('Converged Sampling:')
+
+    sampler.run_mcmc(state, nsweeps=nsweeps, nsteps=nsteps, progress=progress)
+    tau0 = sampler.get_autocorr_time(quiet=True,
+                                        tol=tol_warn,
+                                        #discard=0,
+                                        )[0]
+    ac = np.mean(tau0)
+    niter = sampler.backend[0].iteration
+    converged = np.all(tau0 * tol0 < niter)
+    print(f'converge: {converged}')
+
+    converged &= np.all(np.abs(old_tau - tau0) / tau0 < 0.1)
+
+    print(f'ACi     : {ac}')
+    print(f'tau     : {tau0}')
+    print(f'converge: {converged}')
+    old_tau = tau0
+
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')

@@ -10,10 +10,11 @@
 # **DEB  : debugging needed in this part
 # **DEL  : DELETE AT SOME POINT
 
-import os
+import contextlib
+import sys, os
 import logging
 from copy import deepcopy
-from importlib import reload
+from importlib import reload, import_module
 
 import gc
 from multiprocessing import Pool
@@ -22,15 +23,17 @@ import matplotlib
 import matplotlib.pyplot as pl
 import matplotlib.colors as plc
 import matplotlib.gridspec as gridspec
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from .block import ReddModel
+from .emp_model import ReddModel
 from .globals import _PLATFORM_SYSTEM, _CORES
-from .model_repo import *
-from .unmodel_repo import *
-from .utils import *
+from .block_repo import *
+from .qol_utils import *
+from .math_utils import *
+
 from reddcolors import Palette
 
 import multiprocessing
@@ -42,6 +45,9 @@ if True:
     matplotlib.use('Agg')
 
 rc = Palette()
+
+cor_ = ['C0', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9']
+Color_Cycler = np.array(cor_*5)
 
 def hex2rgb(hex):
     hex_cleaned = hex.lstrip('#')
@@ -101,8 +107,6 @@ def plot_GM_Estimator(estimator, options=None):
         if plot_ylabel is None:
             plot_ylabel = 'Probability Density'
 
-    cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-    colors = np.array([cor,cor,cor,cor,cor]).flatten()
 
     n_components = estimator.n_components
 
@@ -124,7 +128,7 @@ def plot_GM_Estimator(estimator, options=None):
 
         xx[i] = np.append(np.append(xx[i][0], xx[i]), xx[i][-1])
         yy[i] = np.append(np.append(0, yy[i]), 0)
-        ax.fill(xx[i], yy[i], c=colors[fill_cor], alpha=1/sig_factor, zorder=2*(i+1)-1)
+        ax.fill(xx[i], yy[i], c=Color_Cycler[fill_cor], alpha=1/sig_factor, zorder=2*(i+1)-1)
 
         vlines_kwargs = {'lw':[1.5, 1.5], 'ls':['--']}
         ax.vlines([xx[i][0], xx[i][-1]], ymin=[min(yy[i]), min(yy[i])],
@@ -202,9 +206,6 @@ def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
                       3:'Corner Plot'}
     
     
-
-    cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-    colors_ = np.array([cor,cor,cor,cor,cor]).flatten()
     vn = np.array(flatten(my_model.get_attr_param('name')))[my_model.C_]
 
     dothis = []
@@ -263,7 +264,7 @@ def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
                             [arviz_data],
                             var_names=np.array(b.get_attr('name'))[b.C_],
                             shade=0.2,
-                            colors=colors_[b.bnumber_-1],
+                            colors=Color_Cycler[b.bnumber_-1],
                             #hdi_markers='v'
                             )
 
@@ -381,10 +382,8 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                         2:'Density Interval',
                         3:'Corner Plot'}
         
-        cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-        colors_ = np.array([cor,cor,cor,cor,cor]).flatten()
 
-        cmaps_ = [mk_cmap([tg]) for tg in cor]
+
         vn = []
         for v in my_model.get_attr_param('name'):
             vn.extend(v)
@@ -422,7 +421,7 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                                   circ_var_names=circ_var_names,
                                   combined=False,
                                   compact=True,
-                                  chain_prop={'color':[colors_[b.number_-1] for _ in range(sampler.shape[0])],
+                                  chain_prop={'color':[Color_Cycler[b.bnumber_-1] for _ in range(sampler.shape[0])],
                                               'alpha':[0.25 for _ in range(sampler.shape[0])],
                                               'lw':[2 for _ in range(sampler.shape[0])],
                                               },
@@ -438,13 +437,12 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
 
                 # DENSITY INTERVALS
                 if dothis[2]:
-
                     savefigname = saveplace + 'density_intervals/' + f'{trace_mode_dic[2]} {b.name_}.{fmt}'
                     axes = az.plot_density(
                             [arviz_data],
                             var_names=vn_b,
                             shade=0.2,
-                            colors=colors_[b.bnumber_-1],
+                            colors=Color_Cycler[b.bnumber_-1],
                             #hdi_markers='v'
                             )
                     fig = axes.flatten()[0].get_figure()
@@ -455,6 +453,7 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                 # CORNERPLOT
                 if dothis[3] and b.ndim_ > 2:
                     #pbar = tqdm(total=1)
+                    #cmap_ = 
                     savefigname = saveplace + 'cornerplots/' + f'{trace_mode_dic[3]} {b.name_}.{fmt}'
                     az.plot_pair(arviz_data,
                                  var_names=vn_b,
@@ -464,16 +463,15 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                                 marginals=True,  # plot diagonals/histo
                                 marginal_kwargs={'plot_kwargs':{'color':rc.fg,
                                                                 'lw':2},
-                                                 'fill_kwargs':{'color':colors_[b.number_-1],
+                                                 'fill_kwargs':{'color':Color_Cycler[b.number_-2],
                                                                 'alpha':0.85,
                                                                 },
                                                  },
 
                                 kde_kwargs={'contourf_kwargs':{
-                                                            'cmap':cmaps_[b.number_-1],
+                                                            'cmap':mk_cmap([Color_Cycler[b.bnumber_-1]], ncolors=100),
                                                             },
                                             'contour_kwargs':{
-                                                            'linewidths':2,
                                                             'colors':rc.fg,
                                                             'alpha':0.65,
                                                             },
@@ -510,7 +508,6 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
                         az.plot_dist(arviz_data.posterior[p.name].values,
                                     color=rc.fg,
                                     rug=True,
-                                        #figsize=(8, 6),
                                     )
                         #pl.ylabel('Probability Density')                            
                         pl.xlabel('Value')
@@ -524,21 +521,58 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
         elif eng_name == 'dynesty':
             from dynesty import plotting as dyplot
             res2 = sampler
-            for trace_mode in trace_modes:
-                if trace_mode == 0:
-                    # trace
-                    for b in my_model:
-                        try:
-                            vnb = np.array(b.get_attr('name'))[b.C_]
-                            fig, axes = dyplot.traceplot(res2,
-                                                        post_color=rc.fg,
-                                                        trace_color=rc.fg,
-                                                        labels=vnb,
-                                                        dims=b.slice_true)
-                            savefigname = saveplace + f'{trace_mode_dic[trace_mode]} {b.name_}.{fmt}'
-                            pl.savefig(savefigname)
-                        except:
-                            print('Dynesty dyplot failed!')
+            os.rename(f'{saveplace}density_intervals', f'{saveplace}runplot')
+            os.rename(f'{saveplace}normed_posteriors', f'{saveplace}boundplot')
+
+            if dothis[1]:
+                fig, axes = dyplot.runplot(res2,
+                                            color=rc.fg)  # summary (run) plot
+                savefigname = f'{saveplace}runplot/runplot.{fmt}'
+                pl.savefig(savefigname)
+                pl.close()
+
+            for b in my_model:
+                if b.ndim_ == 0:
+                    pbar.update(1)
+                    break
+
+                vnb = np.array(b.get_attr('name'))[b.C_]
+                vnb_mini = np.array(b.get_attr('mininame'))[b.C_]
+                vnb_mini = [f'${mn}$' for mn in vnb_mini]
+                if dothis[0]:
+                    try:
+                        fig, axes = dyplot.traceplot(res2,
+                                                    labels=vnb_mini,
+                                                    dims=b.slice_true,
+                                                    post_color=Color_Cycler[b.bnumber_-1],
+                                                    show_titles=True
+                                                    )
+                        savefigname = f'{saveplace}traces/{trace_mode_dic[0]} {b.name_}.{fmt}'
+                        pl.savefig(savefigname)
+                    except:
+                        print(f'Dynesty dyplot failed for block {b.name_}!')
+                
+
+                if dothis[2]:
+                    # TODO: add bounding plots
+                    print('Bounding plots not implemented for dynesty yet')
+
+                if dothis[3] and b.ndim_ > 2:
+                    fig, axes = dyplot.cornerplot(res2,
+                                            color=Color_Cycler[b.bnumber_-1],
+                                            dims=b.slice_true,
+                                            labels=vnb_mini,
+                                            show_titles=True,
+                                            max_n_ticks=3,
+                                            quantiles=[0.025, 0.5, 0.975])
+                
+                    savefigname = f'{saveplace}cornerplots/corner {b.name_}.{fmt}'
+                    pl.savefig(savefigname)
+                    pl.close()
+                
+                pbar.update(1)
+                gc.collect()
+                pl.close('all')
 
         else:
             print(f'Method is not yet implemented for {eng_name}')
@@ -550,7 +584,7 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
     else:
         print(f'Trace plot for {trace_mode_dic[0]} failed!')
 
-#plot_trace2(sim.sampler[0], sim.engine__.__name__, sim.model, sim.plot_all_list[-1])
+#plot_trace2(sim.sampler.backend[0], sim.engine__.__name__, sim.model, sim.plot_all_list[-1])
 
 #import arviz as az
 #from tqdm import tqdm
@@ -559,8 +593,9 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
 
 #rc = Palette()
 
+#plot_KeplerianModel(options=sim.plot_keplerian_model, **keplerian_kwargs)
 
-def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options=None):
+def plot_KeplerianModel_old(my_data=None, my_model=None, res=[], common_t=0, options=None):
     if options is None:
         options = {}
     if True:
@@ -614,9 +649,6 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
 
         common_t = int(common_t)  # my_data['BJD'].min()
         posterior_method = 'GM'
-        #c = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-        c = ['C0', 'C1', 'C2', 'C4', 'C7', 'C8', 'C9']
-        colors = np.array([c,c,c,c,c]).flatten()
 
         temp_file_names = []
         temp_mod_names = []
@@ -630,8 +662,8 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
                 logging.getLogger("numpoly").setLevel(logger_level)
 
 
-    def create_mod(data_arg, blocks_arg, tail_x, mod_number=0):
-        x = ReddModel(data_arg, blocks_arg)
+    def create_mod1(data_arg, blocks_arg, tail_x, mod_number=0):
+        x = ReddModel(blocks_arg, data_RV=data_arg)
         x.switch_plot = True
 
         x.A_ = []
@@ -644,7 +676,7 @@ def plot_KeplerianModel(my_data=None, my_model=None, res=[], common_t=0, options
         temp_dat_names.append(f'{saveloc}/temp/temp_data{tail_x}.csv')
 
         with open(temp_script, 'w') as f:
-            f.write(open(get_support('init.scr')).read())
+            f.write(open(get_support('init_reddemcee.scr')).read())
             # DEPENDENCIES
             if use_c:
                 f.write(f'''
@@ -669,7 +701,48 @@ gaussian_mixture_objects = dict()
 cornums = {my_model.cornums}
 ''')
 
-            f.write(open(x.write_model_(loc=saveloc, tail=tail_x)).read())
+            f.write(open(x.write_model(loc=saveloc, tail=tail_x)).read())
+
+
+    def create_mod(data_arg, blocks_arg, tail_x, mod_number=0):
+        x = ReddModel(blocks_arg, data_RV=data_arg)
+        x.switch_plot = True
+
+        x.refresh__()  # needed to get nins
+
+        temp_script = f'temp_mod_0{mod_number}.py'
+        temp_file_names.append(temp_script)
+        temp_mod_names.append(f'{saveloc}/temp/temp_model_{x.model_script_no}{tail_x}.py')
+        temp_dat_names.append(f'{saveloc}/temp/temp_data{tail_x}.csv')
+
+        with open(temp_script, 'w') as f:
+            f.write(open(get_support('init_reddemcee.scr')).read())
+            # DEPENDENCIES
+            if use_c:
+                f.write(f'''
+from fast_kepler import calc_rv0
+''')
+            else:
+                f.write('''
+import kepler
+''')
+            if switch_celerite:
+                f.write('''
+import celerite2
+import celerite2.terms as cterms
+''')
+            # CONSTANTS
+            f.write(f'''
+nan = np.nan
+A_ = []
+mod_fixed_ = []
+gaussian_mixture_objects = dict()
+
+cornums = {my_model.cornums}
+''')
+
+            f.write(open(x.write_model(loc=saveloc, tail=tail_x)).read())
+
 
 
     def dual_plot(data, DB, pbar, savename=''):
@@ -704,7 +777,7 @@ cornums = {my_model.cornums}
             axr.axhline(0, **fm_axhline_kwargs)
 
             pl.subplots_adjust(wspace=0.15)
-        
+
         # plot data
         if True:
             for n_ins in range(OGM.nins__):
@@ -713,24 +786,25 @@ cornums = {my_model.cornums}
                     ax.errorbar(data1[mask]['BJD'],
                                 data1[mask]['RV'],
                                 data1[mask]['eRV'],
-                                c=colors[n_ins],
-                                label=OGM.instrument_names[n_ins],
+                                c=Color_Cycler[n_ins],
+                                label=OGM.instrument_names_RV[n_ins],
                                 **fm_errorbar_kwargs)
 
                     axr.errorbar(data1[mask]['BJD'],
                                  data1[mask]['residuals'],
                                  data1[mask]['eRV'],
-                                c=colors[n_ins],
+                                c=Color_Cycler[n_ins],
                                 **fm_errorbar_kwargs)
                 else:
+                    #print(f'{data1[mask]['RV']=}')
                     ax.plot(data1[mask]['BJD'],
                             data1[mask]['RV'],
-                            f'{colors[n_ins]}o',
-                            label=OGM.instrument_names[n_ins])
+                            f'{Color_Cycler[n_ins]}o',
+                            label=OGM.instrument_names_RV[n_ins])
 
                     axr.plot(data1[mask]['BJD'],
                              data1[mask]['residuals'],
-                             colors[n_ins]+'o')
+                             Color_Cycler[n_ins]+'o')
 
         if switch_periodogram:
                     plot_periodogram(data1, options)
@@ -740,7 +814,7 @@ cornums = {my_model.cornums}
             x_c = np.linspace(data1['BJD'].min(),
                               data1['BJD'].max(),
                               5000)
-            
+
             DC = pd.DataFrame({'BJD':x_c,
                                'RV':np.zeros_like(x_c),
                                'eRV':np.ones_like(x_c)})
@@ -766,7 +840,7 @@ cornums = {my_model.cornums}
             while nbins < len(D):
                 counts, bins = np.histogram(data1['RV'],
                                             bins=nbins)
-                
+
                 if (counts==0).any():
                     break
                 else:
@@ -837,7 +911,7 @@ cornums = {my_model.cornums}
     if True:
         # find base for t
         #common_t = find_common_integer_sequence(my_data['BJD'])
-        
+
         #if common_t:
         #    my_data['BJD'] -= common_t
 
@@ -847,7 +921,7 @@ cornums = {my_model.cornums}
         OGM = my_model
 
         # Block selection
-        DB_all = [b for b in OGM]
+        DB_all = list(OGM)
         DB_all_kep = [b for b in OGM if b.display_on_data_==True]  # Keplerians
 
         # pbar
@@ -855,7 +929,7 @@ cornums = {my_model.cornums}
         pbar = tqdm(total=pbar_tot)
 
         ### MOVE DATA AROUND
-        
+
         # this model contains everything
         if DB_all:
             create_mod(D, DB_all, '_DB_all', 0)
@@ -880,8 +954,8 @@ cornums = {my_model.cornums}
             DM_all_kep = reload(temp_mod_01).my_model
             rv_all_kep, error_all_kep = DM_all_kep(ajuste)
 
-        # RVs without instrumentals!
-        
+            # RVs without instrumentals!
+            
 
     # FULL MODEL
 
@@ -913,6 +987,7 @@ cornums = {my_model.cornums}
                     chaos_names = ['Period', 'Amplitude', 'Time_Periastron', 'Ecc_sin', 'Ecc_cos']
 
         '''
+        pass
 
 
     fm_model_line['lw'] = 2
@@ -934,7 +1009,7 @@ cornums = {my_model.cornums}
         nb_ = 0
 
         for b in DB_all_kep:
-            per = np.exp(b[0].value) if b.parameterisation == 1 else b[0].value
+            per = np.exp(b[0].value) if b.parameterisation == 2 else b[0].value
             D_PF = deepcopy(D)
             TB = [deepcopy(b)]                
 
@@ -1054,6 +1129,306 @@ cornums = {my_model.cornums}
     return chaos_thetas
 
 
+def plot_KeplerianModel(model_=None, options={}):
+    labels_ = model_.instrument_names_RV
+    common_t = int(options['common_t'])
+
+    if len(options):
+        saveplace = options['saveloc']
+        saveloc = saveplace + '/plots/models/'
+
+        plot_fmt = options['format']
+
+        switch_histogram = options['hist']
+        switch_uncertain = options['uncertain']
+        switch_periodogram = options['periodogram']
+        switch_errors = options['errors']
+
+        
+        axhline_kwargs = {'color':'gray', 'linewidth':2}
+        errorbar_kwargs_light = {'marker':'o', 'ls':'', 'alpha':0.4,
+                                        'lw':1.2,
+                                        'markersize':8,
+                                        'markeredgewidth':1,
+                                        'markeredgecolor':'k',
+                                        }
+        errorbar_kwargs_dark = {'marker':'o', 'ls':'', 'alpha':0.8,
+                                        'lw':1.2,
+                                        'markersize':8,
+                                        'markeredgewidth':1,
+                                        'markeredgecolor':'k',
+                                        }
+        continuum_kwargs = {'ls':'-', 'color':rc.fg, 'lw':1}
+
+        fm_figsize = (10, 8)
+        # HIST
+        fm_hist = {'lw':2}  # 1
+        fm_hist_tick_fs = 0
+        # LEGEND
+        fm_legend_fs = 14 # 10
+
+        # FM_FRAME
+        fm_frame_lw = 3
+        # FM TICKS
+        fm_tick_xsize = 20
+        fm_tick_ysize = 20
+        # LABELS
+        fm_label_fs = 22
+        # title
+        fm_title_fs = 24
+        
+    def mk_model(data, blocks):
+        temp_model = ReddModel(blocks,
+                               data_RV=data)
+        temp_model.refresh__()
+        return temp_model
+    
+
+    def retrieve_model_func(model, tail=''):
+        model.model_script_no = 0
+        temp_script_name = f'temp_{tail}.py'
+        temp_script_loc = f'{saveplace}/temp'
+
+        dependencies = model.get_dependencies().tolist()
+        constants = model.get_constants()
+
+        with open(f'{temp_script_loc}/{temp_script_name}', 'w') as f:
+            f.write(open(get_support('init_reddemcee.scr')).read())
+            for d in dependencies:
+                f.write(f'''
+{d}''')
+            f.write('''
+''')
+            for c in constants:
+                f.write(f'''{c} = {constants[c]}
+''')
+
+            model_script_name = model.write_model(loc=saveplace, tail=tail)
+            f.write(open(model_script_name).read())
+        
+        sys.path.insert(0, f'{saveplace}/temp')
+        module = import_module(temp_script_name.split('.')[0])
+        module = reload(module)
+        temp_model_func = module.my_model
+        sys.path.pop(0)
+        return temp_model_func
+
+
+    def mk_dual_plot(data, data_c, savename='', isfold=False):
+        # make figure
+        data1 = data
+        if True:
+            fig = pl.figure(figsize=fm_figsize)
+            gs = gridspec.GridSpec(3, 4)
+            if switch_histogram:
+                ax = fig.add_subplot(gs[:2, :-1])
+                axr = fig.add_subplot(gs[2, :-1], sharex=ax)
+                axh = fig.add_subplot(gs[:2, 3], sharey=ax)
+                axrh = fig.add_subplot(gs[2, 3], sharey=axr)
+
+            else:
+                ax = fig.add_subplot(gs[:2, :])
+                axr = fig.add_subplot(gs[2, :], sharex=ax)
+
+            pl.subplots_adjust(hspace=0)
+            ax.axhline(0, **axhline_kwargs)
+            axr.axhline(0, **axhline_kwargs)
+
+            pl.subplots_adjust(wspace=0.15)
+
+        # plot data
+        if True:
+            for n_ins in range(len(labels_)):
+                mask = data1['Flag'] == (n_ins + 1)
+                if switch_errors:
+                    ax.errorbar(data1[mask]['BJD'],
+                                data1[mask]['RV'],
+                                data1[mask]['eRV'],
+                                c=Color_Cycler[n_ins],
+                                #label=labels_[n_ins],
+                                **errorbar_kwargs_light)
+
+                    axr.errorbar(data1[mask]['BJD'],
+                                    data1[mask]['residuals'],
+                                    data1[mask]['eRV'],
+                                c=Color_Cycler[n_ins],
+                                **errorbar_kwargs_light)
+
+                    if switch_errors:
+                        ax.errorbar(data1[mask]['BJD'],
+                                    data1[mask]['RV'],
+                                    data1[mask]['eRV_og'],
+                                    c=Color_Cycler[n_ins],
+                                    label=labels_[n_ins],
+                                    **errorbar_kwargs_dark)
+                        
+                        axr.errorbar(data1[mask]['BJD'],
+                                    data1[mask]['residuals'],
+                                    data1[mask]['eRV_og'],
+                                    c=Color_Cycler[n_ins],
+                                    **errorbar_kwargs_dark)
+                else:
+                    #print(f'{data1[mask]['RV']=}')
+                    ax.plot(data1[mask]['BJD'],
+                            data1[mask]['RV'],
+                            f'{Color_Cycler[n_ins]}o',
+                            label=labels_[n_ins])
+
+                    axr.plot(data1[mask]['BJD'],
+                                data1[mask]['residuals'],
+                                Color_Cycler[n_ins]+'o')   
+        
+        # continuum
+        if True:
+            ax.plot(data_c['BJD'],
+                    data_c['RV'],
+                    **continuum_kwargs)
+
+        # histograms
+        if True and switch_histogram:
+            nbins = 5
+            while nbins < len(data1):
+                counts, bins = np.histogram(data1['RV'],
+                                            bins=nbins)
+
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            nbins = 5
+            while nbins < len(data1):
+                counts, bins = np.histogram(data1['residuals'],
+                                            bins=nbins)
+                if (counts==0).any():
+                    break
+                else:
+                    nbins += 1
+
+            # PLOT HISTOGRAMS
+            axh.hist(data1['RV'],
+                        bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            axrh.hist(data1['residuals'],
+                        bins=nbins-1, orientation='horizontal', ec=rc.fg, lw=fm_hist['lw'])
+            # HIDE TICKS
+            axh.tick_params(axis="x", labelbottom=False, labelsize=fm_tick_xsize)
+            axh.tick_params(axis="y", labelleft=False)
+
+            axrh.tick_params(axis="y", labelleft=False)
+            axrh.tick_params(axis="x", labelsize=fm_tick_xsize)
+            axrh.set_xlabel('Counts', fontsize=fm_label_fs)
+
+        # Ticks and labels
+        if True:
+            ax.tick_params(axis="x", labelbottom=False)
+            ax.tick_params(axis="y", labelsize=fm_tick_ysize)
+
+            axr.tick_params(axis="x", labelsize=fm_tick_xsize)
+            axr.tick_params(axis="y", labelsize=fm_tick_ysize)
+
+            #axr.xaxis.set_major_locator(MaxNLocator(5))
+
+            #ax.set_title('Keplerian Model', fontsize=fm_title_fs)
+            ax.set_ylabel(r'RVs ($\frac{m}{s}$)', fontsize=fm_label_fs)
+            ax.legend(fontsize=fm_legend_fs)#, framealpha=0)
+
+            if common_t and not isfold:
+                xlabel_sup = f'BJD (days) + {common_t}'
+            else:
+                xlabel_sup = 'BJD (days)'
+                
+            axr.set_xlabel(xlabel_sup, fontsize=fm_label_fs)
+            axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
+
+
+        # SPINES
+        if True:
+            for spine in ax.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axr.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+            for spine in axh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+            for spine in axrh.spines.values():
+                spine.set_linewidth(fm_frame_lw)
+
+        fig.savefig(f'{saveloc}{savename}.{plot_fmt}',
+                    bbox_inches='tight')
+
+
+    def add_blocks_to_data(data0, blocks, tail=''):
+        data = deepcopy(data0)
+        model = mk_model(data, blocks)
+        sol = model.get_attr_param('value', flat=True)
+
+        rv, err = retrieve_model_func(model, tail=tail)(sol)
+        data['RV'] += rv
+        return data
+
+
+    # GET ABSOLUTE RESIDUALS
+    if True:
+        model_og = deepcopy(model_)
+        data_og = model_og.data
+        sol_og = model_og.get_attr_param('value', flat=True)
+
+        temp_model_func_ = retrieve_model_func(model_og, tail='full_model')
+
+        rv0, err0 = temp_model_func_(sol_og)
+
+        
+        data_og['eRV_og'] = data_og['eRV'].copy()
+        data_og['eRV'] = np.sqrt(err0)
+        data_og['residuals'] = data_og['RV'] - rv0
+        data_og['RV'] = data_og['residuals']
+
+
+    # plot full model
+    if True:
+        blocks_keps = [b for b in model_og if b.display_on_data_==True]
+        data_keps = add_blocks_to_data(data_og, blocks_keps, tail='AllKep')
+
+        x_c = np.linspace(data_keps['BJD'].min(),
+                          data_keps['BJD'].max(),
+                          5000)
+        data_c = pd.DataFrame({'BJD':x_c,
+                               'RV':np.zeros_like(x_c),
+                               'eRV':np.ones_like(x_c),
+                               'eRV_og':np.ones_like(x_c),
+                               'residuals':np.zeros_like(x_c),})
+        
+        data_keps_c = add_blocks_to_data(data_c, blocks_keps, tail='cont_AllKep')
+
+        mk_dual_plot(data_keps, data_keps_c, savename='KeplerianModel')
+
+    # plot phases
+    if True:
+        counter = 1
+        for b in blocks_keps:
+            per = np.exp(b[0].value) if b.parameterisation == 2 else b[0].value
+            
+            data_folded = fold_dataframe(deepcopy(data_og), per=per)
+            data_folded = add_blocks_to_data(data_folded, [b], tail=f'FoldKep0{counter}')
+
+            x_c = np.linspace(data_folded['BJD'].min(),
+                              data_folded['BJD'].max(),
+                              5000)
+            data_c = pd.DataFrame({'BJD':x_c,
+                                   'RV':np.zeros_like(x_c),
+                                   'eRV':np.ones_like(x_c),
+                                   'eRV_og':np.ones_like(x_c),
+                                   'residuals':np.zeros_like(x_c),})
+            data_keps_c = add_blocks_to_data(data_c, [b], tail=f'cont_FoldKep0{counter}')
+
+            mk_dual_plot(data_folded, data_keps_c,
+                         savename=f'KeplerianBlock {counter}',
+                         isfold=True)
+            counter += 1
+
+    pass
+    
+
 def plot_periodogram(my_data, options, tail_name=''):
     from scipy.signal import lombscargle
     if options is None:
@@ -1150,26 +1525,21 @@ def make_block_plot(foo):
     plot_points, plot_args, index, pltd = foo
 
     if True:
+        ptfmt = pltd['format']
+        scatter_kwargs = pltd['scatter_kwargs']
+        chain_kwargs = pltd['chain_kwargs']
+        vlines_kwargs = pltd['vlines_kwargs']
+        label_kwargs = pltd['label_kwargs']
+        hexbin_kwargs = pltd['hexbin_kwargs']
+        legend_kwargs = pltd['legend_kwargs']
+        tick_params_kwargs = pltd['tick_params_kwargs']
+        colorbar_kwargs = pltd['colorbar_kwargs']
+
         if pltd['paper_mode']:
-            #matplotlib.use('png')
-
-            pltd['fs_supt'] = 48#24
-            pltd['fs_supylabel'] = 44#22
-
-            pl_scatter_alpha = 0.7
-            pl_scatter_size = 10#2
-
+            #pltd['fs_supt'] = 48#24
+            #pltd['fs_supylabel'] = 44#22
             pltd['fs_xlabel'] = 28#14
             fm_frame_lw = 6#3
-
-            fm_tick_xsize = 40#20
-            fm_tick_ysize = 40#20
-
-            pltd['format'] = 'png'
-            plt_vlines_lw = 4#2
-
-            pl_label_fs = 44#22
-
             pltd['figsize_xaxis'] = 20#10
         
         else:
@@ -1178,18 +1548,15 @@ def make_block_plot(foo):
             pltd['fs_xlabel'] = 14
             pltd['figsize_xaxis'] = 10
 
+            fm_frame_lw = 3
+
             pl_scatter_alpha = 0.7
             pl_scatter_size = 10  #2
-            fm_frame_lw = 3
             fm_tick_xsize = 20  #20
             fm_tick_ysize = 20  #20
             plt_vlines_lw = 2#2
             pl_label_fs = 22#22
 
-
-        # do the coloring
-        cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-        colors = np.array([cor,cor,cor,cor,cor]).flatten()
 
 
         ch1, lk0 = plot_points  # chains[t], likes[t]
@@ -1209,8 +1576,6 @@ def make_block_plot(foo):
             elongatey = 2 if b.ndim_ == 1 else 0.5
             #if mode == 1:
             #    elongatey += 5
-
-
 
             fig, axes = pl.subplots(b.ndim_,
                                     figsize=(pltd['figsize_xaxis'] + elongatex,
@@ -1234,24 +1599,21 @@ def make_block_plot(foo):
                 # plot on mode
                 if mode == 0:
                     ax.scatter(ch0, lk0,
-                        c=pltd['colors'][b.bnumber_-1],
-                        alpha=pl_scatter_alpha,
-                        s=pl_scatter_size)
+                               c=Color_Cycler[b.bnumber_-1],**scatter_kwargs)
 
                 if mode == 1:
-                    cmap = mk_cmap([colors[b.bnumber_-1]], ncolors=100)
+                    cmap = mk_cmap([Color_Cycler[b.bnumber_-1]], ncolors=100)
 
                     hb = ax.hexbin(ch0, lk0,
-                                   gridsize=(60, 10),
                                    cmap=cmap,
-                                   mincnt=1)
+                                   **hexbin_kwargs)
                     
                     cb = fig.colorbar(hb, ax=ax, pad=0.02)
-                    cb.set_label('log10(N)', fontsize=pltd['fs_xlabel'])
+                    cb.set_label('log10(N)', **colorbar_kwargs)
                     
                 if mode == 2:
                     # MAKE COLORMAP
-                    cmap = mk_cmap([colors[b.bnumber_-1]], ncolors=100)
+                    cmap = mk_cmap([Color_Cycler[b.bnumber_-1]], ncolors=100)
 
                     # MAKE HEATMAP
                     gaussian_sigma = 8
@@ -1266,7 +1628,8 @@ def make_block_plot(foo):
                                      aspect='auto')
                     
                     cb = fig.colorbar(imsh, ax=ax, pad=0.02)
-                    cb.set_label(f'Counts x {len(lk0)}', fontsize=pltd['fs_xlabel'])
+                    cb.set_label(f'Counts x {len(lk0)}',
+                                 **colorbar_kwargs)
 
                     _param_value_max = (param.value_max - min(ch0)) / (max(ch0) - min(ch0)) * 4
                     _param_value_mean = (param.value_mean - min(ch0)) / (max(ch0) - min(ch0)) * 4
@@ -1276,10 +1639,7 @@ def make_block_plot(foo):
                 if mode == 3:
                     ax.plot(ch0.T,
                             color=pltd['colors'][b.bnumber_-1],
-                            marker='o',
-                            markersize=2,
-                            alpha=pltd['chain_alpha'],
-                            lw=0)
+                            **chain_kwargs)
                     
                 # ACCOMODATE TICKS
                 if mode == 1 or mode == 2:
@@ -1304,56 +1664,57 @@ def make_block_plot(foo):
                     ax.set_yticklabels(yticks_labels_)
                     #ax.yaxis.set_tick_params(which="major")
 
-                ax.tick_params(axis='x', labelsize=fm_tick_xsize, labelrotation=45)
-                ax.tick_params(axis='y', labelsize=fm_tick_ysize)
+                ax.tick_params(axis='x', labelrotation=45, **tick_params_kwargs)
+                ax.tick_params(axis='y', **tick_params_kwargs)
                     
+
+                # Draw max and mean
                 if mode == 3:
                     ax.hlines(_param_value_max,
                                 colors=rc.fg,
                                 xmin=0,
                                 xmax=len(ch0),
-                                **{'ls':'-',
-                                    'label':f'max = {np.round(param.value_max, 3)}',
-                                    'lw':plt_vlines_lw})
+                                ls='-',
+                                label=f'max = {np.round(param.value_max, 3)}',
+                                **vlines_kwargs)
                     ax.hlines(_param_value_mean,
                                 colors=rc.fg,
                                 xmin=0,
                                 xmax=len(ch0),
-                                **{'ls':'--',
-                                    'label':f'mean = {np.round(param.value_mean, 3)}',
-                                    'lw':plt_vlines_lw})
+                                ls='-',
+                                label=f'max = {np.round(param.value_mean, 3)}',
+                                **vlines_kwargs)
+
                     
                     ax.set_ylabel(f'{param.name} {param.unit}',
-                                  fontsize=pl_label_fs)
+                                  **label_kwargs)
                     
                     ax.set_xlabel(f'Steps',
-                                  fontsize=pl_label_fs)
+                                  **label_kwargs)
                     
-                    
-                    #fig.suptitle(f'Chains {b.name_}', fontsize=pltd['fs_supt'])
-                    #fig.supylabel('')
-                    #fig.supxlabel('Steps')
                     
                 else:
                     ax.vlines(_param_value_max,
                                 ymin=minl,
                                 ymax=maxl,
                                 colors=rc.fg,
-                                **{'ls':'-',
-                                    'label':f'max = {np.round(param.value_max, 3)}',
-                                    'lw':plt_vlines_lw})
+                                ls='-',
+                                label=f'max = {np.round(param.value_max, 3)}',
+                                **vlines_kwargs)
                     ax.vlines(_param_value_mean,
                                 ymin=minl,
                                 ymax=maxl,
                                 colors=rc.fg,
-                                **{'ls':'--',
-                                    'label':f'mean = {np.round(param.value_mean, 3)}',
-                                    'lw':plt_vlines_lw})
+                                ls='--',
+                                label=f'mean = {np.round(param.value_mean, 3)}',
+                                **vlines_kwargs)
                 
-                    ax.set_xlabel(f'{param.name} {param.unit}', fontsize=pl_label_fs)
-                    ax.set_ylabel('Log P', fontsize=pl_label_fs)
+                    ax.set_xlabel(f'{param.name} {param.unit}',
+                                  **label_kwargs)
+                    ax.set_ylabel('Log P',
+                                  **label_kwargs)
 
-                ax.legend(framealpha=0., fontsize=pltd['fs_xlabel'], loc=1)
+                ax.legend(**legend_kwargs)
 
                 # SPINES
                 if True:
@@ -1374,7 +1735,7 @@ def make_block_plot(foo):
             pl.tight_layout()
             
             
-            ptfmt = pltd['format']
+            
             mdname = pltd['modes_names'][mode]
             pl.savefig(pltd['saveloc']+f'/plots/posteriors/{mdname}/{t}_temp/{b.name_}.{ptfmt}',
                             bbox_inches='tight')
@@ -1388,18 +1749,12 @@ def make_block_plot(foo):
 
 
 def super_plots(chains=[], posts=[], options={}, my_model=None, ncores=None):
-    cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-    colors = np.array([cor,cor,cor,cor,cor]).flatten()
-
     modes_names = ['scatter', 'hexbin', 'gaussian', 'chains']
 
     saveplace = options['saveloc']
     temps = options['temps']
 
-    options['fs_xlabel'] = 10
-    options['fs_supylabel'] = 16
-    options['figsize_xaxis'] = 12
-    options['colors'] = colors
+    options['colors'] = Color_Cycler
     options['modes_names'] = modes_names
     if ncores is None:
         ncores = _CORES
@@ -1423,7 +1778,7 @@ def super_plots(chains=[], posts=[], options={}, my_model=None, ncores=None):
     num_plots = len(plot_list)
 
 
-
+    # TODO: enter this value through options
     ncores = 4
     tasks = []
     for i in range(num_plots):
@@ -1456,8 +1811,6 @@ def super_plots(chains=[], posts=[], options={}, my_model=None, ncores=None):
 
 def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None):
     from scipy.stats import norm, skew, kurtosis, mode
-    cor = ['C0', 'C1', 'C2', 'C4', 'C5', 'C7', 'C8', 'C9']
-    colors = np.array([cor,cor,cor,cor,cor]).flatten()
 
     saveplace = options['saveloc']
     num_bins = 12
@@ -1467,11 +1820,13 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
     figsize_xaxis = 12
 
     pl_label_fs = 34
+
     fm_tick_xsize = 30
     fm_tick_ysize = 30
     ptfmt = options['format']
     temps = options['temps']
 
+    label_kwargs = {'fontsize':pl_label_fs}
     # make folders
     for t in temps:
         try:
@@ -1484,7 +1839,7 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
     pbar = tqdm(total=pbartot)
     for ti in temps:
         for b in my_model:
-            try:
+            if True:
                 if b.ndim_ > 0:
                     ch0 = chains[ti]
                     pt = posts[ti]
@@ -1538,7 +1893,7 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
                         n, bins, patches = ax.hist(ch,
                                                 num_bins,
                                                 density=True,
-                                                facecolor=colors[b.bnumber_-1],
+                                                facecolor=Color_Cycler[b.bnumber_-1],
                                                 edgecolor=rc.bg,
                                                 linewidth=3,
                                                 alpha=0.6,
@@ -1568,7 +1923,8 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
                         ax.plot(bins_x, y, rc.bg, linewidth=4)
                         ax.plot(bins_x, y, 'r', linewidth=3)
 
-                        ax.set_xlabel(f'{param.name} {param.unit}', fontsize=pl_label_fs)
+                        ax.set_xlabel(f'{param.name} {param.unit}',
+                                      **label_kwargs)
 
                         ax.tick_params(axis='x', labelsize=fm_tick_xsize)
                         ax.tick_params(axis='y', labelsize=fm_tick_ysize)
@@ -1608,7 +1964,7 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
                     pl.close()
                     pbar.update(1)
 
-            except:
+            else:
                 pass
             
     
@@ -1616,10 +1972,12 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
     gc.collect()
     pass
 
+#plot_histograms(sim.chain, sim.posts, sim.plot_histograms, sim.model)
 
 def plot_betas(betas=[], logls=[], setup=[], Z=0, options={}):
     cmap = matplotlib.colormaps['plasma']
     colors = cmap(np.linspace(0, 0.85, setup[0]))
+    # TODO check if this works
 
     if True:
         saveplace = options['saveloc']
@@ -1640,24 +1998,21 @@ def plot_betas(betas=[], logls=[], setup=[], Z=0, options={}):
         pbar = tqdm(total=1)
 
 
-    try:
-        os.makedirs(saveplace+f'/plots/betas')
-    except:
-        pass
+    with contextlib.suppress(Exception):
+        os.makedirs(saveplace + '/plots/betas')
 
-    
     my_text = rf'Evidence: {np.round(Z[0], 3)} $\pm$ {np.round(Z[1], 3)}'
+
     if True:
-        bh = betas.reshape((setup[2], setup[0])).T
         fig, ax = pl.subplots()
         for ti in range(setup[0]):
-            bet = bh[ti]
+            bet = betas[ti]
             ax.plot(bet, np.ones_like(bet)*logls[ti], color=colors[ti], alpha=0.7)
             ax.plot(bet[-1], logls[ti], color=colors[ti], marker='o')
 
         ylims = ax.get_ylim()
         
-        betas0 = [x[-1] for x in bh]
+        betas0 = [x[-1] for x in betas]
         ax.fill_between(betas0, logls,
                         y2=0,
                         color=rc.fg,
@@ -1674,7 +2029,7 @@ def plot_betas(betas=[], logls=[], setup=[], Z=0, options={}):
         
         ax.set_xlim([0, 1])
         pl.tight_layout()
-        pl.savefig(saveplace+f'/plots/betas/beta_ladder.{ptfmt}',
+        pl.savefig(f'{saveplace}/plots/betas/beta_ladder.{ptfmt}',
                                     bbox_inches='tight')
         pl.close()
 
@@ -1682,93 +2037,83 @@ def plot_betas(betas=[], logls=[], setup=[], Z=0, options={}):
     pbar.close()
 
 
-def plot_rates(bh=[], rh=[], afh=[], setup=[], options={}):
+def plot_rates(betas=[], tsw=[], smd=[], setup=[], options={}, run_config={}):
     if True:
         saveplace = options['saveloc']
         ptfmt = options['format']
-        pbar = tqdm(total=1)
-
+        pbar = tqdm(total=setup[0]-1)
         cmap = matplotlib.colormaps['plasma']
         colors = cmap(np.linspace(0, 0.85, setup[0]))
         window = options['window']
-    try:
-        os.makedirs(saveplace+f'/plots/betas')
-    except:
-        pass
+        adapt_batches = run_config['adaptation_batches']
+        adapt_nsweeps = run_config['adaptation_nsweeps']
+
+
+    with contextlib.suppress(Exception):
+        os.makedirs(saveplace + '/plots/betas')
 
     if True:
         fig, axes = pl.subplots(3, 1, figsize=(10, 7), sharex=True)
 
-        bh1 = bh.reshape((setup[2], setup[0]))
-        rh1 = rh.reshape((setup[2], setup[0]-1))
-        tempsm1 = setup[0]-1
-        #rh1 = np.append(np.zeros(tempsm1*(window-1)), rh).reshape((setup[2]+(window-1), tempsm1))
-        rh1 = running(rh1, window)
+        #x0 = np.arange(setup[2]) * setup[3]
 
-
-        afh1 = np.append(np.zeros(setup[0]), afh).reshape((setup[2]+1, setup[0]))
-        afh1 = np.diff(afh1, axis=0) / setup[3]
-
-        afh1 = running(afh1, window)
-
-        # plot temperature adaptation
         for t in range(setup[0]-1):
-            bh_sel = bh1[:, t]
-            b = 1/np.array(bh_sel)
-            axes[0].plot(np.arange(setup[2])*setup[3], b,
-                         color=colors[t])
+            # PLOT BETAS
+            y_bet = betas[t]
+            axes[0].plot(1/y_bet, c=colors[t])
+
+            # PLOT TS_ACCEPTANCE
+            if adapt_batches:
+                x0 = np.arange(setup[2] + adapt_batches*adapt_nsweeps) * setup[3]
+            else:
+                x0 = np.arange(setup[2]) * setup[3]
+            
+            y_tsw = running(tsw[:, t], window)
+            axes[1].plot(x0, y_tsw, alpha=0.75, color=colors[t])
+
+            # PLOT SWAP MEAN DISTANCE
+            y_smd = running(smd[:, t], window)
+            axes[2].plot(x0, y_smd, alpha=0.75, color=colors[t])
+
+            pbar.update(1)
+
+
+        if True:
+            axes[0].set_ylabel(r"$T$")
+            axes[1].set_ylabel(r"$T_{swap}$")
+            axes[2].set_ylabel(r"$SMD$")
+
+            axes[2].set_xlabel("N Step")
+
             axes[0].set_xscale('log')
             axes[0].set_yscale('log')
-        
-        # plot acceptance rate
-        for t in np.arange(setup[0]):
-            afh_sel = afh1[:, t]
-            axes[1].plot(np.arange(setup[2])*setup[3], afh_sel,
-                         alpha=0.75,
-                         color=colors[t])
 
-        for t in np.arange(setup[0]-1):
-            r = rh1[:, t]
-            axes[2].plot(np.arange(setup[2])*setup[3], r,
-                         alpha=0.75,
-                         color=colors[t])
-            
-        if True:
-            axes[0].set_ylabel(r"$\beta^{-1}$")
-            axes[1].set_ylabel(r"$\bar{A_{f}}$")
-            axes[2].set_ylabel(r"$T_{swap}$")
-
-            axes[2].set_xlabel("N Step")    
-            #fig.suptitle('Samples')
-        
         pl.tight_layout()
         pl.savefig(saveplace+f'/plots/betas/rates.{ptfmt}',
                                         bbox_inches='tight')
         pl.close()
-    
-        pbar.update(1)
-    pbar.close()
-    pass
+        
+        pbar.close()
 
 
 def plot_beta_density(betas=[], options={}):
-    if True:
-        saveplace = options['saveloc']
-        ptfmt = options['format']
+    saveplace = options['saveloc']
+    ptfmt = options['format']
+    pbar = tqdm(total=1)
 
     fig, axes = pl.subplots(figsize=(4, 3))
     y = -1/np.diff(np.log(betas))
     max_index = np.argmax(y)
     x_position = (betas[max_index] + betas[max_index + 1]) / 2
-    
+
     pl.step(betas[:-1], y,
             color=rc.fg,
             where='post',
             )
     pl.axvline(x=x_position, color='r', linestyle='--',
                label=fr'$\beta={x_position:.3f}$')
-    
-    
+
+
     pl.gca().invert_xaxis()
     axes.set_xscale('log')
     axes.set_xlabel(r"$\beta$")
@@ -1777,7 +2122,409 @@ def plot_beta_density(betas=[], options={}):
     pl.savefig(saveplace+f'/plots/betas/density.{ptfmt}',
                                         bbox_inches='tight')
     pl.close()
+    pbar.update(1)
+    pbar.close()
+
 #plot_betas(sim.sampler.betas_history, elogl, sim.evidence, options=opts, temps=setup[0])
+
+
+def plot_astrometry1(options={}):
+    pass
+
+
+def plot_periodogram_new(my_data, options={}):
+    from astropy.timeseries import LombScargle
+    if True:
+        Nfreq = 100000
+        min_per = 0.5
+        max_per = 10000
+
+        Npoints = 10
+        Npoints_disp = 5
+    
+    saveplace = options['saveloc']
+    ptfmt = options['format']
+
+    if False:
+        Nfreq = options['Nfreq']
+        min_per = options['min_per']
+        max_per = options['max_per']
+
+        Npoints = options['Npoints']
+        Npoints_disp = options['Npoints_disp']
+
+    work_df = my_data.copy()
+    work_df['Window'] = 1
+
+    YAXIS_ = list(work_df.columns)
+    YAXIS_.remove('BJD')
+    YAXIS_.remove('Flag')
+    labels_ = YAXIS_.copy()
+
+    nplots = len(YAXIS_)
+    fig, axes = pl.subplots(nplots, figsize=(10, 2*nplots), sharex=True)
+    t = work_df['BJD'].values
+
+    for i in range(nplots):
+        if True:
+            yaxis_ = YAXIS_[i]
+            mag = work_df[yaxis_].values
+            
+            periods = np.linspace(min_per, max_per, Nfreq)
+            ang_freqs = 1 / periods
+
+            ls = LombScargle(t, mag, fit_mean=True, center_data=True)  # astropy
+
+            if yaxis_ == 'Window':
+                ls = LombScargle(t, mag, fit_mean=False, center_data=False)  # scipy, astropy
+            power = ls.power(ang_freqs,
+                            method='auto',
+                            #normalization='model',
+                            )
+
+            idx = getExtremePoints(power, 'max')[-Npoints:][::-1]
+            # FAP LINES
+            probabilities = [0.10, 0.01, 0.001]
+            power_rows = 0
+            if yaxis_ != 'Window':
+                fap = ls.false_alarm_level(probabilities, method='baluev')
+
+                relevantpl = idx[(fap[0] >= power[idx])]
+                relevant10 = idx[(fap[1] > power[idx])&(power[idx] > fap[0])]
+                relevant5 = idx[(fap[2] >= power[idx])&(power[idx] >= fap[1])]
+                relevant1 = idx[power[idx] > fap[2]]
+
+                celltext = []
+                cellcolours = []
+
+                counter = 0
+                for relevant in [relevant1, relevant5, relevant10, relevantpl]:
+                    for j in relevant:
+                        if counter < Npoints_disp:
+                            celltext.append([np.round(periods[j], 1), np.round(power[j], 2)])
+                            power_rows += 1
+                            counter += 1
+
+            else:
+                celltext = []
+                counter = 0
+                for j in idx:
+                    if counter < Npoints_disp:
+                        celltext.append([np.round(periods[j], 1), np.round(power[j], 2)])
+                        counter += 1
+                power_rows=5
+            if celltext == []:
+                celltext = [['', '']]
+
+
+            collabels = ['Period', 'Power']
+            if power_rows:
+                axes[i].set
+                the_table = axes[i].table(cellText=celltext,
+                            #rowLabels=['label1'],
+                            #rowColours=colors,
+                            colLabels=collabels,
+                            colWidths=[0.125, 0.125],
+                            #cellColours=cellcolours,
+                            #loc='right',
+                            bbox = [1, 1-(1+power_rows)/7, 0.25, (1+power_rows)/7], 
+                            fontsize=3)
+
+        if True:
+            axes[i].plot(periods, power,
+                    ls='-', c='k')
+
+            # ADD VSPANS
+            #axes[i].axvspan(2403-218, 2403+266,
+            #                color='C1')
+            #axes[i].axvspan(27.4-3.2, 27.4+3.2,
+            #                color='C4')
+
+            #print(periods[idx][:10])
+
+            if yaxis_ == 'Window':
+                axes[i].scatter(periods[idx],
+                        power[idx],
+                        marker='o',
+                        color='C2',
+                        alpha=0.9,
+                        s=35)           
+            else:
+                axes[i].scatter(periods[relevantpl],
+                        power[relevantpl],
+                        marker='o',
+                        color='gray',
+                        alpha=0.9,
+                        s=35)
+
+                axes[i].scatter(periods[relevant10],
+                        power[relevant10],
+                        marker='o',
+                        color='C0',
+                        alpha=0.9,
+                        s=35)
+
+                axes[i].hlines(fap,
+                        xmin=[0],
+                        xmax=[1],
+                        transform=axes[i].get_yaxis_transform(),
+                        color=['C0', 'C3', 'C2'],
+                        ls=[':', ':', '--'])
+
+
+                axes[i].scatter(periods[relevant5],
+                        power[relevant5],
+                        marker='o',
+                        color='C3',
+                        alpha=0.9,
+                        s=35)
+
+                axes[i].scatter(periods[relevant1],
+                        power[relevant1],
+                        marker='o',
+                        color='C2',
+                        alpha=1,
+                        s=35)
+
+
+            # AXES
+            if True:
+                axes[i].set_xscale('log')
+                asd = True if i == (nplots-1) else False
+                axes[i].tick_params(axis="x", which="both",
+                            top=True, labeltop=False,
+                            bottom=True, labelbottom=asd,
+                            direction="in",
+                            labelsize=20
+                            #length=3,
+                            #width=2,
+                            )
+
+                axes[i].tick_params(axis="y", which="both",
+                            top=True, labeltop=False,
+                            bottom=True, labelbottom=False,
+                            direction="in",
+                            labelsize=20
+                            #length=3,
+                            #width=2,
+                            )
+
+                axes[i].tick_params(axis="both", which="major",
+                                    size=8,
+                                    width=1.5)  # default:6; 0.8
+                
+                axes[i].tick_params(axis="both", which="minor",
+                                    size=6,
+                                    width=1.2)  # default:3; 0.4
+
+                axes[i].annotate(f'{labels_[i]}',
+                                xy=(.025, .8),
+                                xycoords='axes fraction',
+                                fontsize=20,
+                                )
+
+                axes[i].set_xlim([min_per, max_per])
+                
+                for spine in axes[i].spines.values():
+                    spine.set_linewidth(3)
+                    spine.set_color('k')
+
+    axes[i].set_xlabel(r'Period (days)', fontsize=22)
+    fig.supylabel('Power', fontsize=22)
+    pl.subplots_adjust(hspace=0.0)
+    #pl.savefig('last_periodogram.pdf', bbox_inches='tight', pad_inches=0.2)
+    pl.savefig(saveplace+f'/plots/periodogram.{ptfmt}',
+               bbox_inches='tight',
+               pad_inches=0.2,
+               )
+#plot_periodogram_new(sim.my_data, options=sim.plot_posteriors)
+
+def plot_correlogram(my_data, options={}):
+    from scipy.stats import pearsonr, spearmanr, kendalltau, linregress
+    if True:
+        plot_scale = 2
+    
+    saveplace = options['saveloc']
+    ptfmt = options['format']
+
+    if False:
+        Nfreq = options['Nfreq']
+        min_per = options['min_per']
+        max_per = options['max_per']
+
+        Npoints = options['Npoints']
+        Npoints_disp = options['Npoints_disp']
+
+    work_df = my_data.copy()
+
+    for ins in np.unique(my_data['Flag']):
+        work_df = my_data[sim.my_data['Flag']==ins].copy()
+        for col in work_df:
+            if np.all(work_df[col]==0):
+                work_df = work_df.drop(columns=col)
+        work_df = work_df.drop(columns=['eRV', 'Flag'])
+
+        columns = list(work_df.columns)    
+        columns.remove('BJD')
+        labels_ = columns.copy()
+        rev = columns[::-1]  # ['D','C','B','A']
+
+        ncols = len(columns)
+        colors = work_df['BJD'].values
+
+        fig, axes = pl.subplots(nrows=ncols, ncols=ncols, figsize=(plot_scale*ncols,
+                                                                plot_scale*ncols))
+        
+        uni=True
+        for i in range(ncols):
+            for j in range(i + 1):
+                if j<=i:
+                    # i corresponds to the "row" (top to bottom)
+                    # j corresponds to the "column" (left to right)
+                    xcol = rev[j]
+                    ycol = rev[i]
+                    ax = axes[i, j]
+                    diag = True if i==j else False
+
+                    y_ = work_df[ycol]
+                    x_ = work_df[xcol]
+                    if diag:
+                        xcol = 'BJD'
+                        x_ = work_df[xcol]
+                        #ax.axhline(y_.mean(),
+                        #           color='k',
+                        #           ls='--')
+                        nbins = 5
+                        brc, brc_tol = 0, 5
+                        while nbins < len(y_):
+                            counts, bins = np.histogram(y_, bins=nbins)
+                            if (counts==0).any():
+                                nbins += 1
+                                brc += 1
+                            else:
+                                nbins += 1
+                                brc = 0
+                            if brc == brc_tol:
+                                nbins -= brc_tol
+                                break
+                        ax.hist(y_,
+                                bins=nbins-1,
+                                #orientation='horizontal',
+                                ec='k',
+                                lw=1)
+                        
+                        #ax.annotate(rf'$\rho = {np.round(r, 2)}$',
+                        #            xy=(1.025, .850),
+                        #            xycoords='axes fraction',
+                        #            )
+
+                    else:
+                        slope, intercept, r, p, stderr = linregress(x_, y_)
+                        ax.axline((x_[0], intercept + slope * x_[0]),
+                                slope=slope, color='k',
+                                label=rf'$\rho$ = {np.round(r, 2)}',)
+
+                        sc = ax.scatter(x_, work_df[ycol],
+                                c=colors, marker='o', cmap='winter',
+                                lw=1, ec='k',
+                                s=20, alpha=1)
+                        if uni:
+                            uni = False
+
+                    if not diag:
+                        ax.legend(fontsize=12, markerscale=0,
+                                framealpha=0,
+                                handlelength=0)
+                    #print(xcol, ycol, i, j)
+                    #ax.xaxis.set_tick_params(which='minor', size=6, width=1.5, direction='in', top='on')
+
+
+                if True:
+                    if True:
+                        ax.xaxis.set_tick_params(which='major', size=8, width=1.5, direction='in',
+                                                        top=True, labeltop=False,
+                                                        bottom=True, labelbottom=False,
+                                                        right=True, labelright=False,
+                                                        left=True, labelleft=False,)        
+
+                        ax.xaxis.set_tick_params(which='minor', size=5, width=1.5, direction='in',
+                                                        top=True, labeltop=False,
+                                                        bottom=True, labelbottom=False,
+                                                        right=True, labelright=False,
+                                                        left=True, labelleft=False,)   
+                        if not diag:
+                            ax.yaxis.set_tick_params(which='major', size=8, width=1.5, direction='in',
+                                                            top=True, labeltop=False,
+                                                            bottom=True, labelbottom=False,
+                                                            right=True, labelright=False,
+                                                            left=True, labelleft=False,) 
+                
+
+                            ax.yaxis.set_tick_params(which='minor', size=5, width=1.5, direction='in',
+                                                            top=True, labeltop=False,
+                                                            bottom=True, labelbottom=False,
+                                                            right=True, labelright=False,
+                                                            left=True, labelleft=False,) 
+                if j==0:
+                    #print(ncols, xcol, ycol, i, j)
+                    if not diag:
+                        ax.yaxis.set_tick_params(which='major', size=8, width=1.5, direction='in',
+                                                top=True, labeltop=False,
+                                                bottom=True, labelbottom=True,
+                                                right=True, labelright=False,
+                                                left=True, labelleft=True,
+                                                labelsize=14)
+                    
+                    ax.set_ylabel(labels_[::-1][i], fontsize=20)
+
+                if i==(ncols-1):
+                    ax.xaxis.set_tick_params(which='major', size=8, width=1.5, direction='in',
+                                            top=True, labeltop=False,
+                                            bottom=True, labelbottom=True,
+                                            right=True, labelright=False,
+                                            left=True, labelleft=False,
+                                            labelsize=14,
+                                            labelrotation=45)
+                    #lab ='BJD' if j==(ncols-1) else labels_[::-1][j]
+                    lab = labels_[::-1][j]
+                    ax.set_xlabel(lab, fontsize=20)
+
+                if diag:
+                    ax.yaxis.set_tick_params(which='major', size=8, width=1.5, direction='in',
+                                            top=True, labeltop=False,
+                                            bottom=True, labelbottom=False,
+                                            right=True, labelright=True,
+                                            left=True, labelleft=False,
+                                            labelsize=14)
+                    
+                    ax.yaxis.tick_right()
+
+                for spine in ax.spines.values():
+                    spine.set_linewidth(3)
+                    spine.set_color('k')
+
+
+        # Hide the empty subplots (those where j > i)
+        for i in range(len(columns)):
+            for j in range(i+1, len(columns)):
+                axes[i, j].set_visible(False)
+
+        cb = pl.colorbar(sc, ax=axes, fraction=0.035, pad=1.5, anchor=(0.3, 0.9),
+                        label='BJD')
+        cb.ax.tick_params(labelsize=14)
+        cb.outline.set_color('k')
+        cb.outline.set_linewidth(2)
+
+        pl.subplots_adjust(hspace=0.0)
+        pl.subplots_adjust(wspace=0.0)
+        fig.subplots_adjust(right=0.85)
+
+        pl.savefig(saveplace+f'/plots/correlogram{ins}.{ptfmt}',
+                bbox_inches='tight',
+                pad_inches=0.2,
+                )
+
+#plot_correlogram(sim.my_data, options=sim.plot_posteriors)
 
 
 def activate_paper_mode():

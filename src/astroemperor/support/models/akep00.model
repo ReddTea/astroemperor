@@ -2,10 +2,10 @@
 
     freq = 2. * np.pi / per
     M = freq * X_ + pha
-    E = np.array([kepler.solve(m, ecc) for m in M])
+    E = kepler.solve(M, np.repeat(ecc, len(M)))
     f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
 
-    sinI = np.sin(I)
-    cosI = np.cos(I)
+    #sinI = np.sin(I)
+    #cosI = np.cos(I)
 
-    model0 += A * (np.cos(f + w) + ecc * np.cos(w)) * sinI
+    model0 += A * (np.cos(f + w) + ecc * np.cos(w))# * sinI

@@ -1,0 +1,8 @@
+    # START OF sinusoid00.model
+    per, A, phase = theta[{}]
+
+    freq = 2. * np.pi / per
+    M = freq * X_ + phase
+
+    model0 += A * np.cos(M)
+    # END OF sinusoid00.model

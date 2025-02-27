@@ -1,0 +1,8 @@
+def run_thing():
+    start = time.time()
+    sampler.run_mcmc(p1, nsweeps=nsweeps, nsteps=nsteps, progress=progress)
+    end = time.time()
+
+    tts = end - start
+    print('temp_script.py took '+str(np.round(tts, 3))+' seconds')
+    

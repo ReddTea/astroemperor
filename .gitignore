@@ -2,10 +2,10 @@
 .DS_store
 
 # Ignore pip dist folder
-dist
-
 # Ignore egg-info
-reddemcee.egg-info
+dist
+astroemperor.egg-info
+MANIFEST
 
 # Ignore files related to API keys
 .env
@@ -16,10 +16,14 @@ reddemcee.egg-info
 # Ignore Private files
 Private
 
-temp*
-
-*.pyc
-
-datalogs*
+# Ignore docs build
+site/
+*.zip
+.cache
 
 __pycache__
+
+temp*
+datalogs*
+*.pyc
+*.so

@@ -1,0 +1,10 @@
+    # START OF magneticcycle00.model
+    per, A1, A2, phase1, phase2 = theta[{}]
+
+    freq2 = 2. * np.pi / per
+    freq1 = np.pi / per
+    M1 = freq1 * X_ + phase1
+    M2 = freq2 * X_ + phase2
+
+    model0 += A1 * np.cos(M1) + A2 * np.cos(M2)
+    # END OF magneticcycle00.model

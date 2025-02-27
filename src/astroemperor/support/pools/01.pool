@@ -1,11 +1,12 @@
 import multiprocessing
-try:
-    #multiprocessing.set_start_method('fork', force=True)
-    #print(multiprocessing.get_start_method())
-    pass
-except:
-    #print('\n FAILED \n multiprocessing.set_start_method(fork, force=True)\n')
-    pass
+ncores, is_darwin = {}
+
+if is_darwin:
+    try:
+        multiprocessing.set_start_method('fork')  # not spawn
+    except:
+        print('\n FAILED \n multiprocessing.set_start_method(fork, force=True)\n')
+
 from multiprocessing import Pool as Pool1
 
-mypool = Pool1({})
+mypool = Pool1(ncores)

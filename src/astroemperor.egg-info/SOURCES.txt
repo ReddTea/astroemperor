@@ -28,12 +28,16 @@ src/astroemperor/fpts/tests.py
 src/astroemperor/fpts/util.py
 src/astroemperor/support/__init__.py
 src/astroemperor/support/endit.scr
+src/astroemperor/support/endit2 copy.scr
 src/astroemperor/support/endit2.scr
 src/astroemperor/support/endit3.scr
 src/astroemperor/support/endit_dyn.scr
 src/astroemperor/support/endit_fpts.scr
 src/astroemperor/support/init.scr
 src/astroemperor/support/init_dyn.scr
+src/astroemperor/support/run_main.scr
+src/astroemperor/support/save_metadata (2).scr
+src/astroemperor/support/save_metadata.scr
 src/astroemperor/support/PAE/00.pae
 src/astroemperor/support/PAE/01.pae
 src/astroemperor/support/PAE/02.pae
@@ -47,8 +51,11 @@ src/astroemperor/support/models/akep00.model
 src/astroemperor/support/models/aoffset00.model
 src/astroemperor/support/models/empty.model
 src/astroemperor/support/models/ins00.model
+src/astroemperor/support/models/ins01 (copy).model
 src/astroemperor/support/models/ins01.model
 src/astroemperor/support/models/ins02.model
+src/astroemperor/support/models/ins03 (copy).model
+src/astroemperor/support/models/ins03.model
 src/astroemperor/support/models/jitter00.model
 src/astroemperor/support/models/kep00.model
 src/astroemperor/support/models/kep01.model
@@ -69,7 +76,6 @@ src/astroemperor/support/pools/04.pool
 src/astroemperor/support/pools/05.pool
 src/astroemperor/support/pools/06.pool
 src/astroemperor/support/pools/07.pool
-src/astroemperor/support/priors/Beta.prior
 src/astroemperor/support/priors/Fixed.prior
 src/astroemperor/support/priors/GaussianMixture.prior
 src/astroemperor/support/priors/Hill.prior

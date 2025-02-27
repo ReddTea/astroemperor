@@ -1,0 +1,13 @@
+def run_thing():
+    start = time.time()
+
+    sampler.run_nested({})
+
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')
+
+
+
+if __name__ == '__main__':
+    run_thing()

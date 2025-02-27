@@ -1,0 +1,2 @@
+    per, A, tp, ecc, w = theta[{}]
+    model0 += calc_rv1(X_, per, A, tp, ecc, w)

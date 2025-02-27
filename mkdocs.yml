@@ -1,0 +1,119 @@
+site_name: emperor
+site_description: Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval
+site_author: Pablo A. Pena R.
+
+repo_url: https://github.com/ReddTea/astroemperor
+site_url: !ENV READTHEDOCS_CANONICAL_URL
+
+nav:
+  - Home: index.md
+  - User Guide:
+      #- Index: user-guide/README.md
+      - Installation: user-guide/ug-installation.md
+      - Getting Started: user-guide/ug-getting-started.md
+      - The Samplers: user-guide/ug-the-samplers.md
+      - The Model: user-guide/ug-the-model.md
+      - Model Comparison: user-guide/ug-model-comparison.md
+      - The Results: user-guide/ug-the-results.md
+      - FAQ: user-guide/ug-FAQ.md
+  - Tutorials:
+      - Peg 51: tutorials/tut-51-peg.md
+      #- Quickstart: tutorials/quickstart/quickstart.md
+      #- Fitting a model: tutorials/fitting_model/fitting_model.md
+      #- Temperatures & Adaptation: tutorials/temperatures/temperatures.md
+      #- Evidence: tutorials/evidence/evidence.md
+      #- Parallelization: tutorials/parallelization/parallelization.md
+      #- Autocorrelation Analysis: tutorials/autocorrelation-analysis.md
+      #- Moves: tutorials/moves.md
+
+theme:
+  name: material  # material  # readthedocs # mkdocs #
+
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default 
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: black
+      accent: indigo
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference 
+
+  features:
+    - header.autohide
+    # favicon: fontawesome/solid/chess-king
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.arithmatex
+
+extra_javascript:
+  - javascripts/katex.js
+  - https://unpkg.com/katex@0/dist/katex.min.js
+  - https://unpkg.com/katex@0/dist/contrib/auto-render.min.js
+
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Math-Italic.woff
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Math-Italic.woff2
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Math-Italic.ttf
+
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Main-Regular.woff
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Main-Regular.woff2
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Main-Regular.ttf
+
+
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Caligraphic-Regular.woff
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Caligraphic-Regular.woff2
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Caligraphic-Regular.ttf
+
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Size2-Regular.woff
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Size2-Regular.woff2
+  - https://unpkg.com/katex@0/dist/fonts/KaTeX_Size2-Regular.ttf
+
+
+
+
+
+extra_css:
+  - https://unpkg.com/katex@0/dist/katex.min.css
+
+plugins:
+  - search
+  - privacy
+  - autorefs
+  - mkdocstrings
+  - mkdocs-jupyter
+
+  
+extra:
+  analytics:
+    provider: google
+    property: G-xxxxxxxxx
+  consent:
+    title: Cookie consent
+    actions:
+    - accept
+    - manage
+    description: >- 
+      We use cookies to recognize your repeated visits and preferences, as well
+      as to measure the effectiveness of our documentation and whether users
+      find what they're searching for. With your consent, you're helping us to
+      make our documentation better.
+
+copyright: >
+  Copyright &copy; 2024 - 2025 Pablo A. Pena R. –
+  <a href="#__consent">Change cookie settings</a>

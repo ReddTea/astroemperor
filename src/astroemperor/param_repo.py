@@ -17,10 +17,12 @@ def make_parameter(target):
 
 dEmpty = { 'prior':'Uniform',
           'limits':[None, None],
+          'init_pos':[None, None],
           'value':-np.inf,
           'value_max':-np.inf,
           'value_mean':-np.inf,
           'value_median':-np.inf,
+          'value_range':[None, None],
           
           'fixed':None,
           'prargs':None,
@@ -32,6 +34,7 @@ dEmpty = { 'prior':'Uniform',
           'std':None,
           'sigma_frac_mean':None,
           
+          'display_prior':'',
           'display_posterior':'',
           }
 
@@ -54,7 +57,7 @@ dPhase = {'name':'Phase',
             'unit':'(rad)',
             'is_circular':True,
             'is_hou':False,
-            'mininame':r'$M_0$',
+            'mininame':r'M_0',
             }
 
 dEccentricity = {'name':'Eccentricity',         
@@ -70,7 +73,9 @@ dLongitude = {'name':'Longitude',
             'is_hou':False,
             'mininame':r'\bar{\omega}',
             }
+
 ######
+
 dlPeriod = {'name':'lPeriod',         
             'unit':'(Days)',
             'is_circular':False,
@@ -106,6 +111,7 @@ dEcc_cos = {'name':'Ecc_cos',
             'is_hou':True,
             'mininame':r'e_{cos}',
             }
+
 #######
 
 dT_0 = {'name':'T_0',         
@@ -123,7 +129,23 @@ dM0 = {'name':'M0',
        }
 
 #######
+
+dSMA = {'name':'Semi-Major Axis',
+        'unit':'(AU)',
+        'is_circular':False,
+        'is_hou':False,
+        'mininame':r'SMA',
+        }
+
+dMinM = {'name':'Minimum Mass',
+         'unit':'(Mj)',
+         'is_circular':False,
+         'is_hou':False,
+         'mininame':r'SMA',
+         }
+
 #######
+
 dOffset = {'name':'Offset',
            'unit':r'($\frac{m}{s}$)',
            'is_circular':False,
@@ -160,7 +182,7 @@ dStaract = {'name':'Staract',
             }
 
 #######
-#######
+
 dAcceleration = {'name':'Acceleration',
                  'unit':r'($\frac{m}{s day}$)',
                  'is_circular':False,
@@ -168,7 +190,6 @@ dAcceleration = {'name':'Acceleration',
                  'mininame':r'\dot{\gamma}',
                 }
 
-#######
 #######
 
 dCeleJitter = {'name':'Jitter Term',
@@ -248,15 +269,82 @@ dMatern32Term_rho = {'name':'Matern32 Term rho',
 
 ########
 
-
-dCeleJitter = {'name':'Jitter Term',
+dSHOTerm_sigma = {'name':'SHO Term sigma',
             'unit':r'($\frac{m}{s}$)',
             'is_circular':False,
             'is_hou':False,
             'mininame':r'',
              }
 
+dSHOTerm_rho = {'name':'SHO Term rho',
+            'unit':r'(days)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dSHOTerm_tau = {'name':'SHO Term tau',
+            'unit':r'(days)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dSHOTerm_S0 = {'name':'SHO Term S0',
+            'unit':r'($\frac{m}{s}$)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dSHOTerm_w0 = {'name':'SHO Term w0',
+            'unit':r'',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dSHOTerm_Q = {'name':'SHO Term Q',
+            'unit':r'',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
 ########
+
+dGonzRotationTerm_rho = {'name':'GRot Term rho',
+            'unit':r'(days)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dGonzRotationTerm_tau = {'name':'GRot Term tau',
+            'unit':r'(days)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dGonzRotationTerm_A1 = {'name':'GRot Term A1',
+            'unit':r'($\frac{m}{s}$)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+dGonzRotationTerm_A2 = {'name':'GRot Term A2',
+            'unit':r'($\frac{m}{s}$)',
+            'is_circular':False,
+            'is_hou':False,
+            'mininame':r'',
+             }
+
+
+
+########
+
 # astrometry, orbital
 dInclination = {'name':'Inclination',
             'unit':'(rad)',
@@ -274,6 +362,7 @@ dOmega = {'name':'Omega',
 
 
 ########
+
 # astrometry, instrumental
 dOffset_ra = {'name':'Offset RA',
            'unit':'(mas)',
