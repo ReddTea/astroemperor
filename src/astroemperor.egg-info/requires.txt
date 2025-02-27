@@ -1,12 +1,9 @@
-numpy
 matplotlib>=3.5.1
-ipywidgets
+kepler.py
+reddemcee
+reddcolors
 tabulate
 termcolor
-reddutils
-kepler.py
-emcee
-arviz
+tqdm
 corner
-reddcolors
-reddemcee
+fast_kepler
