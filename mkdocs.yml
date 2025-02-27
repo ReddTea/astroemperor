@@ -96,9 +96,8 @@ plugins:
   - privacy
   - autorefs
   - mkdocstrings
-  - mkdocs-jupyter
 
-  
+
 extra:
   analytics:
     provider: google
