@@ -232,7 +232,7 @@ def my_prior(theta):
 
         
     def _write_prior_dynesty(self, f):
-        # this could go on constants
+        # this should go on constants
         f.write(f'''
 from scipy.stats import truncnorm
 ptformargs = {self.ptformargs0}
@@ -248,17 +248,41 @@ def my_prior(theta):
         for b in self.model:
             for p in b[b.C_]:
                 if p.prior == 'Uniform':
+#                    if (p.is_circular and
+#                        p.ptformargs[0]==np.pi and
+#                        p.ptformargs[1]==np.pi):
+#                            f.write(f'''
+#    x[{p.cpointer}] =  (x[{p.cpointer}] % 1.) * 2 * np.pi
+#''')
+#                    else:
                     f.write(f'''
     a, b = {p.ptformargs}
     x[{p.cpointer}] =  a * (2. * x[{p.cpointer}] - 1) + b
 ''')
                 elif p.prior == 'Normal':
                     f.write(f'''
-    m, s = {p.prargs}  # mean and standard deviation
     low, high = {p.limits}  # lower and upper bounds
+    m, s, _ = {p.prargs}  # mean and standard deviation
     low_n, high_n = (low - m) / s, (high - m) / s  # standardize
     x[{p.cpointer}] = truncnorm.ppf(theta[{p.cpointer}], low_n, high_n, loc=m, scale=s)
 ''')
+                    
+                elif p.prior == 'Beta':
+                    f.write(f'''
+NOT INCLUDED BETA, DEBUG EMP.PY LN 272
+''')
+                # PERIOD AS LOG
+                # add fking jeffries
+                elif p.prior == 'Jeffreys':
+                    f.write(f'''
+#    low, high = {p.limits}
+#    #x[{p.cpointer}] = np.exp(low + x[{p.cpointer}] * (high - low))
+#    x[{p.cpointer}] = low * np.exp(x[{p.cpointer}] * np.log(high / low))  # Jeffreys
+    a, b = {p.ptformargs}
+    x[{p.cpointer}] =  a * (2. * x[{p.cpointer}] - 1) + b
+''')
+                    
+
         f.write('''              
     return x
 
@@ -533,6 +557,16 @@ sampler = reddemcee.PTSampler(nwalkers,
                              )
 
 ''')
+        self._set_sampler_D_(f)
+    def _set_sampler_D_(self, f):
+        limits = np.array(self.model.get_attr_param('limits',
+                                                    flat=True))[self.model.C_]
+        D_ = np.diff(limits).flatten()
+        f.write(f'''
+sampler.D_ = np.array({np.array2string(D_, separator=', ')})
+
+''')
+        pass
 
 
     def _set_sampler_dynesty(self, f):
@@ -628,8 +662,12 @@ p1 = test_init()
 adaptation_batches = {adapt_batches}
 adaptation_nsweeps = {adapt_nsweeps}
 
+# freeze1
+adaptation_batches = 1
+adaptation_nsweeps = {self.reddemcee_discard}
+
 ''')
-                self.endit_script = 'endit_freeze.scr'
+                self.endit_script = 'endit_freeze1.scr'
             else:
                 self.endit_script = 'endit_reddemcee.scr'
             
@@ -752,7 +790,6 @@ adaptation_nsweeps = {adapt_nsweeps}
         import pickle
         with open(f'{self.saveplace}/restore/backends/{self.backend_name}.pkl', 'rb') as sampler_metadata:
             self.sampler = pickle.load(sampler_metadata)
-
 
 
     def _load_script_models(self):
@@ -1002,6 +1039,7 @@ class emp_painter(object):
                     self.plot_gaussian_mixtures['plot_name'] = f'{b.bnumber_} {p.GM_parameter.name}'
                     plot_GM_Estimator(p.GM_parameter,
                                     options=self.plot_gaussian_mixtures)
+                pbar.update(1)
         pbar.close()
 
 
@@ -1428,39 +1466,36 @@ class emp_counsil(object):
         # TODO make a different method, leave for now
         ###### THIS CAN BE SHARED
         self._get_fit_reddemcee()
+        r = self.sampler
+        samples = r.samples
+        weights = np.exp(r.logwt - r.logz[-1])
+        weights /= np.sum(weights)
+        
+        #from dynesty.utils import quantile
+        # dynesty.utils.quantile(samples[:, i], [0.16, 0.5, 0.84], weights)
         '''
-        self.best_loc_post = np.argmax(raw_posts[0])
-        self.best_loc_like = np.argmax(raw_likes[0])
+        r = sim.sampler
+        weights = np.exp(r.logwt - r.logz[-1])
+        weights /= np.sum(weights)
 
-        self.post_max = raw_posts[0][self.best_loc_post]
-        self.like_max = raw_likes[0][self.best_loc_post]
-        self.prior_max_post = 0.0  # calculate properly
+        for i in range(8):
+            ...:     print(dynesty.utils.quantile(samples[:, i], [0.36, 0.5, 0.64], weights))
+        vals = [[4.2307702768102, 4.230783913236789, 4.230797624141973],
+        [55.5163041392088, 55.709485945761706, 55.9056472781712],
+        [7.180579681830706, 7.3553242075764675, 7.585150916162191],
+        [0.0072205583259223535, 0.010166281858242752, 0.013384756270929339],
+        [0.8254052515045534, 1.0848266869015135, 1.4278938384403816],
+        [-0.004576031733818643, -0.004389921887157595, -0.004205252616377426],
+        [5.1502626959312945, 5.3115763243581355, 5.474122164860442],
+        [0.7824368659647362, 1.0536187976773366, 1.326083745360509],
+        ]
 
-        self.sigmas = np.std(raw_chain[0], axis=0)
-
-        self.fit_max = raw_chain[0][self.best_loc_post]
-        self.fit_mean = np.mean(raw_chain[0], axis=0)
-        self.fit_median = np.median(raw_chain[0], axis=0)
-
-        self.fit_low1, self.fit_high1 = np.percentile(raw_chain[0], find_confidence_intervals(1), axis=0)
-        self.fit_low2, self.fit_high2 = np.percentile(raw_chain[0], find_confidence_intervals(2), axis=0)
-        self.fit_low3, self.fit_high3 = np.percentile(raw_chain[0], find_confidence_intervals(3), axis=0)
-
-        self.fit_maxlike = raw_chain[0][self.best_loc_like]
-
-
-        if self.use_fit == 'max_post':
-            self.ajuste = self.fit_max
-        elif self.use_fit == 'max_like':
-            self.ajuste = self.fit_maxlike
-        elif self.use_fit == 'mean':
-            self.ajuste = self.fit_mean
-        elif self.use_fit == 'median':
-            self.ajuste = self.fit_median
-        else:
-            self.logger(f'Input error in use_fit = {self.use_fit}')
-            self.ajuste = self.fit_max
+        for v in vals:
+            print(f'{v[1]:.9f}+{v[2]-v[1]:.9f}-{v[1]-v[0]:.9f}')
         '''
+
+
+        pass
 
 
     def _calculate_statistics(self):
@@ -1573,6 +1608,37 @@ class emp_counsil(object):
                             extra_names.append(thingy)
                         for thingy in [ecc_, w_]:
                             extra_chains.append(thingy)
+
+                    elif b.parameterisation == 6:
+                        per, A, phase, ecc, w = b.get_attr('value')
+                        per_, A_, phase_, ecc_, w_ = my_params
+
+                        per = np.exp(per)
+                        per_ = np.exp(per_)
+
+                        for thingy in ['Period']:
+                            extra_names.append(thingy+'_{}'.format(b.number_))
+
+                        for thingy in [per_]:
+                            extra_chains.append(thingy)
+
+
+                    elif b.parameterisation == 7:
+                        P, A, phase, S, C = b.get_attr('value')
+                        P_, A_, phase_, S_, C_ = my_params
+
+                        per = np.exp(P)
+                        per_ = np.exp(P_)
+
+                        ecc, w = delinearize(S, C)
+                        ecc_, w_ = adelinearize(S_, C_)
+
+                        for thingy in ['Period', 'Eccentricity', 'Longitude_Periastron']:
+                            extra_names.append(thingy+'_{}'.format(b.number_))
+
+                        for thingy in [per_, ecc_, w_]:
+                            extra_chains.append(thingy)
+
 
                     if self.starmass:
                         sma, mm = cps(per, A, ecc, self.starmass)
@@ -1704,13 +1770,12 @@ class emp_counsil(object):
                         mu = np.round(p.GM_parameter.mixture_mean, 3)
                         sig = np.round(p.GM_parameter.mixture_sigma, 3)
 
-                        p.display_posterior = '𝛴{}~~𝓝 ({}, {})'.format(subscript_nums[p.GM_parameter.n_components],
-                                                                mu, sig)
+                        p.display_posterior = f'𝛴{subscript_nums[p.GM_parameter.n_components]}~~𝓝 ({mu}, {sig})'
                     else:
                         print('Something really weird is going on! Error 110.')
                 for p in b[b.A_]:
                     p.posterior = p.GM_parameter
-                    p.display_posterior = '~𝛿 (x - {})'.format(p.value)
+                    p.display_posterior = '~𝛿 (x - {p.value})'
 
                 for p in b.additional_parameters:
                     if p.has_posterior:
@@ -1723,8 +1788,7 @@ class emp_counsil(object):
                             mu = np.round(p.GM_parameter.mixture_mean, 3)
                             sig = np.round(p.GM_parameter.mixture_sigma, 3)
 
-                            p.display_posterior = '𝛴{}~~𝓝 ({}, {})'.format(subscript_nums[p.GM_parameter.n_components],
-                                                                    mu, sig)
+                            p.display_posterior = f'𝛴{subscript_nums[p.GM_parameter.n_components]}~~𝓝 ({mu}, {sig})'
                         else:
                             print('Something really weird is going on! Error 110.')
 
@@ -1854,29 +1918,30 @@ class emp_counsil(object):
 
 
     def _print_2_run_info(self):
-        if self.engine__.__name__ == 'reddemcee':
-            adapt_ts = self.engine_config['adapt_tau']
-            adapt_ra = self.engine_config['adapt_nu']
-            adapt_sc = self.engine_config['adapt_mode']
+        if self.engine__.__name__ != 'reddemcee':
+            return
+        adapt_ts = self.engine_config['adapt_tau']
+        adapt_ra = self.engine_config['adapt_nu']
+        adapt_sc = self.engine_config['adapt_mode']
 
-            # TODO acceptance fraction with discard!!
-            discard0 = self.reddemcee_discard
-            nsteps0 = self.engine_config['setup'][-1]
+        # TODO acceptance fraction with discard!!
+        discard0 = self.reddemcee_discard
+        nsteps0 = self.engine_config['setup'][-1]
 
-            mean_af = np.mean(self.sampler.acceptance_fraction, axis=1)
+        mean_af = np.mean(self.sampler.acceptance_fraction, axis=1)
 
-            self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}', save_extra_n=True)
-            self.logger('\nBeta Detail                     :   ' + '[' + ', '.join('{:.4}'.format(x) for x in self.sampler.betas) + ']', save_extra_n=True)
-            self.logger('\nMean Logl Detail                :   ' + '[' + ', '.join('{:.3f}'.format(np.mean(x)) for x in self.likes) + ']', save_extra_n=True)
-            self.logger('\nMean Acceptance Fraction        :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_af) + ']', save_extra_n=True)
-            self.logger('\nAutocorrelation Time            :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.autocorr_time[0]) + ']', save_extra_n=True)
-            
-            if self.engine_config['tsw_history']:
-                mean_tsw = np.mean(self.sampler.get_tsw(discard=discard0//nsteps0), axis=0)
-                self.logger('\nTemperature Swap Rate           :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_tsw) + ']', save_extra_n=True)
-            if self.engine_config['smd_history']:
-                mean_smd = np.mean(self.sampler.get_smd(discard=discard0//nsteps0), axis=0)
-                self.logger('\nMean Swap Distance              :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_smd) + ']', save_extra_n=True)
+        self.logger('\nDecay Timescale, Rate, Scheme   :   ' + f'{adapt_ts}, {adapt_ra}, {adapt_sc}', save_extra_n=True)
+        self.logger('\nBeta Detail                     :   ' + '[' + ', '.join('{:.4}'.format(x) for x in self.sampler.betas) + ']', save_extra_n=True)
+        self.logger('\nMean Logl Detail                :   ' + '[' + ', '.join('{:.3f}'.format(np.mean(x)) for x in self.likes) + ']', save_extra_n=True)
+        self.logger('\nMean Acceptance Fraction        :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_af) + ']', save_extra_n=True)
+        self.logger('\nAutocorrelation Time            :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in self.autocorr_time[0]) + ']', save_extra_n=True)
+
+        if self.engine_config['tsw_history']:
+            mean_tsw = np.mean(self.sampler.get_tsw(discard=discard0//nsteps0), axis=0)
+            self.logger('\nTemperature Swap Rate           :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_tsw) + ']', save_extra_n=True)
+        if self.engine_config['smd_history']:
+            mean_smd = np.mean(self.sampler.get_smd(discard=discard0//nsteps0), axis=0)
+            self.logger('\nMean Swap Distance              :   ' + '[' + ', '.join('{:.3f}'.format(x) for x in mean_smd) + ']', save_extra_n=True)
             
 
     def _print_3_statistics(self):
@@ -2354,7 +2419,7 @@ class Simulation(emp_retainer, model_manager,
         elif self.run_config['burnin'] is None:
             self.reddemcee_discard = 0
 
-        if self.run_config['adaptation_batches']:
+        if False:#self.run_config['adaptation_batches']:
             adapt_iter = self.run_config['adaptation_nsweeps'] * nsteps
             self.adaptation_niter = self.run_config['adaptation_batches'] * adapt_iter
             self.reddemcee_discard += self.adaptation_niter
@@ -2366,12 +2431,18 @@ class Simulation(emp_retainer, model_manager,
         # TODO: ptformargs here!
         # TODO: add other priors?
         self.ptformargs0 = []
+        self.ptformargs1 = []
         for b in self.blocks__:
             for p in b[b.C_]:
+                # PERIOD AS LOG
+                if False:
+                    if p.name[:3] == 'Per':
+                        p.prior = 'Jeffreys'
+
                 if p.ptformargs == None:
                     l, h = p.limits
                     p.ptformargs = [(h-l)/2., (h+l)/2.]
-                    if b.parameterisation in [1, 2, 4]:
+                    if b.parameterisation in [1, 2, 4, 7]:
                         if p.name[:3] == 'Ecc' and p.ptformargs[0] > 0.707:
                             p.ptformargs[0] = 0.707
                 else:
@@ -2515,6 +2586,8 @@ class Simulation(emp_retainer, model_manager,
 
     def _constrain_next_run(self):
         # TODO constrain options as dict
+        if not self.switch_constrain:
+            return
         known_methods = ['sigma', 'GM', 'range']
         if self.constrain_method in known_methods:
             getattr(self, f'_apply_constrain_{self.constrain_method}')()
@@ -2580,8 +2653,10 @@ class Simulation(emp_retainer, model_manager,
 
                     rang = limc - limf
 
-                    if rang / abs(p.value) < 1e-5:
-                        self.add_condition([p.name, 'fixed', p.value])
+                    if rang / abs(p.value) < 1e-4:
+                        #self.add_condition([p.name, 'fixed', p.value])
+                        print(f'Not further constraining {p.name}.')
+                        pass
                     else:
                         self.add_condition([p.name, 'limits', [limf, limc]])
 

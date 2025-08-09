@@ -11,6 +11,7 @@
 
 import numpy as np
 from .qol_utils import get_support
+from scipy.stats import norm
 
 class Parameter(object):
     def __init__(self, attributes_dict: dict):
@@ -78,6 +79,23 @@ class Parameter_Block(object):
         return ndim
 
 
+    def _check_prargs(self):
+        for p in self:
+            if p.prior == 'Uniform':
+                low, high = p.limits
+                logZ = np.log(1 / (high - low))
+                p.prargs = logZ
+
+            if p.prior == 'Normal':
+                low, high = p.limits
+                mu, s = p.prargs[0], p.prargs[1]
+                a, b = (low - mu)/s, (high - mu)/s
+                logZ = np.log(norm.cdf(b) - norm.cdf(a))   # normalising constant
+                p.prargs = [mu, s, logZ]
+
+
+
+
     def _add_display_prior(self):
         subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉']
         for param in self:
@@ -92,6 +110,8 @@ class Parameter_Block(object):
                 param.display_prior = '~𝛽 ({}, {})'.format(*np.round(param.prargs, 3))
             elif param.prior == 'Fixed':
                 param.display_prior = f'~𝛿 (x - {param.value})'
+            elif param.prior == 'Jeffreys':
+                param.display_prior = '~J ({}, {})'.format(*np.round(param.limits, 3))
             else:
                 param.display_prior = f'Method not built for {param.prior}'
 
@@ -234,8 +254,8 @@ class ReddModel(object):
         self.C_ = np.arange(blen)
         self.A_ = np.arange(0)
 
-        if np.any(self.mod_fixed):
-            mask_fixed_bool = self.mod_fixed is None
+        if np.any(self.mod_fixed != None):
+            mask_fixed_bool = self.mod_fixed == None
             self.C_ = np.arange(blen)[mask_fixed_bool]
             self.A_ = np.arange(blen)[~mask_fixed_bool]
 
@@ -266,6 +286,10 @@ class ReddModel(object):
         # Add display priors
         for b in self:
             b._add_display_prior()
+
+        # Checks prargs
+        for b in self:
+            b._check_prargs()
         # set dependencies?
         # set constants?
         self.model_constants = {'nan':'np.nan',

@@ -1,0 +1,16 @@
+def run_thing():
+    start = time.time()
+    state = p1
+
+    nsweeps1 = adaptation_nsweeps
+    nsweeps2 = nsweeps - adaptation_nsweeps
+
+    print('Adaptation Burn-in:')
+    state = sampler.run_mcmc(state, nsweeps=nsweeps1, nsteps=nsteps, progress=progress)
+
+    sampler.select_adjustment('00')
+    sampler.run_mcmc(state, nsweeps=nsweeps2, nsteps=nsteps, progress=progress)
+
+    end = time.time()
+    tts = end - start
+    print('It took '+str(np.round(tts, 3))+' seconds')

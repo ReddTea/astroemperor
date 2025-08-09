@@ -1,0 +1,10 @@
+
+    P, A, phase, ecc, w = theta[{}]
+
+    per = np.exp(P)
+
+    freq = 2. * np.pi / per
+    M = freq * X_ + phase
+    E = kepler.solve(M, np.repeat(ecc, len(M)))
+    f = np.arctan(((1. + ecc)/(1. - ecc)) ** 0.5 * np.tan(E / 2.)) * 2.
+    model0 += A * (np.cos(f + w) + ecc * np.cos(w))

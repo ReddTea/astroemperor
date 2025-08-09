@@ -1,0 +1,7 @@
+def Jeffreys(x, limits, args):
+    low, high = limits
+    #ln_norm = np.log(np.log(high/low))
+    if low <= x <= high:
+        return np.log(1 / (high - low))
+    return -np.inf
+

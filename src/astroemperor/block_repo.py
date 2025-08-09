@@ -25,7 +25,9 @@ def KeplerianBlock(parameterisation, number, use_c):
                     ['dlPeriod', 'dAmp_sin', 'dAmp_cos', 'dEcc_sin', 'dEcc_cos'],
                     ['dPeriod', 'dAmplitude', 'dT_0', 'dEccentricity', 'dLongitude'],
                     ['dPeriod', 'dAmplitude', 'dT_0', 'dEcc_sin', 'dEcc_cos'],
-                    ['dPeriod', 'dAmplitude', 'dM0', 'dEccentricity', 'dLongitude']
+                    ['dPeriod', 'dAmplitude', 'dM0', 'dEccentricity', 'dLongitude'],
+                    ['dlPeriod', 'dAmplitude', 'dPhase', 'dEccentricity', 'dLongitude'],
+                    ['dlPeriod', 'dAmplitude', 'dPhase', 'dEcc_sin', 'dEcc_cos'],
                     ]
     param_list = params_param[parameterisation]
     Kep_Block = {'model_script':f'kep0{parameterisation}.model',
@@ -518,7 +520,6 @@ class SmartSetter(object):
 
         amp_limiter = sig_limiter * np.sqrt(4)
 
-
         ecc_limits, ecc_prargs = kwargs['prargs']
 
         if b.parameterisation == 0:
@@ -547,7 +548,6 @@ class SmartSetter(object):
             prargs = [None, None, None, None, None]
             self.ecc_w_add_additional(b)
 
-
         if b.parameterisation == 2:
             kamp = np.sqrt(amp_limiter/2)
             lims = [[np.log(1.5), np.log(per_limiter)],
@@ -559,7 +559,6 @@ class SmartSetter(object):
             priors = [self.uni, self.uni, self.uni, self.uni, self.uni]
             prargs = [None, None, None, None, None]
             self.ecc_w_add_additional(b)
-
 
         if b.parameterisation == 3:
             lims = [[1.5, per_limiter],
@@ -582,7 +581,30 @@ class SmartSetter(object):
             prargs = [None, None, None, None, None]
             self.ecc_w_add_additional(b)
 
-        
+        if b.parameterisation == 6:
+            lims = [[np.log(1.5), np.log(per_limiter)],
+                    [1e-6, amp_limiter],
+                    self.angular_limiter,
+                    ecc_limits,
+                    self.angular_limiter]
+            
+            priors = ['Jeffreys', self.uni, self.uni, self.norm, self.uni]
+            prargs = [None, None, None, ecc_prargs, None]
+            self.per_add_additional(b, per_limiter=per_limiter)
+
+        if b.parameterisation == 7:
+            lims = [[np.log(1.5), np.log(per_limiter)],
+                    [1e-6, amp_limiter],
+                    self.angular_limiter,
+                    [-1, 1],
+                    [-1, 1]]
+            
+            priors = ['Jeffreys', self.uni, self.uni, self.uni, self.uni]
+            prargs = [None, None, None, None, None]
+
+            self.per_add_additional(b, per_limiter=per_limiter)
+            self.ecc_w_add_additional(b, prargs=ecc_prargs)
+
 
         if kwargs['starmass']:
             # TODO
@@ -621,12 +643,16 @@ class SmartSetter(object):
             additional_parameter.display_name = additional_parameter.name
             b.add_additional_parameters(additional_parameter)
 
-    def ecc_w_add_additional(self, b):
+    def ecc_w_add_additional(self, b, prargs=None):
         param_list = ['dEccentricity', 'dLongitude']
         my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
         
         my_params[0].has_prior = True
         my_params[0].limits = [0, 1]
+        if prargs is not None:
+            my_params[0].prior = self.norm
+            my_params[0].prargs = prargs
+
 
         my_params[1].has_prior = False
         my_params[1].limits = self.angular_limiter 
@@ -639,6 +665,19 @@ class SmartSetter(object):
                 additional_parameter.mininame += f' {b.number_}'
             additional_parameter.display_name = additional_parameter.name
             b.add_additional_parameters(additional_parameter)
+
+    def per_add_additional(self, b, per_limiter=None):
+        my_params = Parameter(pr.make_parameter(getattr(pr, 'dPeriod')))
+        my_params.has_prior = False
+        my_params.limits = [0, per_limiter]
+        my_params.has_posterior = True
+        if b.number_:
+            my_params.name += f' {b.number_}'
+            my_params.mininame += f' {b.number_}'
+            my_params.display_name = my_params.name
+            b.add_additional_parameters(my_params)
+
+
 
     def set_Offset(self, b, *args, **kwargs):
         lims, priors, prargs = [], [], []
@@ -793,6 +832,12 @@ class SmartSetter(object):
         prargs = [[], [], [], [], []]
 
         return lims, priors, prargs
+
+
+    def add_constant(self, lims, priors, prargs):
+        for i, pr in enumerate(priors):
+            if pr == 'Uniform':
+                low, high = lims[i]
 
 
     def __call__(self, block, *args, **kwargs):
