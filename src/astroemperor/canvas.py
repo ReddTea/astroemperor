@@ -190,6 +190,7 @@ def plot_GM_Estimator(estimator, options=None):
     pl.close('all')
 
 
+
 def plot_trace(sampler=None, eng_name='', my_model=None, options={}):
     if True:
         trace_modes = options['modes']
@@ -1009,7 +1010,9 @@ cornums = {my_model.cornums}
         nb_ = 0
 
         for b in DB_all_kep:
-            per = np.exp(b[0].value) if b.parameterisation == 2 else b[0].value
+            per = b[0].value
+            if b.parameterisation==2 or b.parameterisation==6:
+                per = np.exp(b[0].value)
             D_PF = deepcopy(D)
             TB = [deepcopy(b)]                
 
@@ -1371,7 +1374,8 @@ def plot_KeplerianModel(model_=None, options={}):
     if True:
         model_og = deepcopy(model_)
         data_og = model_og.data
-        sol_og = model_og.get_attr_param('value', flat=True)
+        sol_og = np.array(model_og.get_attr_param('value', flat=True))[model_og.C_]
+        #sol_og = model_og.get_attr_param('value', flat=True)
 
         temp_model_func_ = retrieve_model_func(model_og, tail='full_model')
 
@@ -1406,7 +1410,9 @@ def plot_KeplerianModel(model_=None, options={}):
     if True:
         counter = 1
         for b in blocks_keps:
-            per = np.exp(b[0].value) if b.parameterisation == 2 else b[0].value
+            per = b[0].value
+            if b.parameterisation==2 or b.parameterisation==6:
+                per = np.exp(b[0].value) 
             
             data_folded = fold_dataframe(deepcopy(data_og), per=per)
             data_folded = add_blocks_to_data(data_folded, [b], tail=f'FoldKep0{counter}')
@@ -1517,9 +1523,8 @@ def plot_periodogram(my_data, options, tail_name=''):
 def make_block_plot(foo):
     if _PLATFORM_SYSTEM == 'Darwin':
         matplotlib.use('Agg')
-        pass
     
-    if _PLATFORM_SYSTEM == 'Linux':
+    elif _PLATFORM_SYSTEM == 'Linux':
         matplotlib.use('Agg')
 
     plot_points, plot_args, index, pltd = foo
@@ -2063,7 +2068,8 @@ def plot_rates(betas=[], tsw=[], smd=[], setup=[], options={}, run_config={}):
             axes[0].plot(1/y_bet, c=colors[t])
 
             # PLOT TS_ACCEPTANCE
-            if adapt_batches:
+
+            if False:#adapt_batches:
                 x0 = np.arange(setup[2] + adapt_batches*adapt_nsweeps) * setup[3]
             else:
                 x0 = np.arange(setup[2]) * setup[3]
