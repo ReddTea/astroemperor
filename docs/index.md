@@ -50,7 +50,7 @@ pip install astroemperor
 In the console type
 ```sh
 git clone https://github.com/ReddTea/astroemperor/
-cd reddemcee
+cd astroemperor
 python -m pip install -e .
 ```
 

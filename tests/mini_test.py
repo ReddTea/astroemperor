@@ -7,35 +7,33 @@ import astroemperor as emp
 
 np.random.seed(1234)
 
-
+## Engine Setup
 sim = emp.Simulation()
-target_folder = '51Peg'
-sim.load_data(target_folder)
-
-
-setup = np.array([5, 100, 500])  # temps, walkers, steps
+sim.load_data('51Peg')  # folder read from /datafiles/
 
 sim.set_engine('reddemcee')
-sim.reddemcee_config['burnin'] = 0.25
+sim.engine_config['setup'] = [8, 128, 512, 1]  # ntemps, nwalkers, nsweeps, nsteps
+
+sim.cores__ = 12  # threads to use
+
+## Model setup
+sim.instrument_names = ['LICK']
+sim.starmass = 1.12
+sim.keplerian_parameterisation = 1
 
 
-# constrains to speed up the test
-if target_folder == '51Peg':
-    sim.instrument_names = ['LICK']
-    sim.starmass = 1.12
+sim.add_condition(['Period 1', 'limits', [3, 5]])
+sim.add_condition(['Amplitude 1', 'limits', [45, 60]])
 
-    sim.add_condition(['Period 1', 'limits', [3, 5]])
-    sim.add_condition(['Amplitude 1', 'limits', [45, 60]])
-    sim.add_condition(['Phase 1', 'limits', [2.5, 3.5]])
-    sim.add_condition(['Eccentricity 1', 'limits', [0, 0.1]])
-    sim.add_condition(['Longitude 1', 'limits', [1.1, 1.5]])
+sim.add_condition(['Offset 1', 'limits', [-10., 10.]])
 
-    sim.add_condition(['Offset 1', 'limits', [-10., 10.]])
-
-# some options to speed up the test
-# PLOT OPTIONS
-sim.plot_paper_mode = True  # superseeds other options
-sim.save_plots_fmt = 'png'  # lower memory usage
+sim.add_condition(['Period 1', 'init_pos', [4.1, 4.3]])
+sim.add_condition(['Amplitude 1', 'init_pos', [50, 60]])
 
 
-sim.run_auto(setup, k_start=1, k_end=1)
+## Plot Options
+sim.plot_posteriors['temps'] = [0, 2, 8]
+sim.plot_trace['plot'] = False
+
+
+sim.autorun(0, 1)
