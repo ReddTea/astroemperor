@@ -93,6 +93,22 @@ class Parameter_Block(object):
                 logZ = np.log(norm.cdf(b) - norm.cdf(a))   # normalising constant
                 p.prargs = [mu, s, logZ]
 
+    def _check_additional_prargs(self):
+        for p in self.additional_parameters:
+            if not p.has_prior:
+                continue
+            if p.prior == 'Uniform':
+                low, high = p.limits
+                logZ = np.log(1 / (high - low))
+                p.prargs = logZ
+
+            if p.prior == 'Normal':
+                low, high = p.limits
+                mu, s = p.prargs[0], p.prargs[1]
+                a, b = (low - mu)/s, (high - mu)/s
+                logZ = np.log(norm.cdf(b) - norm.cdf(a))   # normalising constant
+                p.prargs = [mu, s, logZ]
+
 
 
 
@@ -290,6 +306,7 @@ class ReddModel(object):
         # Checks prargs
         for b in self:
             b._check_prargs()
+            b._check_additional_prargs()
         # set dependencies?
         # set constants?
         self.model_constants = {'nan':'np.nan',
