@@ -17,7 +17,7 @@ sim.engine_config['setup'] = [8, 128, 512, 1]  # ntemps, nwalkers, nsweeps, nste
 sim.cores__ = 12  # threads to use
 
 ## Model setup
-sim.instrument_names = ['LICK']
+sim.instrument_names_RV = ['LICK']
 sim.starmass = 1.12
 sim.keplerian_parameterisation = 1
 

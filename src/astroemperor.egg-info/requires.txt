@@ -1,6 +1,9 @@
 matplotlib>=3.5.1
+pandas
+scikit-learn
 kepler.py
 reddemcee
+h5py
 reddcolors
 tabulate
 termcolor

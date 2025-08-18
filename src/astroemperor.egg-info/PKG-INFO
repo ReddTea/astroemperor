@@ -1,6 +1,6 @@
-Metadata-Version: 2.2
+Metadata-Version: 2.4
 Name: astroemperor
-Version: 0.9.5
+Version: 0.9.6
 Summary: Flexible python exoplanet fitter
 Author-email: ReddTea <redd@tea.com>
 License: MIT License
@@ -37,20 +37,26 @@ Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: matplotlib>=3.5.1
+Requires-Dist: pandas
+Requires-Dist: scikit-learn
 Requires-Dist: kepler.py
 Requires-Dist: reddemcee
+Requires-Dist: h5py
 Requires-Dist: reddcolors
 Requires-Dist: tabulate
 Requires-Dist: termcolor
 Requires-Dist: tqdm
 Requires-Dist: corner
 Requires-Dist: fast_kepler
+Dynamic: license-file
 
 # EMPEROR
 Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval
 
 # Overview
 `EMPEROR` (Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval), is a Python-based algorithm that automatically searches for signals in Radial Velocity timeseries, employing Markov chains and parallel tempering methods, convergence tests and Bayesian statistics, along with various noise models. A number of posterior sampling routines are available, focused on efficiently searching for signals in highly multi-modal posteriors. The code allows the analysis of multi-instrument and multi-planet data sets and performs model comparisons automatically to return the optimum model that best describes the data.
+
+Make sure to check the [documentation!](https://astroemperor.readthedocs.io/en/latest/)
 
 ## Why `EMPEROR`?
 

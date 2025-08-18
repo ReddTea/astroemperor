@@ -70,10 +70,15 @@ Options to constrain subsequent runs based on parameter uncertainties are also a
 2. [\\(\mu - n\sigma\\), \\(\mu + n\sigma\\)]-th percentiles of the chain, matching the corresponding \\(n\sigma\\) Gaussian range.
 3. High-Density Interval (HDI), matching the \\(n\sigma\\) Gaussian range (e.g. \\(2\sigma\\) will constrain around the 95% HDI). By default, `emperor` applies a 99% HDI interval.
 
-These methods are accesible through the `sigma`, `percentile`, and `range` keywords. Alternatively, using previous posteriors can be accessed with the `GM` or `KDE` keywords. The \\(n\sigma\\) value can be accessed through `constrain_sigma`, and to which blocks this will be applied through `constrain_types` (the default is just for the Keplerian blocks and Jitter's upper boundaries).
+These methods are accesible through the `constrain` dictionary. 
+
+The \\(n\sigma\\) value can be accessed through `sigma`, and to which blocks this will be applied through `types` (the default is just for the Keplerian blocks and Jitter's upper boundaries).
 
 
 ```python
-sim.constrain_sigma = 3
-sim.constrain_method = 'range'  # 'sigma', 'GM', 'range'
+sim.constrain['method'] = 'range'  # 'sigma', 'GM', 'range'
+sim.constrain['sigma'] = 3
+sim.constrain['types'] = ['Keplerian', 'Jitter']
+sim.constrain['tol'] = 1e-4  # don't constrain to a range smaller than this ratio (upper_lim-lower_lim)/value
+
 ```

@@ -123,7 +123,7 @@ if True:
 
 
     if target_folder == 'synth':
-        sim.instrument_names = ['Synth Data 1', 'Synth Data 2']
+        sim.instrument_names_RV = ['Synth Data 1', 'Synth Data 2']
 
         if my_parameterisation == 0:
             sim.add_condition(['Period 1', 'limits', [40, 80]])

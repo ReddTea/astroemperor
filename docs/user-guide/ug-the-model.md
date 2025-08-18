@@ -129,7 +129,6 @@ sim.magnetic_cycle = True
 
 ### Celerite Block
 
-[In construction!]
 The celerite mode must be turned on or off with `switch_celerite`.
 The `celerite` kernel must be added through a dictionary. Terms are additive, and they go in as a list. Their respective parameterisation must be defined as in:
 
@@ -143,6 +142,8 @@ sim.my_kernel = {'terms':['RotationTerm'],
                             'f':None}]
                             }
 ```
+
+The order of the parameters defined in my_kernel is important! It should match the parameter order in the terminal.
 
 Please refer to the excellent documentation of [celerite2](https://celerite2.readthedocs.io/en/latest/api/python/#model-building).
 

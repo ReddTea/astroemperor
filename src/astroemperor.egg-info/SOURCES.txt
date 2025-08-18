@@ -19,6 +19,7 @@ src/astroemperor.egg-info/requires.txt
 src/astroemperor.egg-info/top_level.txt
 src/astroemperor/support/endit_dynesty.scr
 src/astroemperor/support/endit_freeze.scr
+src/astroemperor/support/endit_freeze1.scr
 src/astroemperor/support/endit_reddemcee.scr
 src/astroemperor/support/init_dynesty.scr
 src/astroemperor/support/init_reddemcee.scr
@@ -29,6 +30,7 @@ src/astroemperor/support/PAE/01.pae
 src/astroemperor/support/PAE/02.pae
 src/astroemperor/support/PAE/03.pae
 src/astroemperor/support/PAE/04.pae
+src/astroemperor/support/PAE/06.pae
 src/astroemperor/support/deadtime/astrometric_gaps_gaiadr2_08252020.csv
 src/astroemperor/support/deadtime/astrometric_gaps_gaiaedr3_12232020.csv
 src/astroemperor/support/kernels/00.kernel
@@ -57,6 +59,8 @@ src/astroemperor/support/models/kep01.model
 src/astroemperor/support/models/kep02.model
 src/astroemperor/support/models/kep03.model
 src/astroemperor/support/models/kep04.model
+src/astroemperor/support/models/kep06.model
+src/astroemperor/support/models/kep07.model
 src/astroemperor/support/models/magneticcycle00.model
 src/astroemperor/support/models/moav00 copy.model
 src/astroemperor/support/models/moav00.model

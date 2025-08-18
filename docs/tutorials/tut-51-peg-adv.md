@@ -51,7 +51,7 @@ sim.engine_config['setup'] = [10, 500, 3000, 1]
 We feed the name of the instrument (optional), as well as the starmass for calculating the minimum-mass and semi-major axis. We will use the Keplerian parameterisation (P, K, \\(\phi\\), \\(e_{s}\\), \\(e_{c}\\)). We add some boundaries to speed up the process, and add some initial positions:
 
 ```python
-sim.instrument_names = ['LICK']
+sim.instrument_names_RV = ['LICK']
 sim.starmass = 1.12
 sim.keplerian_parameterisation = 1
 
@@ -133,7 +133,7 @@ Here we can add more to the model.
 
 
 ```python
-sim.instrument_names = ['LICK']
+sim.instrument_names_RV = ['LICK']
 sim.starmass = 1.12
 sim.keplerian_parameterisation = 1
 
