@@ -33,7 +33,7 @@ import time
 class emp_retainer(object):
     NONETHINGS = ['starname', 'betas', 'saveplace', 'ndim__',
                   'instrument_names_RV', 'instrument_names_AM', 'instrument_names_PM']
-    SWITCHES_F = ['switch_RV', 'switch_SA', 'switch_SA_pro', 'switch_constrain',
+    SWITCHES_F = ['switch_RV', 'switch_SA', 'switch_SA_pro',
                     'switch_dynamics', 'dynamics_already_included',
                     'switch_celerite', 'switch_AM', 'switch_PM', 'switch_inclination',
                     'FPTS', 'save_all', 'save_plots', 'use_c']
@@ -104,9 +104,12 @@ class emp_retainer(object):
         self.use_fit = 'max_post'
 
         # constrain
-        self.constrain_sigma = 3
-        self.constrain_method = 'sigma'  # 'sigma', 'GM', 'range'
-        self.constrain_types = ['Keplerian', 'Jitter']
+        self.constrain = {'method':'range',
+                          'sigma':3,
+                          'types':['Keplerian', 'Jitter'],
+                          'tol':1e-4,
+                          'known_methods':['sigma', 'GM', 'range', 'None']}
+    
         # posterior
         self.cherry = {'cherry':False,
                        'median':False,
@@ -315,6 +318,8 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
         nterms = len(self.my_kernel['terms'])
         sumeq = '='
 
+
+        # goes in my_model
         if in_func:
             tail = '01'
             with open(f'temp_kernel{tail}', 'w') as f:
@@ -328,7 +333,7 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
                     term_inputs = ''
                     for k in param_dict:
                         if param_dict[k] == None:
-                            term_inputs += f'{k} = theta_gp[{c}], '
+                            term_inputs += f'{k}=theta_gp[{c}], '
                             c += 1
                         else:
                             term_inputs += f'{k} = {param_dict[k]}, '
@@ -355,9 +360,9 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
                     term_inputs = ''
                     for k in param_dict:
                         if param_dict[k] == None:
-                            term_inputs += f'{k} = 1.0, '
+                            term_inputs += f'{k}=1.0, '
                         else:
-                            term_inputs += f'{k} = {param_dict[k]}, '
+                            term_inputs += f'{k}={param_dict[k]}, '
                     f.write(f'''
 {line_str}({term_inputs})
 ''')
@@ -369,15 +374,15 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
         if in_func:
             with open('temp_kernel01', 'w') as f:
                 f.write(f'''
-    kernel = cterms.SHOTerm(S0=theta_gp[2],rho=theta_gp[0], tau=theta_gp[1])
-    kernel += cterms.SHOTerm(S0=theta_gp[3],rho=theta_gp[0]*0.5, tau=theta_gp[1])
+    kernel = cterms.SHOTerm(S0=theta_gp[2], rho=theta_gp[0], tau=theta_gp[1])
+    kernel += cterms.SHOTerm(S0=theta_gp[3], rho=theta_gp[0]*0.5, tau=theta_gp[1])
     gp_.kernel = kernel
 ''')
         else:
             with open('temp_kernel00', 'w') as f:
                 f.write(f'''
-kernel = cterms.SHOTerm(S0=1,rho=4., tau=8.)
-kernel += cterms.SHOTerm(S0=1,rho=2., tau=8.)
+kernel = cterms.SHOTerm(S0=1, rho=4., tau=8.)
+kernel += cterms.SHOTerm(S0=1, rho=2., tau=8.)
 ''')           
 
 
@@ -1470,9 +1475,20 @@ class emp_counsil(object):
         samples = r.samples
         weights = np.exp(r.logwt - r.logz[-1])
         weights /= np.sum(weights)
-        
-        #from dynesty.utils import quantile
-        # dynesty.utils.quantile(samples[:, i], [0.16, 0.5, 0.84], weights)
+
+        from dynesty.utils import quantile
+
+        all_quants = []
+        all_quants.extend(
+            quantile(samples[:, i], [0.16, 0.84, 0.1, 0.9, 0.05, 0.95], weights)
+            for i in range(samples.shape[1]))
+
+        all_quants = np.array(all_quants)
+        self.fit_low1, self.fit_high1 = all_quants[:, 0], all_quants[:, 1]
+        self.fit_low2, self.fit_high2 = all_quants[:, 2], all_quants[:, 3]
+        self.fit_low3, self.fit_high3 = all_quants[:, 4], all_quants[:, 5]
+
+
         '''
         r = sim.sampler
         weights = np.exp(r.logwt - r.logz[-1])
@@ -1549,7 +1565,6 @@ class emp_counsil(object):
 
                 for p in b[b.A_]:
                     my_params[p.A_] = p.value * np.ones(len(ch0))
-
 
                 if True:
                     if b.parameterisation == 0:
@@ -2049,9 +2064,15 @@ class emp_counsil(object):
     def _save_chain_summary(self):
         cs_names = self.model.get_attr_param('name', flat=True)
         max_length = max(len(item) for item in cs_names)
-        cs_names = [item.ljust(max_length) for item in cs_names]
+        cs_names = np.array([item.ljust(max_length) for item in cs_names])
+        #summary_rounder = 8
+        #attrs = ["value_max_lk", "value_max", "value_mean", "sigma",
+        #         "value_low3", "value_low2", "value_low1",
+        #         "value_median", "value_high1", "value_high2", "value_high3"]
+        #get = self.model.get_attr_param
 
-        cs = [cs_names,
+
+        cs = np.array([cs_names,
             np.round(self.model.get_attr_param('value_max_lk', flat=True), 8),
             np.round(self.model.get_attr_param('value_max', flat=True), 8),
             np.round(self.model.get_attr_param('value_mean', flat=True), 8),
@@ -2063,20 +2084,42 @@ class emp_counsil(object):
             np.round(self.model.get_attr_param('value_high1', flat=True), 8),
             np.round(self.model.get_attr_param('value_high2', flat=True), 8),
             np.round(self.model.get_attr_param('value_high3', flat=True), 8),
-            ]
+            ])
         
+
+        for b in self.model:
+            if len(b.additional_parameters):
+                mask = [x.has_posterior for x in b.additional_parameters]
+                for p in np.array(b.additional_parameters)[mask]:
+                    h = np.array([p.name.ljust(max_length),
+                         np.round(p.value_max_lk, 8),
+                         np.round(p.value_max, 8),
+                         np.round(p.value_mean, 8),
+                         np.round(p.sigma, 8),
+                         np.round(p.value_low3, 8),
+                         np.round(p.value_low2, 8),
+                         np.round(p.value_low1, 8),
+                         np.round(p.value_median, 8),
+                         np.round(p.value_high1, 8),
+                         np.round(p.value_high2, 8),
+                         np.round(p.value_high3, 8),
+                         ])[:, None]
+                    cs = np.hstack([cs, h]).tolist()
+                    
+
+
         cs_header=['Parameter',
-                    'MaxLogl  ',
-                    'MaxPost  ',
-                    'Mean     ',
-                    'Std      ',
-                    '00.27    ',
-                    '04.55    ',
-                    '31.73    ',
-                    'Median   ',
-                    '68.26    ',
-                    '95.44    ',
-                    '99.73    ',
+                   'MaxLogl  ',
+                   'MaxPost  ',
+                   'Mean     ',
+                   'Std      ',
+                   '00.27    ',
+                   '04.55    ',
+                   '31.73    ',
+                   'Median   ',
+                   '68.26    ',
+                   '95.44    ',
+                   '99.73    ',
                     ]
         
         np.savetxt(f'{self.saveplace}/tables/chain_summary.dat',
@@ -2386,8 +2429,12 @@ class Simulation(emp_retainer, model_manager,
         self.debug.debug_snapshot()
         self.debug(f'run  : begin | {time.time()-self.time_init}')
 
-        if self.constrain_method == 'GM' and not self.gaussian_mixtures_fit:
-            msg = 'Invalid constrain_method = GM with .gaussian_mixtures_fit = False'
+        if not self.constrain['method'] in self.constrain['known_methods']:
+            msg = f'Invalid constrain[method] = {self.constrain['method']}'
+            raise SyntaxError(msg)
+
+        if self.constrain['method'] == 'GM' and not self.gaussian_mixtures_fit:
+            msg = 'Invalid constrain[method] = GM with .gaussian_mixtures_fit = False'
             raise SyntaxError(msg)
         
         # PRE-CLEAN
@@ -2586,35 +2633,34 @@ class Simulation(emp_retainer, model_manager,
 
     def _constrain_next_run(self):
         # TODO constrain options as dict
-        if not self.switch_constrain:
+        constrain_method = self.constrain['method']
+        if constrain_method=='None':
             return
-        known_methods = ['sigma', 'GM', 'range']
-        if self.constrain_method in known_methods:
-            getattr(self, f'_apply_constrain_{self.constrain_method}')()
+        if constrain_method in self.constrain['known_methods']:
+            getattr(self, f'_apply_constrain_{constrain_method}')()
         else:
-            print(f'ERROR: Constrain method {self.constrain_method} not identified')
+            print(f'ERROR: Constrain method {constrain_method} not identified')
 
 
     def _apply_constrain_sigma(self):
         for b in self.blocks__:
-            if (b.type_ == 'Keplerian' or
-                b.type_ == 'Jitter'):
+            if b.type_ in self.constrain['types']:
                 for p in b[b.C_]:
                     pval = p.value
                     psig = p.sigma
 
-                    limf = pval - self.constrain_sigma*psig
-                    limc = pval + self.constrain_sigma*psig
+                    limf = pval - self.constrain['sigma']*psig
+                    limc = pval + self.constrain['sigma']*psig
 
-                    if limc > p.limits[1]:
-                        limc = p.limits[1]
-
+                    limc = min(limc, p.limits[1])
                     if (limf < p.limits[0] or
                         b.type_ == 'Jitter'):
                         limf = p.limits[0]
 
-                    if psig / abs(pval) < 1e-5:
-                        self.add_condition([p.name, 'fixed', pval])
+                    rang = limc - limf
+
+                    if rang / abs(pval) < self.constrain['tol']:
+                        print(f'Not further constraining {p.name}.')
                     else:
                         self.add_condition([p.name, 'limits', [limf, limc]])
 
@@ -2623,7 +2669,7 @@ class Simulation(emp_retainer, model_manager,
         # TODO replace count with p.cpoint?
         count = 0
         for b in self.blocks__:
-            if b.type_ == 'Keplerian':
+            if b.type_ in self.constrain['types']:
                 for p in b[b.C_]:
                     if p.GM_parameter.n_components == 1:
                         prarg0 = [p.GM_parameter.means[0], p.GM_parameter.sigmas[0]]
@@ -2639,21 +2685,19 @@ class Simulation(emp_retainer, model_manager,
 
     def _apply_constrain_range(self):
         for b in self.blocks__:
-            if b.type_ in self.constrain_types:
+            if b.type_ in self.constrain['types']:
                 for p in b[b.C_]:
-                    limf = getattr(p, f'value_low{self.constrain_sigma}')
-                    limc = getattr(p, f'value_high{self.constrain_sigma}')
+                    limf = getattr(p, f'value_low{self.constrain['sigma']}')
+                    limc = getattr(p, f'value_high{self.constrain['sigma']}')
 
-                    if limc > p.limits[1]:
-                        limc = p.limits[1]
-
+                    limc = min(limc, p.limits[1])
                     if (limf < p.limits[0] or
                         b.type_ == 'Jitter'):
                         limf = p.limits[0]
 
                     rang = limc - limf
 
-                    if rang / abs(p.value) < 1e-4:
+                    if rang / abs(p.value) < self.constrain['tol']:
                         #self.add_condition([p.name, 'fixed', p.value])
                         print(f'Not further constraining {p.name}.')
                         pass
@@ -2746,7 +2790,7 @@ class Simulation(emp_retainer, model_manager,
 
         self.logger.message_width('Dynamical Criteria is', dyn_crit, label_width)
         self.logger.message_width('Posterior fit method is', self.posterior_dict[self.posterior_fit_method], label_width)
-        self.logger.message_width('Limits constrain method is', self.constrain_method, label_width)
+        self.logger.message_width('Limits constrain method is', self.constrain['method'], label_width)
         self.logger.message_width('Model Selection method is', self._crit_current, label_width)
 
         self.logger.line()
