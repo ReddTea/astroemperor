@@ -1,66 +1,102 @@
-# User Guide
+# EMPEROR
+Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval
 
-In depth utilities of reddemcee
+# Overview
+`EMPEROR` (Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval), is a Python-based algorithm that automatically searches for signals in Radial Velocity timeseries, employing Markov chains and parallel tempering methods, convergence tests and Bayesian statistics, along with various noise models. A number of posterior sampling routines are available, focused on efficiently searching for signals in highly multi-modal posteriors. The code allows the analysis of multi-instrument and multi-planet data sets and performs model comparisons automatically to return the optimum model that best describes the data.
 
----
+Make sure to check the [documentation!](https://astroemperor.readthedocs.io/en/latest/)
 
-asd
+## Why `EMPEROR`?
 
----
+  - It's really simple to use
+  - It has a series of configuration commands that will amaze you
+  - Advanced Noise Model
+  - Quite Flexible!
 
 
-## Installation
+# Dependencies
+This code makes use of:
 
-### Requirements
-Section in construction!
+  - [Numpy](https://numpy.org)
+  - [Scipy](https://scipy.org)
+  - [pandas](https://pandas.pydata.org)
+  - [matplotlib>=3.5.1](https://matplotlib.org)
 
-### Pip
+  - [kepler](https://github.com/dfm/kepler.py)
+  - [reddemcee](https://github.com/ReddTea/reddemcee/)
+  - [reddcolors](https://github.com/ReddTea/reddcolors/)
+  - [tabulate](https://pypi.org/project/tabulate/)
+  - [termcolor](https://pypi.python.org/pypi/termcolor)
+  - [tqdm](https://pypi.python.org/pypi/tqdm)
+
+All of them can be easily installed with pip.
+
+For additional capabilities, you can install:
+
+  - [arviz](https://arviz-devs.github.io/arviz/)
+  - [celerite2](https://celerite2.readthedocs.io/en/latest/)
+  - [corner](https://pypi.python.org/pypi/corner)
+  - [dynesty](https://dynesty.readthedocs.io/en/stable/)
+  - [emcee](http://dan.iel.fm/emcee/current/)
+  - [scikit-learn](https://scikit-learn.org/stable/)
+
+
+
+# Installation
+
+## Pip
 In the console type
 ```sh
-pip install astroemperor
+pip3 install astroEMPEROR
 ```
 
-### From Source
+## From Source
 In the console type
 ```sh
-git clone https://github.com/ReddTea/astroemperor
-cd astroemperor
-python -m pip install -e .
+git clone https://github.com/ReddTea/astroEMPEROR.git
 ```
 
----
-## APT Sampler
-View the object detail
 
----
-## FAQ
+## Installation Verification
+Download the [tests folder](https://github.com/ReddTea/astroemperor/tree/main/tests) and run `test_basic.py` to make sure everything works!
 
-### Why `EMPEROR`?
-- APT is really well suited for multimodal posteriors, as well as very large prior-volumes.
-- APT provides a reliable estimation of the bayesian evidence (Z)
+In terminal:
 
-### What is APT?
-Adaptative Parallel Tempering. I highly recommend checking proper literature as the ones suggested in the homepage!
-
-In very few sentences, Adaptive Parallel Tempering MCMC is a variant of Markov Chain Monte Carlo (MCMC) designed to improve sampling efficiency, especially for multimodal distributions. It runs multiple chains in parallel at different "temperatures". Higher temperatures explore the distribution more broadly, while lower temperatures focus on finer details. Periodically, the chains swap states, enabling better exploration of the distribution's modes. 
-
-The "adaptive" component refers to dynamically adjusting the temperature levels based on past performance, making the method more efficient over time. This combination enhances convergence and reduces the risk of getting stuck in local minima.
+```sh
+python test_basic.py
+```
 
 
-### How many walkers?
-[In construction!]
+# Quick Usage
+We need to set up our working directory with two subfolders, `datafiles` and `datalogs`, the former for data input, the later for output.
 
-- At least double the dimensions.
-- I recommend a multiple of the threads you are using to minimise idle-core time.
-- I like to scale them as an exponential of ndim.
-- You can never go wrong with more
-- More walkers means more concurrent memory usage.
+```
+📂working_directory
+ ┣ 📜mini_test.py
+ ┣ 📂datafiles
+ ┃ ┣ 📂51Peg
+ ┃ ┃ ┗ 📂RV
+ ┃ ┃ ┃ ┗ 📜51peg.vels
+ ┣ 📂datalogs
+ ┃ ┣ 📂51Peg
+ ┃ ┃ ┗ 📂run_1
+```
 
+Running the code is as simple as:
 
-### How many temps?
-[In construction!]
+```python
+import astroemperor
 
-- Really problem dependant.
-- At least 5, more than 20 seems overkill.
+sim = astroemperor.Simulation()
 
+sim.set_engine('reddemcee')
+sim.engine_config['setup'] = [2, 100, 500, 1]
+sim.load_data('51Peg')  # read from ./datafiles/
 
+sim.plot_trace['plot'] = False  # deactivate arviz plots
+sim.autorun(1, 1)  # (from=1, to=1): just 1 keplerian
+
+```
+
+# Outputs
+All results can be found in the `datalogs` folder. You will see chain plots, posterior plots, histograms, phasefolded curves, the chain sample and more!
