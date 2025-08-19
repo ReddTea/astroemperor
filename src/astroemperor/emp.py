@@ -721,13 +721,6 @@ adaptation_nsweeps = {self.reddemcee_discard}
             g["smd_history"][:] = sampler.backend.smd_history
 
 
-    ch_save = sampler.get_chain()
-    ll_save = sampler.get_log_like()
-    lp_save = sampler.get_log_prob()
-    bt_save = sampler.get_betas()
-    
-    ac_save = sampler.backend.accepted
-
     ntot = sampler.backend[0].iteration
     for t in range(ntemps):
         saver[t].grow(ntot, None)
@@ -736,11 +729,11 @@ adaptation_nsweeps = {self.reddemcee_discard}
             g = f[saver[t].name]
             g.attrs["iteration"] = ntot
 
-            g["chain"][:, :, :] = ch_save[t]
-            g["log_like"][:, :] = ll_save[t]
-            g["log_prob"][:, :] = lp_save[t]
-            g["beta_history"][:] = bt_save[t]
-            g["accepted"][:] = ac_save[t]
+            g["chain"][:, :, :] = sampler.get_chain()[t]
+            g["log_like"][:, :] = sampler.get_log_like()[t]
+            g["log_prob"][:, :] = sampler.get_log_prob()[t]
+            g["beta_history"][:] = sampler.get_betas()[t]
+            g["accepted"][:] = sampler.backend.accepted[t]
 ''')
 
 
