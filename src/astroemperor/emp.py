@@ -2422,14 +2422,14 @@ class Simulation(emp_retainer, model_manager,
         self.debug.debug_snapshot()
         self.debug(f'run  : begin | {time.time()-self.time_init}')
 
-        if not self.constrain['method'] in self.constrain['known_methods']:
-            msg = f'Invalid constrain[method] = {self.constrain['method']}'
+        if self.constrain['method'] not in self.constrain['known_methods']:
+            msg = f"Invalid constrain[method] = {self.constrain['method']}"
             raise SyntaxError(msg)
 
         if self.constrain['method'] == 'GM' and not self.gaussian_mixtures_fit:
-            msg = 'Invalid constrain[method] = GM with .gaussian_mixtures_fit = False'
+            msg = "Invalid constrain[method] = GM with .gaussian_mixtures_fit = False"
             raise SyntaxError(msg)
-        
+
         # PRE-CLEAN
         self.sampler = None
         # BURN-IN and THIN
@@ -2680,8 +2680,8 @@ class Simulation(emp_retainer, model_manager,
         for b in self.blocks__:
             if b.type_ in self.constrain['types']:
                 for p in b[b.C_]:
-                    limf = getattr(p, f'value_low{self.constrain['sigma']}')
-                    limc = getattr(p, f'value_high{self.constrain['sigma']}')
+                    limf = getattr(p, f"value_low{self.constrain['sigma']}")
+                    limc = getattr(p, f"value_high{self.constrain['sigma']}")
 
                     limc = min(limc, p.limits[1])
                     if (limf < p.limits[0] or
