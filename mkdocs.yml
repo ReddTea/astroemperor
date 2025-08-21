@@ -25,7 +25,7 @@ nav:
       #- Parallelization: tutorials/parallelization/parallelization.md
       #- Autocorrelation Analysis: tutorials/autocorrelation-analysis.md
       #- Moves: tutorials/moves.md
-  - API Reference: api.md
+  - API Reference: reference/api.md
 
 theme:
   name: material  # material  # readthedocs # mkdocs #
