@@ -729,11 +729,11 @@ adaptation_nsweeps = {self.reddemcee_discard}
             g = f[saver[t].name]
             g.attrs["iteration"] = ntot
 
-            g["chain"][:, :, :] = sampler.get_chain()[t]
-            g["log_like"][:, :] = sampler.get_log_like()[t]
-            g["log_prob"][:, :] = sampler.get_log_prob()[t]
-            g["beta_history"][:] = sampler.get_betas()[t]
-            g["accepted"][:] = sampler.backend.accepted[t]
+            g["chain"][:, :, :] = sampler.backend[t].get_chain()
+            g["log_like"][:, :] = sampler.backend[t].get_log_like()
+            g["log_prob"][:, :] = sampler.backend[t].get_log_prob()
+            g["beta_history"][:] = sampler.backend[t].get_betas()
+            g["accepted"][:] = sampler.backend[t].accepted
 ''')
 
 
@@ -2382,9 +2382,16 @@ class Simulation(emp_retainer, model_manager,
 
             self.k_start += 1
 
+
+
             if self._check_continue_run():
                 self.logger.end_run_message()
                 break
+
+            # free some memory
+            self._delete_backends()
+            self._clear_samples()
+
 
             self.logger.next_run_message()
             #self.logger._add_subtitle('~~~~~~~~~~~~~~~')
@@ -2394,7 +2401,7 @@ class Simulation(emp_retainer, model_manager,
 
             self._load_next_model()
 
-            self._delete_backends()
+
 
             # CLEAN RUNS
             # CLEAN LOGS! or make a clear separator
@@ -2618,10 +2625,30 @@ class Simulation(emp_retainer, model_manager,
     def _delete_backends(self):
         if not self.save_backends:
             if self.engine__.__name__ == 'reddemcee':
-                os.system(f'rm {self.saveplace}/restore/backends/*.h5')
+                ext = 'h5'
+            elif self.engine__.__name__ == 'dynesty':
+                ext = 'pkl'
+            else:
+                print(f'BACKENDS NOT DELETED FOR ENGINE {self.engine__.__name__}')
 
-            if self.engine__.__name__ == 'dynesty':
-                os.system(f'rm {self.saveplace}/restore/backends/*.pkl')
+            os.system(f'rm {self.saveplace}/restore/backends/*.{ext}')
+
+
+    def _clear_samples(self):
+        getattr(self, f'_clear_samples_{self.engine__.__name__}')()
+        
+
+    def _clear_samples_reddemcee(self):
+        ntemps = self.engine_config['setup'][0]
+        self.chain = np.empty(ntemps, dtype=object)
+        self.likes = np.empty(ntemps, dtype=object)
+        self.posts = np.empty(ntemps, dtype=object)
+
+    def _clear_samples_dynesty(self):
+        ntemps = 1
+        self.chain = np.empty(ntemps, dtype=object)
+        self.likes = np.empty(ntemps, dtype=object)
+        self.posts = np.empty(ntemps, dtype=object)
 
 
     def _constrain_next_run(self):
