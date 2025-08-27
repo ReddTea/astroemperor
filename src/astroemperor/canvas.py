@@ -1859,109 +1859,113 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
 
 
                     for pi in range(b.ndim_):
-                        ch = ch0[:, b.cpointer[pi]]
-                        ax = axes if b.ndim_ == 1 else axes[pi]
-
                         param = b[b.C_][pi]
-                        mu, sigma = norm.fit(ch)
-                        # first histogram of the data
-                        n, bins = np.histogram(ch, bins=num_bins, density=dens_bool)
-
-                        # Get the maximum and the data around it!!
-                        maxi = ch[np.where(pt == np.amax(pt))][0]
-                        dif = np.fabs(maxi - bins)
-                        his_max = bins[np.where(dif == np.amin(dif))]
-
-                        res = np.where(n == 0)[0]  # Find the zeros!!
-                        if res.size:
-                            if len(res) > 2:
-                                for j in range(len(res)):
-                                    if res[j + 2] - res[j] == 2:
-                                        sub = j
-                                        break
-                            else:
-                                sub = res[0]
-
-                            # Get the data subset!!
-                            if bins[sub] > his_max:
-                                pt = pt[np.where(ch <= bins[sub])]
-                                ch = ch[np.where(ch <= bins[sub])]
-                            else:
-                                pt = pt[np.where(ch >= bins[sub])]
-                                ch = ch[np.where(ch >= bins[sub])]
+                        try:
+                            ch = ch0[:, b.cpointer[pi]]
+                            ax = axes if b.ndim_ == 1 else axes[pi]
 
 
-                        # Get the maximum and the data around it!!
-                        _param_value_max = param.value_max
-                        _param_value_mean = param.value_mean
+                            mu, sigma = norm.fit(ch)
+                            # first histogram of the data
+                            n, bins = np.histogram(ch, bins=num_bins, density=dens_bool)
 
-                        n, bins, patches = ax.hist(ch,
-                                                num_bins,
-                                                density=True,
-                                                facecolor=Color_Cycler[b.bnumber_-1],
-                                                edgecolor=rc.bg,
-                                                linewidth=3,
-                                                alpha=0.6,
-                                                )
+                            # Get the maximum and the data around it!!
+                            maxi = ch[np.where(pt == np.amax(pt))][0]
+                            dif = np.fabs(maxi - bins)
+                            his_max = bins[np.where(dif == np.amin(dif))]
 
-                        mu, sigma = norm.fit(ch)
-                        var = sigma**2.
+                            res = np.where(n == 0)[0]  # Find the zeros!!
+                            if res.size:
+                                if len(res) > 2:
+                                    for j in range(len(res)):
+                                        if res[j + 2] - res[j] == 2:
+                                            sub = j
+                                            break
+                                else:
+                                    sub = res[0]
 
-                        # Some Stats!!
-                        skew0 = np.round(skew(ch), 3)
-                        kurt0 = np.round(kurtosis(ch), 3)
-                        medi0 = np.round(np.median(ch), 3) 
-                        mode0 = np.round(mode(ch)[0], 3)
-
-                        mu0 = np.round(mu, 3)
-                        var0 = np.round(var, 3)
-
-
-                        # Make a model x-axis!!
-                        span = bins[len(bins) - 1] - bins[0]
-                        bins_x = ((np.arange(num_bins * 100.) /
-                                (num_bins * 100.)) * span) + bins[0]
-                        
-                        # Renormalised to the histogram maximum!!
-                        y = np.exp(-np.power((bins_x - mu) / sigma, 2.) / 2.) * np.amax(n)
-
-                        ax.plot(bins_x, y, rc.bg, linewidth=4)
-                        ax.plot(bins_x, y, 'r', linewidth=3)
-
-                        ax.set_xlabel(f'{param.name} {param.unit}',
-                                      **label_kwargs)
-
-                        ax.tick_params(axis='x', labelsize=fm_tick_xsize)
-                        ax.tick_params(axis='y', labelsize=fm_tick_ysize)
+                                # Get the data subset!!
+                                if bins[sub] > his_max:
+                                    pt = pt[np.where(ch <= bins[sub])]
+                                    ch = ch[np.where(ch <= bins[sub])]
+                                else:
+                                    pt = pt[np.where(ch >= bins[sub])]
+                                    ch = ch[np.where(ch >= bins[sub])]
 
 
-                        # Get the axis positions!!
-                        ymin, ymax = ax.get_ylim()
-                        xmin, xmax = ax.get_xlim()
+                            # Get the maximum and the data around it!!
+                            _param_value_max = param.value_max
+                            _param_value_mean = param.value_mean
 
-                        ax.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
-                                * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$", size=28)
-                        
+                            n, bins, patches = ax.hist(ch,
+                                                    num_bins,
+                                                    density=True,
+                                                    facecolor=Color_Cycler[b.bnumber_-1],
+                                                    edgecolor=rc.bg,
+                                                    linewidth=3,
+                                                    alpha=0.6,
+                                                    )
 
-                        left_fact = 0.9
-                        right_fact = 0.4
-                        textsize = 26
-                        ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
-                                * 0.180, r"$\mu_1 ={}$".format(mu0), size=textsize)
-                        ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
-                                * 0.265, r"$\sigma^2 ={}$".format(var0), size=textsize)
-                        ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
-                                * 0.350, r"$\mu_3 ={}$".format(skew0), size=textsize)
-                        
+                            mu, sigma = norm.fit(ch)
+                            var = sigma**2.
 
-                        ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
-                                * 0.180, r"$\mu_4 ={}$".format(kurt0), size=textsize)
-                        ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
-                                * 0.265, r"$Median ={}$".format(medi0), size=textsize)
-                        ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
-                                * 0.350, r"$Mode ={}$".format(mode0), size=textsize)
-                        
-    
+                            # Some Stats!!
+                            skew0 = np.round(skew(ch), 3)
+                            kurt0 = np.round(kurtosis(ch), 3)
+                            medi0 = np.round(np.median(ch), 3)
+                            mode0 = np.round(mode(ch)[0], 3)
+
+                            mu0 = np.round(mu, 3)
+                            var0 = np.round(var, 3)
+
+
+                            # Make a model x-axis!!
+                            span = bins[len(bins) - 1] - bins[0]
+                            bins_x = ((np.arange(num_bins * 100.) /
+                                    (num_bins * 100.)) * span) + bins[0]
+
+                            # Renormalised to the histogram maximum!!
+                            y = np.exp(-np.power((bins_x - mu) / sigma, 2.) / 2.) * np.amax(n)
+
+                            ax.plot(bins_x, y, rc.bg, linewidth=4)
+                            ax.plot(bins_x, y, 'r', linewidth=3)
+
+                            ax.set_xlabel(f'{param.name} {param.unit}',
+                                        **label_kwargs)
+
+                            ax.tick_params(axis='x', labelsize=fm_tick_xsize)
+                            ax.tick_params(axis='y', labelsize=fm_tick_ysize)
+
+
+                            # Get the axis positions!!
+                            ymin, ymax = ax.get_ylim()
+                            xmin, xmax = ax.get_xlim()
+
+                            ax.text(xmax - (xmax - xmin) * 0.65, ymax - (ymax - ymin)
+                                    * 0.1, r"$\mathcal{N}(\mu_1,\sigma^2,\mu_3,\mu_4)$", size=28)
+
+
+                            left_fact = 0.9
+                            right_fact = 0.4
+                            textsize = 26
+                            ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
+                                    * 0.180, r"$\mu_1 ={}$".format(mu0), size=textsize)
+                            ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
+                                    * 0.265, r"$\sigma^2 ={}$".format(var0), size=textsize)
+                            ax.text(xmax - (xmax - xmin) * left_fact, ymax - (ymax - ymin)
+                                    * 0.350, r"$\mu_3 ={}$".format(skew0), size=textsize)
+
+
+                            ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
+                                    * 0.180, r"$\mu_4 ={}$".format(kurt0), size=textsize)
+                            ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
+                                    * 0.265, r"$Median ={}$".format(medi0), size=textsize)
+                            ax.text(xmax - (xmax - xmin) * right_fact, ymax - (ymax - ymin)
+                                    * 0.350, r"$Mode ={}$".format(mode0), size=textsize)
+
+                        except Exception:
+                            print(f'Failed to plot the {param.name} histogram')
+
                     pl.tight_layout()
                     pl.savefig(saveplace+f'/plots/histograms/{ti}_temp/{b.name_}.{ptfmt}',
                                 bbox_inches='tight')
@@ -1969,10 +1973,7 @@ def plot_histograms(chains=[], posts=[], options={}, my_model=None, ncores=None)
                     pl.close()
                     pbar.update(1)
 
-            else:
-                pass
-            
-    
+
     pbar.close()
     gc.collect()
     pass
