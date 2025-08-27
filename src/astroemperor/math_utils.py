@@ -28,20 +28,45 @@ def adelinearize(s, c):
     return np.array([A, B])
 
 
-def cps(pers, amps, eccs, starmass):
+def cps(pers, amps, eccs, starmass, dM=None):
     #sma, minmass = np.zeros(kplanets), np.zeros(kplanets)
-    G = 6.674e-11  # m3 / (kg * s2)
-    #m2au = 6.685e-12  # au
-    #kg2sm = 5.03e-31  # solar masses
-    #s2d = 1.157e-5  # days
-    #G_ = G * m2au**3 / (kg2sm*s2d)  # au3 / (sm * d2)
+    G = 6.6743e-11          # m3 / (kg * s2)
+    M_sun = 1.98847e30      # kg
+    AU  = 1.495978707e11    # m
+    day_to_sec = 86400.0    # s
+    Kconst = 28.4329        # canonical constant, m/s
 
-    consts = 4*np.pi**2/(G*1.99e30)
+    # Vectorise inputs
+    P_d = np.asarray(pers, dtype=float)
+    K   = np.asarray(amps, dtype=float)
+    e   = np.asarray(eccs, dtype=float)
 
-    sma = ((pers*24*3600)**2 * starmass / consts)**(1./3) / 1.49598e11
-    minmass = amps / ( (28.4329/np.sqrt(1. - eccs**2.)) * (starmass**(-0.5)) * (sma**(-0.5)) )
+    if dM:
+        frac = dM / starmass
+        sigma_ln = np.sqrt(np.log1p(frac**2))
+        mu_ln = np.log(starmass) - 0.5 * sigma_ln**2
+        M = np.random.lognormal(mean=mu_ln, sigma=sigma_ln, size=P_d.shape)
+
+    else:
+        M = starmass
+
+    # Semi-major axis (Kepler's 3rd; ignore m_p):
+    P = P_d * day_to_sec
+    a_m = (G * (M * M_sun) * P**2 / (4.0 * np.pi**2))**(1.0/3.0)  # metres
+    sma = a_m / AU  # AU
+
+    # Minimum mass in M_Jup using the "a" form:
+    # K = 28.4329 m/s * (mpsini/M_Jup) * (a/AU)^(-1/2) * (M/M_sun)^(-1/2) * (1-e^2)^(-1/2)
+    minmass = (K / Kconst) * np.sqrt(1.0 - e**2) * np.sqrt(M * sma)  # M_Jup
 
     return sma, minmass
+
+
+def fold_mass_uncertainty(a, a_err, msini, msini_err, M0, M_err):
+    frac = M_err / M0
+    a_err_new = np.sqrt(a_err**2 + (a * (frac/3.0))**2)
+    msini_err_new = np.sqrt(msini_err**2 + (msini * (2.0*frac/3.0))**2)
+    return a_err_new, msini_err_new
 
 
 def hdi_of_samples(samples, cred_mass=0.9):
