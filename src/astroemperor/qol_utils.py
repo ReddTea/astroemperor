@@ -153,6 +153,8 @@ class DataWrapper(object):
             # which catalogs we are using
             if identifier == 'hipgaia.hg123':
                 m['AM_cata'] = True
+                m['AM_astro'] = True
+
                 m['df_hg123'] = pd.read_csv(ff, sep=r'\s+')
 
             # hipp iad
@@ -166,11 +168,8 @@ class DataWrapper(object):
                 m['df_gost'] = pd.read_csv(ff)
                 m['df_gost'].columns = m['df_gost'].columns.astype(str).str.strip()
 
-            # gaia astro
             elif identifier == 'hipgaia.astro':
-                m['AM_astro'] = True
-                m['df_astro'] = pd.read_csv(ff, sep=r'\s+')
-
+                pass
 
             elif identifier == 'Image.rel1':
                 m['AM_relAst'] = True
@@ -178,6 +177,11 @@ class DataWrapper(object):
                 
             else:
                 print(f'File format not identified for {identifier}')
+            # gaia astro
+            '''
+                m['AM_astro'] = True
+                m['df_astro'] = pd.read_csv(ff, sep=r'\s+')
+            '''
 
             str2prt += f'\nReading data from {file}'
         return str2prt
