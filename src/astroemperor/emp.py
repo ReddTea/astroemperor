@@ -77,6 +77,7 @@ class emp_retainer(object):
         self.rounder_math = 2
         self.rounder_tables = 2
         self.starmass = 1.
+        self.starmass_err = None
         self.multiprocess_method = 1
         self.cores__ = _CORES
         self.evidence = (-np.inf, np.inf)
@@ -120,6 +121,10 @@ class emp_retainer(object):
         self.posterior_dict = {'GM': 'Gaussian Mixtures',
                                'KDE': 'Kernel Density Estimation',
                                None: 'None'}
+
+        self.evidence_method = 'thermodynamic_integration'
+        #self.evidence_method = 'stepping_stones'
+        #self.evidence_method = 'hybrid_evidence'
 
 
     def _sampler_config(self):
@@ -374,6 +379,9 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
         if in_func:
             with open('temp_kernel01', 'w') as f:
                 f.write(f'''
+    #S0_1 = theta_gp[2] * theta_gp[0] ** 2 / (2*theta_gp[1]*np.pi**2)
+    #S0_2 = theta_gp[3] * theta_gp[0] ** 2 / (8*theta_gp[1]*np.pi**2)
+                        
     kernel = cterms.SHOTerm(S0=theta_gp[2], rho=theta_gp[0], tau=theta_gp[1])
     kernel += cterms.SHOTerm(S0=theta_gp[3], rho=theta_gp[0]*0.5, tau=theta_gp[1])
     gp_.kernel = kernel
@@ -1200,6 +1208,7 @@ class model_manager(object):
         prargs = [self.eccentricity_limits, self.eccentricity_prargs]
         kw = {'prargs':prargs, 'dynamics':self.switch_dynamics,
               'kplan':self.kplanets__, 'starmass':self.starmass,
+              'starmass_err':self.starmass_err,
               'dynamics_already_included':self.dynamics_already_included}
         
         # I like to insert in a specific position :s
@@ -1376,7 +1385,7 @@ class emp_counsil(object):
         self.reddemcee_dict = {'discard':self.reddemcee_discard,
                                'thin':self.reddemcee_thin,
                                'flat':True}
-        
+
         raw_chain0 = self.sampler.get_chain(**self.reddemcee_dict)
         raw_likes0 = self.sampler.get_log_like(**self.reddemcee_dict)
         raw_posts0 = self.sampler.get_log_prob(**self.reddemcee_dict)
@@ -1400,12 +1409,14 @@ class emp_counsil(object):
             self.chain = raw_chain0
             self.likes = raw_likes0
             self.posts = raw_posts0
-    
+
         # TODO move to... ?
         if self.switch_evidence:
             try:
-                zaux = self.sampler.thermodynamic_integration(discard=self.reddemcee_discard)
-            except:
+                #zaux = self.sampler.thermodynamic_integration(discard=self.reddemcee_discard)
+                zaux = getattr(self.sampler, self.evidence_method)(discard=self.reddemcee_discard)[:2]
+
+            except Exception:
                 print('Thermodynamic Integration interpolation failed! Using classic method...')
                 zaux = self.sampler.thermodynamic_integration_classic(discard=self.reddemcee_discard)
             self.evidence = zaux[0], zaux[1]
@@ -1649,8 +1660,8 @@ class emp_counsil(object):
 
 
                     if self.starmass:
-                        sma, mm = cps(per, A, ecc, self.starmass)
-                        sma_, mm_ = cps(per_, A_, ecc_, self.starmass)
+                        sma, mm = cps(per, A, ecc, self.starmass)  # No starmass error
+                        sma_, mm_ = cps(per_, A_, ecc_, self.starmass, self.starmass_err)
 
                         if b.astrometry_bool:
                             mm = mm/np.sin(inc)
