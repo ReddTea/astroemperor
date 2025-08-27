@@ -325,17 +325,33 @@ class ReddModel(object):
         
         if self.switch_AM:
             self.AM_hg123.to_csv(f'{saveloc}temp_hg123{tail}.csv')
-            self.AM_abs.to_csv(f'{saveloc}temp_abs{tail}.csv')
+            self.AM_hipp.to_csv(f'{saveloc}temp_hipp{tail}.csv')
             self.AM_gost.to_csv(f'{saveloc}temp_gost{tail}.csv')
+            self.AM_astro.to_csv(f'{saveloc}temp_astro{tail}.csv')
 
-            c = 0
-            for GDR in self.AM_cats:
-                np.savetxt(f'{saveloc}GSV_{GDR}.txt', self.data_AM['Gaia_solution_vector'][c])
+            for cat in self.AM_cats:
+                np.savetxt(f'{saveloc}temp_AM_GSV_{cat}.csv', self.AM_GSV[cat])
 
-            self.data_AM['astro_gost'].to_csv(f'{saveloc}astro_gost{tail}.csv')
+
+
+            np.save(f'{saveloc}temp_AM_inv_COV{tail}', self.AM_inv_COV)
             
+            #np.savetxt(f'{saveloc}temp_AM_inv_COV{tail}.csv', self.AM_inv_COV)
+            np.savetxt(f'{saveloc}temp_AM_log_det_COV{tail}.csv', self.AM_log_det_COV)
+
+
+            #np.array().to_csv()
+            #np.array(self.AM_log_det_COV).to_csv(f'{saveloc}temp_AM_log_det_COV{tail}.csv')
+            #np.savez(f'{saveloc}temp_AM_log_det_COV{tail}', **self.AM_log_det_COV)
+
+
             self.data_AM['dead_gdr2'].to_csv(f'{saveloc}dead_gdr2{tail}.csv')
             self.data_AM['dead_gdr3'].to_csv(f'{saveloc}dead_gdr3{tail}.csv')
+
+            np.save(f'{saveloc}temp_AM_mask_GDR2{tail}', self.mask_GDR2)
+            np.save(f'{saveloc}temp_AM_mask_GDR3{tail}', self.mask_GDR3)
+
+
 
             # TODO: rel
 
@@ -404,15 +420,11 @@ SAI{sai_count}_ = my_data.iloc[:, {3+sai_count}].values
                     sai_count += 1
 
     def _write_data_AM_backup(self, f, saveloc, tail):
-        # TODO, add switches self.model.data_AM['AM_abs']
         f.write(f'''
-
-from numpy.linalg import inv, slogdet
-                
 
 # BEGIN WRITE_DATA_AM FROM MODEL
 data_hg123 = pd.read_csv('{saveloc}temp_hg123{tail}.csv', index_col=0)
-data_abs = pd.read_csv('{saveloc}temp_abs{tail}.csv', index_col=0)
+data_hipp = pd.read_csv('{saveloc}temp_abs{tail}.csv', index_col=0)
 data_gost = pd.read_csv('{saveloc}temp_gost{tail}.csv', index_col=0)
 AM_astro_gost = pd.read_csv('{saveloc}astro_gost{tail}.csv', index_col=0)
 #data_relast = pd.read_csv('{saveloc}temp_relast{tail}.csv')
@@ -435,7 +447,7 @@ AM_DT = AM_tt - AM_catalog_array[AM_iref, 0]  # Observations at the reference in
 AM_obs = AM_catalog_array[AM_iref, 1:]  # Time differences relative to GDR3 epoch
 
 # Extract observation times for astrometry data
-AM_abs_T = data_abs['BJD'].values  # Hipparcos observation times
+AM_abs_T = data_hipp['BJD'].values  # Hipparcos observation times
 AM_gost_T = data_gost['BJD'].values  # GOST observation times
 AM_gost_T_refed = AM_gost_T - AM_tt[AM_iref]  # Time differences relative to GDR3 epoch
 AM_t_all = np.concatenate([AM_abs_T, AM_gost_T])  # Combine all observation times
@@ -443,10 +455,10 @@ AM_t_all = np.concatenate([AM_abs_T, AM_gost_T])  # Combine all observation time
 # Parallax at reference epoch
 AM_PLX = data_hg123['parallax'].values[AM_iref]
 
-
-AM_flags = np.array([], dtype=float)
-AM_flags = np.append(AM_flags, np.repeat('HIP', len(AM_abs_T)))
-AM_flags = np.append(AM_flags, np.repeat('GOST', len(AM_gost_T)))
+# add names
+#AM_flags = np.array([], dtype=float)
+#AM_flags = np.append(AM_flags, np.repeat('HIP', len(AM_abs_T)))
+#AM_flags = np.append(AM_flags, np.repeat('GOST', len(AM_gost_T)))
 
 
 # Astrometry constants
@@ -583,54 +595,40 @@ common_t = {self.common_t}
 
 
     def _write_data_AM(self, f, saveloc, tail):
-        # TODO, add switches self.model.data_AM['AM_abs']
-        f.write(f'''
-                
-# CONSTANTS
-LOG_2PI      = np.log(2*np.pi)
-MAS_PER_DEG  = np.longdouble(3.6e6)   # 1 deg = 3.6e6 mas
-DEG2MAS = np.longdouble(3.6e6)
-PC_PER_KPC   = 1e3
-DAY_PER_YEAR = 365.25
-PC2AU        = 206265
-AUYR2KMS     = 4.74047
-
-def mas2deg(x):
-    return np.longdouble(x) / MAS_PER_DEG         
-
-def bl2xyz(b_rad, l_rad):
-    # Converts spherical coordinates (latitude b_rad and 
-    # longitude l_rad) to Cartesian coordinates (x, y, z)
-    x = np.cos(b_rad) * np.cos(l_rad)
-    y = np.cos(b_rad) * np.sin(l_rad)
-    z = np.sin(b_rad)
-    return np.array([x,y,z])
-                
-def xyz2bl_vec(x,y,z):
-    # Converts Cartesian coordinates back to spherical coordinates.
-    b = np.arctan2(z,np.sqrt(x**2+y**2))
-    ind = b>np.pi/2
-    if(np.sum(ind)>0):
-        b[ind] = b[ind]-np.pi
-    l = np.arctan2(y,x)%(2*np.pi)
-    return b,l
-                
+        f.write(open(get_support('astrometry/constants.scr')).read())
+        
+        f.write(f'''       
 
 # BEGIN WRITE_DATA_AM FROM MODEL
 data_hg123 = pd.read_csv('{saveloc}temp_hg123{tail}.csv', index_col=0)
-data_iad_hipp = pd.read_csv('{saveloc}temp_abs{tail}.csv', index_col=0)
+data_iad_hipp = pd.read_csv('{saveloc}temp_hipp{tail}.csv', index_col=0)
 data_iad_gost = pd.read_csv('{saveloc}temp_gost{tail}.csv', index_col=0)
-AM_astro_gost = pd.read_csv('{saveloc}astro_gost{tail}.csv', index_col=0)
+AM_astro_gost = pd.read_csv('{saveloc}temp_astro{tail}.csv', index_col=0)
 #data_relast = pd.read_csv('{saveloc}temp_relast{tail}.csv')
 
-# Load Dead Points Data
-data_dead_gdr2 = pd.read_csv('{saveloc}dead_gdr2{tail}.csv', comment='#', index_col=0)
-data_dead_gdr3 = pd.read_csv('{saveloc}dead_gdr3{tail}.csv', comment='#', index_col=0)
+# LOAD COV MATRIX
+#AM_GSV = pd.read_csv(f'{saveloc}temp_AM_GSV{tail}.csv', index_col=0)
+#AM_inv_COV = pd.read_csv(f'{saveloc}temp_AM_inv_COV{tail}.csv', index_col=0)
+#AM_log_det_COV = pd.read_csv(f'{saveloc}temp_AM_log_det_COV{tail}.csv', index_col=0)
 
+AM_GSV = dict([
+    ('GDR2', np.loadtxt('{saveloc}temp_AM_GSV_GDR2.csv')),
+    ('GDR3', np.loadtxt('{saveloc}temp_AM_GSV_GDR3.csv')),
+])
+
+AM_inv_COV = np.load('{saveloc}temp_AM_inv_COV{tail}.npy')
+AM_log_det_COV = np.loadtxt('{saveloc}temp_AM_log_det_COV{tail}.csv')
+
+
+#AM_inv_COV = np.loadtxt(f'{saveloc}temp_AM_inv_COV{tail}.csv')
+
+#AM_log_det_COV = np.load(f'{saveloc}temp_AM_log_det_COV{tail}')
 # Define catalogs and reference index
 AM_cats_ = {self.AM_cats}
 AM_iref_ = -1  # Reference index pointing to GDR3 data
 
+
+# TODO Do this in datawrapper
 # Extract necessary columns from data_hg123
 columns_to_extract = ['ref_epoch', 'ra', 'dec', 'parallax', 'pmra', 'pmdec', 'radial_velocity']
 AM_catalogs_ = data_hg123[columns_to_extract].values
@@ -664,8 +662,8 @@ PARF_HIPP_ = data_iad_hipp['PARF'].values
 RES_HIPP_ = data_iad_hipp['RES'].values
 SRES_HIPP_ = data_iad_hipp['SRES'].values
 
-CPSI_GOST_ = np.cos(data_iad_gost['psi'].values)
-SPSI_GOST_ = np.sin(data_iad_gost['psi'].values)
+CPSI_GOST_ = data_iad_gost['CPSI'].values
+SPSI_GOST_ = data_iad_gost['SPSI'].values
 PARF_GOST_ = data_iad_gost['parf'].values
 
 
@@ -677,139 +675,14 @@ N_HIPP = len(time_iad_hipp)
 N_GOST = len(time_iad_gost)
 N_IAD = len(time_iad_all)
 
-AM_hipp_epoch = 2448348.75
-AM_GDR1_ref_ep = 2457023.5
-AM_GDR2_ref_ep = 2457206
-AM_GDR3_ref_ep = 2457388.5
-
-AM_GDR1_baseline = 2457281.5
-AM_GDR2_baseline = 2457532
-AM_GDR3_baseline = 2457902
-
-gaia_offset = 1717.6256
-gaia_scale_factor = DAY_PER_YEAR / 1461
-
-# flags for IAD
-AM_flags = np.array([], dtype=float)
-AM_flags = np.append(AM_flags, np.repeat('HIPP', N_HIPP))
-AM_flags = np.append(AM_flags, np.repeat('GOST', N_GOST))
-
-
-# Convert dead intervals for GDR2/3
-data_dead_gdr2['start'] = 2457023.75 + (data_dead_gdr2['start'] - 1717.6256)/(1461)*DAY_PER_YEAR
-data_dead_gdr3['start'] = 2457023.75 + (data_dead_gdr3['start'] - 1717.6256)/(1461)*DAY_PER_YEAR
-
-data_dead_gdr2['end']   = 2457023.75 + (data_dead_gdr2['end'] - 1717.6256)/(1461)*DAY_PER_YEAR
-data_dead_gdr3['end']   = 2457023.75 + (data_dead_gdr3['end'] - 1717.6256)/(1461)*DAY_PER_YEAR
-
-# Create validity masks for GDR2 and GDR3
-
-am_valid1 = np.ones(N_GOST, dtype=bool)
-am_valid2 = np.ones(N_GOST, dtype=bool)
-am_valid3 = np.ones(N_GOST, dtype=bool)
-
-for dead in data_dead_gdr2.values:
-    am_valid2[np.logical_and(time_iad_gost >= dead[0], time_iad_gost <= dead[1])] = 0
-
-for dead in data_dead_gdr3.values:
-    am_valid3[np.logical_and(time_iad_gost >= dead[0], time_iad_gost <= dead[1])] = 0
-
-
-mask_GDR2 = time_iad_gost < AM_GDR2_baseline
-mask_GDR3 = time_iad_gost < AM_GDR3_baseline
-
-mask_GDR2 &= am_valid2
-mask_GDR3 &= am_valid3
+mask_GDR2 = np.load('{saveloc}temp_AM_mask_GDR2{tail}.npy')
+mask_GDR3 = np.load('{saveloc}temp_AM_mask_GDR3{tail}.npy')
 
 # Prepare a Gaia loop descriptor
 GAIA_CATS = dict(GDR2=dict(mask=mask_GDR2, row=0, cov_idx=1),
                  GDR3=dict(mask=mask_GDR3, row=1, cov_idx=2),
                  )
-             
 
-
-# COEFS
-
-AM_coeffs = dict()
-
-for cat in AM_cats_:
-    if cat == 'GDR2':
-        dgost = data_iad_gost[mask_GDR2]
-        ref_ep = AM_GDR2_ref_ep
-    elif cat == 'GDR3':
-        dgost = data_iad_gost[mask_GDR3]
-        ref_ep = AM_GDR3_ref_ep
-    else:
-        continue  # Skip unknown catalogs
-
-    dgost_psi = dgost['psi'].values
-    dgost_time = dgost['BJD'].values - ref_ep
-    time_factor = dgost_time / DAY_PER_YEAR
-
-    sin_psi = np.sin(dgost_psi)
-    cos_psi = np.cos(dgost_psi)
-
-    AM_coeffs[cat] = dict([
-        ('a1', sin_psi),
-        ('a2', cos_psi),
-        ('a3', dgost['parf'].values),
-        ('a4', time_factor * sin_psi),
-        ('a5', time_factor * cos_psi)
-        ])
-
-
-# Gaia Solution Vector
-
-AM_GSV = dict()
-
-for cat in AM_cats_:
-    coeffs = AM_coeffs[cat]
-    XX_dr = np.column_stack([
-        coeffs['a1'],
-        coeffs['a2'],
-        coeffs['a3'],
-        coeffs['a4'],
-        coeffs['a5']
-    ])
-
-    # Use pseudo-inverse for stability
-    solution_vector = np.linalg.pinv(XX_dr)
-    AM_GSV[cat] = solution_vector
-
-
-# COV ASTRO
-
-def construct_cov(catalog_data):
-    keys = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
-    num_entries = len(catalog_data)
-    cov_matrices = np.zeros((num_entries, 5, 5), dtype=float)
-
-    for idx, row in catalog_data.iterrows():
-        cov_matrix = np.zeros((5, 5), dtype=float)
-        for i, key_i in enumerate(keys):
-            error_key = f'{{key_i}}_error'
-            cov_matrix[i, i] = row[error_key] ** 2
-            for j in range(i + 1, 5):
-                key_j = keys[j]
-                cov_key = f'{{key_i}}_{{key_j}}_cov'
-                cov_value = row[cov_key]
-                cov_matrix[i, j] = cov_matrix[j, i] = cov_value
-        cov_matrices[idx] = cov_matrix
-
-    return cov_matrices
-
-AM_COV = construct_cov(data_hg123)
-AM_inv_COV = []
-AM_log_det_COV = []
-
-
-for cov_matrix in AM_COV:
-    inv_cov_matrix = inv(cov_matrix)
-    sign, log_det_cov = slogdet(cov_matrix)
-    if sign <= 0:
-        raise ValueError("Covariance matrix for "+str(cat)+ "is not positive definite.")
-    AM_inv_COV.append(inv_cov_matrix)
-    AM_log_det_COV.append(log_det_cov)
 
 common_t = {self.common_t}
 
@@ -1342,8 +1215,7 @@ def loglike_AM(theta):
 
 
     def _write_model_AM(self, f):
-        # self.model.data_AM['AM_abs']
-        if self.data_AM['AM_abs']:
+        if self.data_AM['AM_cata']:
             for b in self:
                 if b.type_ == 'AstrometryOffset':
                     # helpers
@@ -1821,21 +1693,23 @@ def loglike_AM(theta):
         self.data_AM = data_AM
         
         # astro_array
-        #to_get = ['ref_epoch','ra','dec','parallax','pmra','pmdec','radial_velocity']
-        self.AM_hg123 = self.data_AM['df_hg123']#[to_get].values
-        self.AM_abs = self.data_AM['df_abs']#[to_get].values
-        self.AM_gost = self.data_AM['df_gost']#[to_get].values
+        self.AM_hg123 = self.data_AM['df_hg123']
+        self.AM_hipp = self.data_AM['df_hipp']
+        self.AM_gost = self.data_AM['df_gost']
+        #self.AM_astro = self.data_AM['df_astro']
+        self.AM_astro = self.data_AM['df_astro']
+        
         #self.AM_relast = self.data_AM['df_hg123']#[to_get].values
 
         self.AM_cats = self.data_AM['cats']
         self.common_t = self.data_AM['common_t']
-        #self.AM_tt = self.AM_astro_array[:, 0]
-        #iref = -1  # ref to GDR3
-        #self.AM_DT = self.AM_tt - self.AM_astro_array[iref,0]
-        #self.AM_obs = self.AM_astro_array[iref, 1:]
 
+        self.AM_GSV = self.data_AM['AM_GSV']
+        self.AM_inv_COV = self.data_AM['AM_inv_COV']
+        self.AM_log_det_COV = self.data_AM['AM_log_det_COV']
 
-        #self.data_AM = {'astro_array':self.AM_astro_array,}
+        self.mask_GDR2 = self.data_AM['mask_GDR2']
+        self.mask_GDR3 = self.data_AM['mask_GDR3']
 
 
 

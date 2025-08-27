@@ -103,33 +103,72 @@ class DataWrapper(object):
     def mk_AM(self):
         m = self['AM']
         str2prt = ''
-        m['AM_cata'] = False
-        m['AM_abs'] = False
-        m['AM_gost'] = False
-        m['AM_relAst'] = False
 
-        self.set_reference_epochs()
 
+        self.AM_set_data_constants()
+
+        self.AM_load_files()
+
+        self.AM_process_data()
+
+        #self.astrometry_epochs()
+
+        #self.astro_gost()
+
+        return str2prt
+
+
+    def AM_process_data(self):
+        # which catalogs we are using
+        m = self['AM']
+        if m['AM_cata'] == True:
+            # df_hg123
+            self.astrometry_hg123()
+
+        if m['AM_astro'] == True:
+            self.astrometry_astro()
+
+        if m['AM_hipp'] == True:
+            # df_hipp
+            self.astrometry_hipp()
+
+        if m['AM_gost'] == True:
+            self.astrometry_gost()
+
+        #if identifier == 'hipgaia.astro':
+        #    m['df_astro'] = pd.read_csv(ff, sep=r'\s+')
+
+
+        if m['AM_relAst'] == True:
+            print('Relative Astrometry not yet implemented')
+
+
+    def AM_load_files(self):
+        str2prt = ''
+        m = self['AM']
         for file in m['filenames']:
             identifier = file.split('_')[-1]
             ff = m['PATH']+file
 
+            # which catalogs we are using
             if identifier == 'hipgaia.hg123':
                 m['AM_cata'] = True
                 m['df_hg123'] = pd.read_csv(ff, sep=r'\s+')
-                self.astrometry_hg123()
 
+            # hipp iad
             elif identifier == 'hip2.abs':
-                m['AM_abs'] = True
-                m['df_abs'] = pd.read_csv(ff, sep=r'\s+')
-                self.astrometry_abs()
+                m['AM_hipp'] = True
+                m['df_hipp'] = pd.read_csv(ff, sep=r'\s+')
 
+            # gost iad
             elif identifier == 'gost.csv':
                 m['AM_gost'] = True
                 m['df_gost'] = pd.read_csv(ff)
-                self.astrometry_gost()
+                m['df_gost'].columns = m['df_gost'].columns.astype(str).str.strip()
 
+            # gaia astro
             elif identifier == 'hipgaia.astro':
+                m['AM_astro'] = True
                 m['df_astro'] = pd.read_csv(ff, sep=r'\s+')
 
 
@@ -141,12 +180,6 @@ class DataWrapper(object):
                 print(f'File format not identified for {identifier}')
 
             str2prt += f'\nReading data from {file}'
-
-
-        #self.astrometry_epochs()
-
-        #self.astro_gost()
-
         return str2prt
 
 
@@ -163,19 +196,24 @@ class DataWrapper(object):
         return df.fillna(0)
 
 
-    def set_reference_epochs(self):
+    def AM_set_data_constants(self):
         m = self['AM']
+        m['AM_cata'] = False
+        m['AM_hipp'] = False
+        m['AM_gost'] = False
+        m['AM_relAst'] = False
+
         m['cats'] = ['GDR2', 'GDR3']  # GYX GDR2?
 
         m['hipp_epoch'] = self.time_all_2jd(1991.25,
                                             fmt='decimalyear')  # 2448348.75
 
-        m['gdr1_ref_ep'] = 2457023.5  # self.time_all_2jd(2015, fmt='decimalyear')  # 2457023.5
+        m['AM_GDR1_ref_ep'] = 2457023.5  # self.time_all_2jd(2015, fmt='decimalyear')  # 2457023.5
 
-        m['gdr2_ref_ep'] = 2457206  # self.time_all_2jd(2015.5, fmt='decimalyear')  # 2457206 hardcode?
+        m['AM_GDR2_ref_ep'] = 2457206  # self.time_all_2jd(2015.5, fmt='decimalyear')  # 2457206 hardcode?
         m['gdr2_baseline'] = 2457532
 
-        m['gdr3_ref_ep'] = 2457388.5  # self.time_all_2jd(2016, fmt='decimalyear')  # 2457388.5
+        m['AM_GDR3_ref_ep'] = 2457388.5  # self.time_all_2jd(2016, fmt='decimalyear')  # 2457388.5
         m['gdr3_baseline'] = 2457902
 
         m['dead_gdr2'] = pd.read_csv(get_support('deadtime/astrometric_gaps_gaiadr2_08252020.csv'), comment='#')
@@ -187,32 +225,34 @@ class DataWrapper(object):
         # delete DR1 data?
         #m['df_hg123'] = m['df_hg123'].drop(1)
         #m['df_hg123'] = m['df_hg123'].reset_index(drop=True)
+        data_hg123 = self['AM']['df_hg123']
+        columns_to_extract = ['ref_epoch', 'ra', 'dec', 'parallax', 'pmra', 'pmdec', 'radial_velocity']
+        AM_catalogs_ = data_hg123[columns_to_extract]
 
+        m['AM_iref_'] = -1
+        m['AM_catalogs_'] = AM_catalogs_
+
+
+    def astrometry_astro(self):
+        m = self['AM']
         df = self['AM']['df_hg123'][['ra','dec','parallax','pmra','pmdec']][-2:]
-        print(f'{df=}')
-        # some transform
-        # GYX: which units?
+
         df['ra'] = (df['ra']-df['ra'].iloc[-1])*np.cos(df['dec'].iloc[-2]*np.pi/180)*3.6e6
         df['dec'] = (df['dec']-df['dec'].iloc[-1])*3.6e6
         df.rename(columns={'ra': 'dra', 'dec':'ddec'}, inplace=True)
-        print(f'{df=}')
-
         
-        self['AM']['astro_gost'] = df
+        self['AM']['df_astro'] = df
+
         if 'GDR2' not in m['cats']:
-            self['AM']['astro_gost'] = self['AM']['astro_gost'].drop(1)
-        print(f"{self['AM']['astro_gost']=}")
-
-        # use this for?
-        self['AM']['tt'] = self['AM']['df_hg123'][['ra','dec','parallax','pmra','pmdec']].iloc[-1]
-        self['AM']['ihip'] = 0
-        self['AM']['iref'] = -1
-        self['AM']['parallax'] = self['AM']['df_hg123'].iloc[-1]['parallax']
+            self['AM']['astro_gost'] = self['AM']['astro_gost'].drop(1)        
+        
 
 
-    def astrometry_abs(self):
-        self['AM']['data_epoch'] = self['AM']['df_abs']
-        self['AM']['ins_epoch'] = 'hip2'
+    def astrometry_hipp(self):
+        # assert df_iad_gost is correct
+        self['AM']['data_iad_gost'] = self['AM']['df_hipp']
+        pass
+
 
     def astrometry_gost(self):
         self.astrometry_gost_readable_()
@@ -220,7 +260,10 @@ class DataWrapper(object):
         self.astrometry_gost_filter()
 
         # GYX: check dead time of DR2 and DR3
-        self.astrometry_gost_epochs()
+        self.astrometry_validate_epochs()
+        #self.astrometry_gost_epochs_legacy()
+
+        self.astrometry_gost_transform()
 
         # GDRx to use
         for gdr in self['AM']['cats']:
@@ -228,6 +271,11 @@ class DataWrapper(object):
             self.astrometry_gost_coef(number)
         
         self.astrometry_gost_gaia_sol_vec()
+
+        self.astrometry_construct_covariance()
+
+
+
 
     def astrometry_gost_readable_(self):
         m = self['AM']
@@ -252,7 +300,50 @@ class DataWrapper(object):
         filtered = a[a['BJD'] < m['gdr3_baseline']]
         m['df_gost'] = filtered[['BJD', 'psi', 'parf', 'parx']]
 
-    def astrometry_gost_epochs(self):
+    def astrometry_validate_epochs(self):
+        m = self['AM']
+        N_GOST = len(m['df_gost'])
+        gaia_offset = 1717.6256
+        DAY_PER_YEAR = 365.25
+        gaia_scale_factor = DAY_PER_YEAR / 1461
+        # Convert dead intervals for GDR2/3
+        m['dead_gdr2']['start'] = 2457023.75 + (m['dead_gdr2']['start'] - gaia_offset)*gaia_scale_factor
+        m['dead_gdr3']['start'] = 2457023.75 + (m['dead_gdr3']['start'] - gaia_offset)*gaia_scale_factor
+
+        m['dead_gdr2']['end']   = 2457023.75 + (m['dead_gdr2']['end'] - gaia_offset)*gaia_scale_factor
+        m['dead_gdr3']['end']   = 2457023.75 + (m['dead_gdr3']['end'] - gaia_offset)*gaia_scale_factor
+
+        # Create validity masks for GDR2 and GDR3
+
+        am_valid1 = np.ones(N_GOST, dtype=bool)
+        am_valid2 = np.ones(N_GOST, dtype=bool)
+        am_valid3 = np.ones(N_GOST, dtype=bool)
+
+        time_iad_gost = m['df_gost'].BJD.values
+
+        for dead in m['dead_gdr2'].values:
+            am_valid2[np.logical_and(time_iad_gost >= dead[0], time_iad_gost <= dead[1])] = 0
+
+        for dead in m['dead_gdr3'].values:
+            am_valid3[np.logical_and(time_iad_gost >= dead[0], time_iad_gost <= dead[1])] = 0
+
+        mask_GDR2 = time_iad_gost < m['gdr2_baseline']
+        mask_GDR3 = time_iad_gost < m['gdr3_baseline']
+
+        mask_GDR2 &= am_valid2
+        mask_GDR3 &= am_valid3
+
+        m['mask_GDR2'] = mask_GDR2
+        m['mask_GDR3'] = mask_GDR3
+        
+        m['a1'], m['a2'], m['a3'], m['a4'], m['a5'] = [], [], [], [], []
+
+    def astrometry_gost_transform(self):
+        m = self['AM']
+        m['df_gost']['CPSI'] = np.cos(m['df_gost']['psi'].values)
+        m['df_gost']['SPSI'] = np.sin(m['df_gost']['psi'].values)
+
+    def astrometry_gost_epochs_legacy(self):
         m = self['AM']
         m0 = m['df_gost']
         if isinstance(m0, pd.DataFrame):
@@ -270,38 +361,89 @@ class DataWrapper(object):
             m['mask_gdr2'] = (m['gdr2_epoch'][0] <= t) & (t<= m['gdr2_epoch'][1])
             m['mask_gdr3'] = (m['gdr3_epoch'][0] <= t) & (t<= m['gdr3_epoch'][1])
 
-            m['iref'] = m['hipp_epoch']
-
             m['a1'], m['a2'], m['a3'], m['a4'], m['a5'] = [], [], [], [], []
     
     def astrometry_gost_coef(self, gdr):
         m = self['AM']
-        mask = m[f'mask_gdr{gdr}']
-        bjd = m['df_gost']['BJD']
-        psi = m['df_gost']['psi']
-        parf = m['df_gost']['parf']
-        gdr_ref_epoch = m[f'gdr{gdr}_ref_ep']
+        DAY_PER_YEAR = 365.25
+        m['AM_coeffs'] = dict()
+        for cat in m['cats']:
+            mask = m[f'mask_{cat}']
+            dgost = m['df_gost'][mask]
+            ref_ep = m[f'AM_{cat}_ref_ep']
+            
+            dgost_time = dgost['BJD'].values - ref_ep
+            time_factor = dgost_time / DAY_PER_YEAR
 
-        m['a1'].append(np.sin(psi[mask].values))
-        m['a2'].append(np.cos(psi[mask].values))
-        m['a3'].append(parf[mask].values)
-        m['a4'].append(((bjd-gdr_ref_epoch)/365.25*np.sin(psi))[mask].values)
-        m['a5'].append(((bjd-gdr_ref_epoch)/365.25*np.cos(psi))[mask].values)
+            sin_psi = dgost['SPSI'].values
+            cos_psi = dgost['CPSI'].values
+
+            m['AM_coeffs'][cat] = dict([
+                        ('a1', sin_psi),
+                        ('a2', cos_psi),
+                        ('a3', dgost['parf'].values),
+                        ('a4', time_factor * sin_psi),
+                        ('a5', time_factor * cos_psi)
+                        ])
 
     def astrometry_gost_gaia_sol_vec(self):
         m = self['AM']
-        m['Gaia_solution_vector'] = []
+        m['AM_GSV'] = dict()
 
-        for k in range(len(m['a1'])):
-            df = {'a1':m['a1'][k],
-                  'a2':m['a2'][k],
-                  'a3':m['a3'][k],
-                  'a4':m['a4'][k],
-                  'a5':m['a5'][k]}
-            data = pd.DataFrame(df)
-            XX_dr = np.array([data['a1'].values, data['a2'].values, data['a3'].values, data['a4'].values,data['a5'].values]).T
-            solution_vector = np.linalg.inv(XX_dr.T@XX_dr).astype(float)@XX_dr.T
-            m['Gaia_solution_vector'].append(solution_vector)
+        for cat in m['cats']:
+            coeffs = m['AM_coeffs'][cat]
+            XX_dr = np.column_stack([
+                    coeffs['a1'],
+                    coeffs['a2'],
+                    coeffs['a3'],
+                    coeffs['a4'],
+                    coeffs['a5']
+            ])
+
+            # Use pseudo-inverse for stability
+            solution_vector = np.linalg.pinv(XX_dr)
+            #solution_vector = np.linalg.inv(XX_dr.T@XX_dr).astype(float)@XX_dr.T
+            m['AM_GSV'][cat] = solution_vector
+
+
+    def astrometry_construct_covariance(self):
+        from numpy.linalg import inv, slogdet
+        m = self['AM']
+        AM_COV = self._construct_cov(m['df_hg123'])
+        AM_inv_COV = []
+        AM_log_det_COV = []
+
+        for cov_matrix in AM_COV:
+            inv_cov_matrix = inv(cov_matrix)
+            sign, log_det_cov = slogdet(cov_matrix)
+            if sign <= 0:
+                raise ValueError("Covariance matrix for "+str(cat)+ "is not positive definite.")
+            AM_inv_COV.append(inv_cov_matrix)
+            AM_log_det_COV.append(log_det_cov)
+        m['AM_inv_COV'] = np.array(AM_inv_COV)
+        m['AM_log_det_COV'] = AM_log_det_COV
+
+
+    def _construct_cov(self, catalog_data):
+        keys = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
+        num_entries = len(catalog_data)
+        cov_matrices = np.zeros((num_entries, 5, 5), dtype=float)
+
+        for idx, row in catalog_data.iterrows():
+            cov_matrix = np.zeros((5, 5), dtype=float)
+            for i, key_i in enumerate(keys):
+                error_key = f'{key_i}_error'
+                cov_matrix[i, i] = row[error_key] ** 2
+                for j in range(i + 1, 5):
+                    key_j = keys[j]
+                    cov_key = f'{key_i}_{key_j}_cov'
+                    cov_value = row[cov_key]
+                    cov_matrix[i, j] = cov_matrix[j, i] = cov_value
+            cov_matrices[idx] = cov_matrix
+
+        return cov_matrices        
+
+
 
     def time_all_2jd(self, time_str, fmt='iso'):
         from astropy.time import Time as AstroTime

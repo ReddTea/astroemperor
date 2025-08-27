@@ -1,0 +1,34 @@
+# ASTROMETRY DATA HANDLING
+
+# CONSTANTS
+LOG_2PI      = np.log(2*np.pi)
+MAS_PER_DEG  = np.longdouble(3.6e6)   # 1 deg = 3.6e6 mas
+DEG2MAS = np.longdouble(3.6e6)
+PC_PER_KPC   = 1e3
+DAY_PER_YEAR = 365.25
+PC2AU        = 206265
+AUYR2KMS     = 4.74047
+
+
+def mas2deg(x):
+    return np.longdouble(x) / MAS_PER_DEG         
+
+
+def bl2xyz(b_rad, l_rad):
+    # Converts spherical coordinates (latitude b_rad and 
+    # longitude l_rad) to Cartesian coordinates (x, y, z)
+    x = np.cos(b_rad) * np.cos(l_rad)
+    y = np.cos(b_rad) * np.sin(l_rad)
+    z = np.sin(b_rad)
+    return np.array([x,y,z])
+
+
+def xyz2bl_vec(x,y,z):
+    # Converts Cartesian coordinates back to spherical coordinates.
+    b = np.arctan2(z,np.sqrt(x**2+y**2))
+    ind = b>np.pi/2
+    if(np.sum(ind)>0):
+        b[ind] = b[ind]-np.pi
+    l = np.arctan2(y,x)%(2*np.pi)
+    return b,l
+
