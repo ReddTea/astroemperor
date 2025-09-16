@@ -122,9 +122,10 @@ class emp_retainer(object):
                                'KDE': 'Kernel Density Estimation',
                                None: 'None'}
 
-        self.evidence_method = 'thermodynamic_integration'
-        #self.evidence_method = 'stepping_stones'
-        #self.evidence_method = 'hybrid_evidence'
+
+        #self.evidence_method = 'ti'
+        self.evidence_method = 'ss'
+        self.evidence_method = 'hybrid'
 
 
     def _sampler_config(self):
@@ -204,6 +205,7 @@ def my_prior(theta):
 
 ''')
 
+
             for p in b.additional_parameters:
                 if p.has_prior:
                     if p.name[:3] == 'Amp':
@@ -222,6 +224,18 @@ def my_prior(theta):
     kplanets = {p.prargs[0]}
 ''')
                         f.write(open(get_support(f'PAE/0{b.parameterisation}.pae')).read())
+
+
+                    elif p.name[:3] == 'Inc1':
+                        f.write('''
+    Inc1 = theta[5]
+    Inc2 = theta[12]
+    if Inc1 - Inc2 < 0:
+        lp += -np.inf
+    if Inc1 + Inc2 > np.pi:
+        lp += -np.inf
+''')                 
+
 
                     else:
                         continue
@@ -300,7 +314,11 @@ NOT INCLUDED BETA, DEBUG EMP.PY LN 272
 
     def _write_likelihood(self, f):
         if self.switch_AM:
-            aux_str = 'a00'
+            if self.kplanets__== 2:
+                aux_str = 'a00'
+                #aux_str = 'a00_k2'
+            else:
+                aux_str = 'a00'
         elif self.switch_celerite:
             aux_str = '02'
         else:
@@ -1414,7 +1432,7 @@ class emp_counsil(object):
         if self.switch_evidence:
             try:
                 #zaux = self.sampler.thermodynamic_integration(discard=self.reddemcee_discard)
-                zaux = getattr(self.sampler, self.evidence_method)(discard=self.reddemcee_discard)[:2]
+                zaux = getattr(self.sampler, f'get_evidence_{self.evidence_method}')(discard=self.reddemcee_discard)[:2]
 
             except Exception:
                 print('Thermodynamic Integration interpolation failed! Using classic method...')
@@ -1575,6 +1593,8 @@ class emp_counsil(object):
                         if b.astrometry_bool:
                             per, A, phase, ecc, w, inc, Ome = b.get_attr('value')
                             per_, A_, phase_, ecc_, w_, inc_, Ome_ = my_params
+
+
                         else:
                             per, A, phase, ecc, w = b.get_attr('value')
                             per_, A_, phase_, ecc_, w_ = my_params
@@ -2224,19 +2244,13 @@ class Simulation(emp_retainer, model_manager,
                 self.logger(m['logger_msg'], center=True, c='blue')
             self.logger('\n')
 
+
         if self.data_wrapper['RV']['use']:
             self._load_data_RV()
 
-        if self.data_wrapper['AM']['use']:
-            self.switch_AM = True
-            self.switch_inclination = True
-            
+        if self.switch_AM == True:
+            self.switch_inclination = True            
             self.data_AM = self.data_wrapper['AM']
-            #to_get = ['ref_epoch','ra','dec','parallax','pmra','pmdec','radial_velocity']
-            #self.AM_astro_array = self.data_wrapper['AM']['df_hg123'][to_get].values
-            #self.data_AM = {'astro_array':self.AM_astro_array,
-            #                }
-            #self.switch_AM_cata = self.data_wrapper['AM']['AM_cata']
         else:
             self.data_AM = None
 
