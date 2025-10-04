@@ -360,6 +360,34 @@ dOmega = {'name':'Omega',
           'mininame':r'\Omega',
           }
 
+dInc1 = {'name':'Inc1',
+            'unit':'(rad)',
+            'is_circular':True,
+            'is_hou':False,
+            'mininame':r'I',
+            }
+
+dInc2 = {'name':'Inc2',
+            'unit':'(rad)',
+            'is_circular':True,
+            'is_hou':False,
+            'mininame':r'I',
+            }
+
+dInc0 = {'name':'Inclination',
+            'unit':'(rad)',
+            'is_circular':True,
+            'is_hou':False,
+            'mininame':r'I',
+            }
+
+
+dIncD = {'name':'Inclination',
+            'unit':'(rad)',
+            'is_circular':True,
+            'is_hou':False,
+            'mininame':r'I',
+            }
 
 ########
 

@@ -534,8 +534,10 @@ class SmartSetter(object):
 
             if b.astrometry_bool:
                 lims.extend([[0, np.pi], self.angular_limiter])  # Ome
-                priors.extend([self.uni, self.uni])
+                priors.extend(['Isometric', self.uni])
                 prargs.extend([None, None])
+                #if b.number_==2:
+                #    self.true_incs_add_additional(b)
 
         if b.parameterisation == 1:
             lims = [[1.5, per_limiter],
@@ -626,6 +628,20 @@ class SmartSetter(object):
                     b.add_additional_parameters(d0)
 
         return lims, priors, prargs
+
+
+    def true_incs_add_additional(self, b):
+        param_list = ['dInc1', 'dInc2']
+        my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
+        for additional_parameter in my_params:
+            additional_parameter.has_prior = True
+            additional_parameter.has_posterior = False
+            additional_parameter.limits = [0, np.pi]
+            if b.number_:
+                additional_parameter.name += f' {b.number_}'
+                additional_parameter.mininame += f' {b.number_}'
+            additional_parameter.display_name = additional_parameter.name
+            b.add_additional_parameters(additional_parameter)
 
 
     def sma_minmass_add_additional(self, b):

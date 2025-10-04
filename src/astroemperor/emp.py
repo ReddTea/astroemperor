@@ -1339,6 +1339,7 @@ class emp_counsil(object):
 
         self._set_additional_parameters()
 
+        # calculate gaussian mixtures, make optional
         self._set_posteriors()
 
         self._print_posteriors()

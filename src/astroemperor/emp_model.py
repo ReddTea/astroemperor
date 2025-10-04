@@ -1142,6 +1142,8 @@ def AstroDiff(obs1, obs2):
                             
 
 def loglike_AM(theta):
+    for a in A_:
+        theta = np.insert(theta, a, mod_fixed_[a])
     ll = 0.
     J_H, J_G = theta[{b.slice}]
     barycenter, epoch, cats = astrometry_kepler(theta)

@@ -1,0 +1,19 @@
+# Astrometry
+
+def my_likelihood(theta):
+    inc_c, Om_c = theta[5:7]  # centers
+    inc_d, Om_d = theta[12:14]  # deltas
+    inc1, inc2 = inc_c-inc_d, inc_c+inc_d
+    Om1, Om2 = Om_c-Om_d, Om_c+Om_d
+
+    theta0 = theta.copy()
+    theta0[5:7] = inc1, Om1
+    theta0[12:14] = inc2, Om2
+
+    model, err2 = my_model(theta0)
+    ll1 = -0.5 * (np.sum((Y_ - model) ** 2 / err2 + np.log(err2))) - 0.5 * np.log(2*np.pi) * ndat
+
+    ll2 = loglike_AM(theta0)
+    return ll1 + ll2
+    
+
