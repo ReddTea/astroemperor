@@ -3,14 +3,14 @@ Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval.
 
 
 ## Overview
-`EMPEROR` (Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval), is a Python-based algorithm that automatically searches for signals in Radial Velocity timeseries, employing Markov chains and parallel tempering methods, convergence tests and Bayesian statistics, along with various noise models. A number of posterior sampling routines are available, focused on efficiently searching for signals in highly multi-modal posteriors. The code allows the analysis of multi-instrument and multi-planet data sets and performs model comparisons automatically to return the optimum model that best describes the data.
+`EMPEROR` (Exoplanet Mcmc Parallel tEmpering for Rv Orbit Retrieval), is a Python-based algorithm that automatically searches for signals in Radial Velocity timeseries (and also joint modelling with Astrometry), employing Markov chains and parallel tempering methods, convergence tests and Bayesian statistics, along with various noise models. A number of posterior sampling routines are available, focused on efficiently searching for signals in highly multi-modal posteriors. The code allows the analysis of multi-instrument and multi-planet data sets and performs model comparisons automatically to return the optimum model that best describes the data.
 
 
 ## Why `EMPEROR`?
 
   - It's really simple to use
   - It has a series of configuration commands that will amaze you
-  - Advanced Noise Model
+  - Advanced Noise Models
   - Quite Flexible!
 
 ## Quick Install

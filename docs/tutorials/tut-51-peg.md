@@ -35,7 +35,6 @@ np.random.seed(1234)
 
 
 sim = emp.Simulation()
-sim.load_data('51Peg')  # folder read from /datafiles/
 ```
 
 ### Setting the engine
@@ -74,9 +73,10 @@ sim.plot_trace['plot'] = False
 
 ```
 
-Finally, we run our simulation (it will take some minutes):
+Finally, we read the data and run our simulation (it will take some minutes):
 
 ```python
+sim.load_data('51Peg')  # folder read from /datafiles/
 sim.autorun(0, 1)
 ```
 

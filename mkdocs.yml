@@ -18,6 +18,7 @@ nav:
       - FAQ: user-guide/ug-FAQ.md
   - Tutorials:
       - Peg 51: tutorials/tut-51-peg.md
+      - Astrometry: tutorials/astrometry.md
       #- Quickstart: tutorials/quickstart/quickstart.md
       #- Fitting a model: tutorials/fitting_model/fitting_model.md
       #- Temperatures & Adaptation: tutorials/temperatures/temperatures.md
