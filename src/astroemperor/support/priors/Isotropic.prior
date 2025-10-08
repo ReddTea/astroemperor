@@ -1,0 +1,5 @@
+def Isotropic(x, limits, args):
+    logZ = args
+    if limits[0] <= x <= limits[1]:
+        return np.log(0.5*np.sin(x)) - logZ
+    return -np.inf

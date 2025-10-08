@@ -534,7 +534,7 @@ class SmartSetter(object):
 
             if b.astrometry_bool:
                 lims.extend([[0, np.pi], self.angular_limiter])  # Ome
-                priors.extend(['Isometric', self.uni])
+                priors.extend(['Isotropic', self.uni])
                 prargs.extend([None, None])
                 #if b.number_==2:
                 #    self.true_incs_add_additional(b)

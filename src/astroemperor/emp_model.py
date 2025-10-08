@@ -93,6 +93,11 @@ class Parameter_Block(object):
                 logZ = np.log(norm.cdf(b) - norm.cdf(a))   # normalising constant
                 p.prargs = [mu, s, logZ]
 
+            if p.prior == 'Isotropic':
+                low, high = p.limits
+                logZ = np.log(0.5 * (np.cos(low) - np.cos(high)))
+                p.prargs = logZ
+
     def _check_additional_prargs(self):
         for p in self.additional_parameters:
             if not p.has_prior:
@@ -109,7 +114,10 @@ class Parameter_Block(object):
                 logZ = np.log(norm.cdf(b) - norm.cdf(a))   # normalising constant
                 p.prargs = [mu, s, logZ]
 
-
+            if p.prior == 'Isotropic':
+                low, high = p.limits
+                logZ = np.log(0.5 * (np.cos(low) - np.cos(high)))
+                p.prargs = logZ
 
 
     def _add_display_prior(self):
@@ -128,6 +136,11 @@ class Parameter_Block(object):
                 param.display_prior = f'~𝛿 (x - {param.value})'
             elif param.prior == 'Jeffreys':
                 param.display_prior = '~J ({}, {})'.format(*np.round(param.limits, 3))
+
+            elif param.prior == 'Isotropic':
+                param.display_prior = '~I ({}, {})'.format(*np.round(param.limits, 3))
+
+
             else:
                 param.display_prior = f'Method not built for {param.prior}'
 
