@@ -2162,11 +2162,7 @@ class emp_counsil(object):
         v2 = np.array(self.model.get_attr_param('value_range', flat=True))[:, 1]
 
 
-        par_box = [par_box_names,
-                    v0,
-                    v1,
-                    v2,
-                    ]        
+    
 
         par_box_names_a = []
         v0_a = []
@@ -2183,9 +2179,15 @@ class emp_counsil(object):
 
         if par_box_names_a:
             par_box_names.extend(par_box_names_a)
-            v0.extend(v0_a)
-            v1.extend(v1_a)
-            v2.extend(v2_a)
+            v0 = np.append(v0, v0_a)
+            v1 = np.append(v1, v1_a)
+            v2 = np.append(v2, v2_a)
+            
+        par_box = [par_box_names,
+                    v0,
+                    v1,
+                    v2,
+                    ]    
         par_box = adjust_table_tex(par_box, rounder=16)
 
         pb_header = ['Parameter',
