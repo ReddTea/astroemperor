@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "astroemperor"
-version = "0.9.9"
+version = "0.9.9.1"
 authors = [{ name="ReddTea", email="redd@tea.com"}]
 description = "Flexible python exoplanet fitter"
 readme = "README.md"
