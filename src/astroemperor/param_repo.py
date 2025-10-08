@@ -429,7 +429,7 @@ dOffset_pm_de = {'name':'Offset pm DE',
             }
 
 
-dJitterH = {'name':'Jitter Hipparcos',
+dJitterH = {'name':'Jitter Hipp',
            'unit':'',
            'is_circular':False,
            'is_hou':False,

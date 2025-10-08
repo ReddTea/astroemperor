@@ -2067,7 +2067,7 @@ class emp_counsil(object):
                                    f'{self.RMSE:.3f}'])
         stat_box = [stat_box_names,
                     stat_box_value]
-        stat_box = adjust_table_tex(stat_box, rounder=8)
+        stat_box = adjust_table_tex(stat_box, rounder=12)
         stat_box_header = ['Stat', 'Value']
 
         df0 = pd.DataFrame(np.array(stat_box).T, columns=stat_box_header)
@@ -2156,24 +2156,43 @@ class emp_counsil(object):
     def _save_latex(self):
         # save param_minimal.dat
         par_box_names = self.model.get_attr_param('name', flat=True)
-        
+
         v0 = np.array(self.model.get_attr_param('value_range', flat=True))[:, 0]
         v1 = self.model.get_attr_param('value_max', flat=True)
         v2 = np.array(self.model.get_attr_param('value_range', flat=True))[:, 1]
+
 
         par_box = [par_box_names,
                     v0,
                     v1,
                     v2,
-                    ]
-        
-        par_box = adjust_table_tex(par_box, rounder=8)
+                    ]        
+
+        par_box_names_a = []
+        v0_a = []
+        v1_a = []
+        v2_a = []
+        for b in self.model:
+            if len(b.additional_parameters):
+                mask = [x.has_posterior for x in b.additional_parameters]
+                for p in np.array(b.additional_parameters)[mask]:
+                    par_box_names_a.append(p.name)
+                    v0_a.append(p.value_range[0] or None)
+                    v1_a.append(p.value_max or None)
+                    v2_a.append(p.value_range[1] or None)
+
+        if par_box_names_a:
+            par_box_names.extend(par_box_names_a)
+            v0.extend(v0_a)
+            v1.extend(v1_a)
+            v2.extend(v2_a)
+        par_box = adjust_table_tex(par_box, rounder=16)
 
         pb_header = ['Parameter',
                         'lower    ',
                         'value    ',
                         'higher   ']
-        
+
         df0 = pd.DataFrame(np.array(par_box).T, columns=pb_header)
 
         df0.to_csv(f'{self.saveplace}/tables/param_minimal.dat',
@@ -2189,7 +2208,7 @@ class emp_counsil(object):
 
         # save latex
         df_latex = df0[['Parameter', 'Value']]
-        
+
         latex_table = df_latex.to_latex(index=False, escape=False)
 
         with open(f'{self.saveplace}/tables/values.tex', 'w') as f:
