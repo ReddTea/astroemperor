@@ -32,7 +32,8 @@ import time
 
 class emp_retainer(object):
     NONETHINGS = ['starname', 'betas', 'saveplace', 'ndim__',
-                  'instrument_names_RV', 'instrument_names_AM', 'instrument_names_PM']
+                  'instrument_names_RV', 'instrument_names_AM', 'instrument_names_PM',
+                  'backend_name', 'backend_bool']
     SWITCHES_F = ['switch_RV', 'switch_SA', 'switch_SA_pro',
                     'switch_dynamics', 'dynamics_already_included',
                     'switch_celerite', 'switch_AM', 'switch_PM', 'switch_inclination',
@@ -551,8 +552,10 @@ ndim = {self.model.ndim__}
 
 
     def _set_backends(self, f):
-        self.backend_bool = False
-        self.backend_name = 'backend_savetest'
+        if self.backend_bool is None:
+            self.backend_bool = False
+        if self.backend_name is None:
+            self.backend_name = f'{self.starname}_{self.saveplace_run}'
 
         if self.backend_bool:
             if self.engine__.__name__ == 'reddemcee':
@@ -717,11 +720,7 @@ adaptation_nsweeps = {self.reddemcee_discard}
 
 
     def _save_backend(self, f):
-        self.backend_bool = True
-        # TODO rename backend to something with star&run?
-        self.backend_name = f'{self.starname}_{self.saveplace_run}'
-
-        if self.backend_bool:
+        if self.backend_bool is False:
             if self.engine__.__name__ == 'reddemcee':
                 f.write(f'''
     from reddemcee.hdf import PTHDFBackend
@@ -1432,12 +1431,19 @@ class emp_counsil(object):
         # TODO move to... ?
         if self.switch_evidence:
             try:
-                #zaux = self.sampler.thermodynamic_integration(discard=self.reddemcee_discard)
                 zaux = getattr(self.sampler, f'get_evidence_{self.evidence_method}')(discard=self.reddemcee_discard)[:2]
+                if zaux[0] == -np.inf:
+                    print('Are you running a short chain?')
+                    print(f'Evidence with {self.evidence_method} failed! Trying fallback to TI')
+                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard)[:2]
+                if zaux[0] == -np.inf:
+                    print('Are you running a short chain?')
+                    print('Evidence with TI failed! Trying fallback to classic')
+                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)[:2]
 
             except Exception:
                 print('Thermodynamic Integration interpolation failed! Using classic method...')
-                zaux = self.sampler.thermodynamic_integration_classic(discard=self.reddemcee_discard)
+                zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)
             self.evidence = zaux[0], zaux[1]
 
         self.best_loc_post = np.argmax(self.posts[0])
@@ -2173,9 +2179,9 @@ class emp_counsil(object):
                 mask = [x.has_posterior for x in b.additional_parameters]
                 for p in np.array(b.additional_parameters)[mask]:
                     par_box_names_a.append(p.name)
-                    v0_a.append(p.value_range[0] or None)
-                    v1_a.append(p.value_max or None)
-                    v2_a.append(p.value_range[1] or None)
+                    v0_a.append(p.value_range[0])
+                    v1_a.append(p.value_max)
+                    v2_a.append(p.value_range[1])
 
         if par_box_names_a:
             par_box_names.extend(par_box_names_a)

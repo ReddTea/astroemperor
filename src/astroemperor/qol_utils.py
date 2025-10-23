@@ -175,13 +175,11 @@ class DataWrapper(object):
                 m['AM_relAst'] = True
                 m['df_rel'] = pd.read_csv(ff)
                 
-            else:
-                print(f'File format not identified for {identifier}')
-            # gaia astro
-            '''
+            elif identifier == 'Gaia_astro_placeholder':
                 m['AM_astro'] = True
                 m['df_astro'] = pd.read_csv(ff, sep=r'\s+')
-            '''
+            else:
+                print(f'File format not identified for {identifier}')
 
             str2prt += f'\nReading data from {file}'
         return str2prt

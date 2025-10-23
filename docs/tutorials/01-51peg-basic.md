@@ -39,11 +39,11 @@ sim = emp.Simulation()
 
 ### Setting the engine
 
-For this example, we will use `reddemcee`, with 10 temperatures, 500 walkers, 3000 sweeps each of 1 step:
+For this example, we will use `reddemcee`, with 10 temperatures, 256 walkers, 2048 sweeps each of 1 step:
 
 ```python
 sim.set_engine('reddemcee')
-sim.engine_config['setup'] = [10, 500, 3000, 1]
+sim.engine_config['setup'] = [10, 256, 2048, 1]
 ```
 
 ### Setting the model

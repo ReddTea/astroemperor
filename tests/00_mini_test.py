@@ -36,4 +36,4 @@ sim.plot_posteriors['temps'] = [0, 2, 8]
 sim.plot_trace['plot'] = False
 
 
-sim.autorun(0, 1)
+sim.autorun(1, 1)
