@@ -34,7 +34,7 @@ def run_thing():
             print('CONVERGED! ')
             break
         
-    sampler.config_adaptation_halflife = 0
+    sampler.adapt_tau = 0
     print('Converged Sampling:')
 
     sampler.run_mcmc(state, nsweeps=nsweeps, nsteps=nsteps, progress=progress)

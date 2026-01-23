@@ -8,7 +8,7 @@ def run_thing():
     print('Adaptation Burn-in:')
     state = sampler.run_mcmc(state, nsweeps=nsweeps1, nsteps=nsteps, progress=progress)
 
-    sampler.select_adjustment('00')
+    sampler.select_adjustment('NONE')
     sampler.run_mcmc(state, nsweeps=nsweeps2, nsteps=nsteps, progress=progress)
 
     end = time.time()
