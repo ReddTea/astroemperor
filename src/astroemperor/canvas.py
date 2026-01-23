@@ -585,6 +585,10 @@ def plot_trace2(sampler=None, eng_name='', my_model=None, options={}):
     else:
         print(f'Trace plot for {trace_mode_dic[0]} failed!')
 
+
+
+
+
 #plot_trace2(sim.sampler.backend[0], sim.engine__.__name__, sim.model, sim.plot_all_list[-1])
 
 #import arviz as az
@@ -808,7 +812,7 @@ cornums = {my_model.cornums}
                              Color_Cycler[n_ins]+'o')
 
         if switch_periodogram:
-                    plot_periodogram(data1, options)
+            plot_periodogram(data1, options)
 
         # make continuum
         if True:
@@ -1281,6 +1285,11 @@ def plot_KeplerianModel(model_=None, options={}):
                                 data1[mask]['residuals'],
                                 Color_Cycler[n_ins]+'o')   
         
+        if switch_periodogram:
+            #print(f'{data1=}')
+            #plot_periodogram(data1, options, tail=savename)
+            pass
+
         # continuum
         if True:
             ax.plot(data_c['BJD'],
@@ -1338,7 +1347,7 @@ def plot_KeplerianModel(model_=None, options={}):
             if common_t and not isfold:
                 xlabel_sup = f'BJD (days) + {common_t}'
             else:
-                xlabel_sup = 'BJD (days)'
+                xlabel_sup = 'Days'
                 
             axr.set_xlabel(xlabel_sup, fontsize=fm_label_fs)
             axr.set_ylabel(r'Residuals ($\frac{m}{s}$)', fontsize=fm_label_fs)
@@ -1372,10 +1381,10 @@ def plot_KeplerianModel(model_=None, options={}):
 
     # GET ABSOLUTE RESIDUALS
     if True:
+        # returns data_og, res_og
         model_og = deepcopy(model_)
         data_og = model_og.data
         sol_og = np.array(model_og.get_attr_param('value', flat=True))[model_og.C_]
-        #sol_og = model_og.get_attr_param('value', flat=True)
 
         temp_model_func_ = retrieve_model_func(model_og, tail='full_model')
 
@@ -1406,6 +1415,14 @@ def plot_KeplerianModel(model_=None, options={}):
 
         mk_dual_plot(data_keps, data_keps_c, savename='KeplerianModel')
 
+        if switch_periodogram:
+            # make periodogram here, with data_keps
+            #print('Periodogram currently disabled!')
+            #print('Correlogram currently disabled!')
+            pass
+
+
+
     # plot phases
     if True:
         counter = 1
@@ -1428,14 +1445,232 @@ def plot_KeplerianModel(model_=None, options={}):
             data_keps_c = add_blocks_to_data(data_c, [b], tail=f'cont_FoldKep0{counter}')
 
             mk_dual_plot(data_folded, data_keps_c,
-                         savename=f'KeplerianBlock {counter}',
+                         savename=f'KeplerianBlock_{counter}',
                          isfold=True)
             counter += 1
 
     pass
     
 
-def plot_periodogram(my_data, options, tail_name=''):
+
+def plot_AstrometricModel(model_=None, input_theta=None, options={}):
+    if True:
+        saveplace_ = options['saveloc']
+        savefmt_ = options['format']
+        tail = options['tail']
+        saveloc_plot_ = saveplace_ + f'/plots/models/astrometry_model.{savefmt_}'
+        figsize_ = options['figsize']
+
+        label_fontsize = options['label_fontsize']
+        title_fontsize = options['title_fontsize']
+        tick_labelsize = options['tick_labelsize']
+        line_width = options['line_width']
+        major_tick_length = options['major_tick_length']
+        minor_tick_length = options['minor_tick_length']
+        marker_size = options['marker_size']
+        scatter_size = options['scatter_size']
+        legend_fs = options['legend_fs']
+        fm_frame_lw = options['fm_frame_lw']
+        ceil_step = options['ceil_step']
+
+    model_.model_script_no = 0
+    #temp_script_name = f'temp_astrometry_plot{tail}.py'
+    temp_script_loc = f'{saveplace_}'  # TODO: change
+    temp_plot_script = f'temp_am_plot_{tail}.py'
+
+    dependencies = model_.get_dependencies().tolist()
+    constants = model_.get_constants()
+
+
+    with open(temp_plot_script, 'w') as f:
+        if True:
+            # ASTROMETRY EXCLUSIVE
+            f.write('''
+# dependencies
+if True:
+    import matplotlib.gridspec as gridspec
+    import matplotlib.colors as plc
+    from matplotlib.ticker import MaxNLocator, FixedLocator
+    from matplotlib.cm import plasma
+    from matplotlib.colors import Normalize
+    from astropy.time import Time as AstroTime
+    from matplotlib.patches import Polygon, Patch
+    from matplotlib.lines import Line2D   
+    
+    from reddcolors import Palette
+    from astroemperor.canvas import hex2rgb, mk_cmap
+''')
+            # --------
+
+            f.write(open(get_support('init_reddemcee.scr')).read())
+            for d in dependencies:
+                f.write(f'''
+{d}''')
+            f.write('''
+''')
+            for c in constants:
+                f.write(f'''{c} = {constants[c]}
+''')
+
+            model_script_name = model_.write_model(loc=saveplace_,
+                                                tail=tail)
+            f.write(open(model_script_name).read())
+
+
+            # astrometry exclusive functions
+            f.write(open(get_support('astrometry/plot.00')).read())
+
+            f.write(f"""
+theta = np.array({input_theta})
+""")
+
+            kc = 1
+            for b in model_:
+                if b.type_=='Keplerian':
+                    f.write(f"""
+slice_kep{kc} = {repr(b.slice)}
+""")
+                    kc += 1
+                elif b.type_=='AstrometryOffset':
+                    f.write(f"""
+theta_am_off = theta[{repr(b.slice)}]
+""")
+                elif b.type_=='AstrometryJitter':
+                    f.write(f"""
+theta_am_jit = theta[{repr(b.slice)}]
+""")
+                
+            # astrometry IAD
+            f.write("""
+ca = 0
+ca_err = 0
+ca_hipp = 0
+go = 0
+nodes = 0
+tt_cats = AM_catalogs_times[1:] - common_t
+
+
+plx0 = AM_PLX_ref - theta_am_off[2]
+
+df_hipp_b = data_iad_hipp.copy().groupby("BJD").agg({
+    'IORB': 'mean',
+    'EPOCH': 'mean',
+    'PARF': 'mean',
+    'CPSI': 'mean',
+    'SPSI': 'mean',
+    'RES': 'mean',
+    'SRES': 'mean'}).reset_index()               
+    """)
+            kc = 1
+
+            # TODO: kplan__=0
+
+            for b in model_:
+                if b.type_=='Keplerian':
+                    f.write(f"""
+P{kc} = theta[slice_kep{kc}][0]
+tt{kc} = np.linspace(0, P{kc}, 5000)
+
+ca += calc_astro_new_t(theta[slice_kep{kc}], plx0, tt=tt{kc})
+ca_hipp += calc_astro_hipp_binned(theta[slice_kep{kc}], plx0, df_hipp_b)
+go += calc_astro_new_t(theta[slice_kep{kc}], plx0, tt=tt_cats)
+nodes += calc_astro_nodes(theta[slice_kep{kc}], plx0)
+""")
+                    kc += 1
+
+
+            f.write(open(get_support('astrometry/plot.01')).read())
+            
+
+            
+            f.write("""
+# astrometry inputs
+
+def get_projections(iad_df):
+    ca_err = 0
+    t_hip = iad_df['BJD'].values
+    cpsi = iad_df['CPSI'].values
+    spsi = iad_df['SPSI'].values
+    r_al = iad_df['RES'].values
+    sig_al = iad_df['SRES'].values
+
+    hipp_iad_time = t_hip - common_t
+""")
+            
+            kc = 1
+            for b in model_:
+                if b.type_=='Keplerian':
+                    f.write(f"""
+    ca_err += calc_astro_new_t(theta[slice_kep{kc}], plx0, tt=hipp_iad_time)
+""")
+                kc += 1
+            f.write("""
+    x_mod = ca_err[0]
+    y_mod = ca_err[1]
+
+    u = np.column_stack([cpsi, spsi]) 
+    obs = np.column_stack([x_mod, y_mod]) + r_al[:, None]*u
+
+    sres = np.sqrt(sig_al**2 + theta_am_jit[0]**2)
+    seg_lo = obs - sres[:, None]*u
+    seg_hi = obs + sres[:, None]*u
+    segments_long = np.stack([seg_lo, seg_hi], axis=1)
+
+    seg_lo = obs - sig_al[:, None]*u
+    seg_hi = obs + sig_al[:, None]*u
+    segments_short = np.stack([seg_lo, seg_hi], axis=1)
+
+
+    return obs, segments_long, segments_short
+
+
+proj = get_projections(data_iad_hipp0)
+dra_hipp_iad = proj[0][:, 0]
+dde_hipp_iad = proj[0][:, 1]
+
+proj_b = get_projections(df_hipp_b)
+dra_hipp_biad = proj_b[0][:, 0]
+dde_hipp_biad = proj_b[0][:, 1]
+
+
+binned_lines_long = proj_b[1]
+binned_lines_shor = proj_b[2]
+
+colors_bin = plasma(Normalize(vmin=df_hipp_b['BJD'].min(),
+                            vmax=df_hipp_b['BJD'].max())(df_hipp_b['BJD']))
+
+""")
+
+            f.write(f"""
+figsize_ = {figsize_}
+saveloc_ = '{saveloc_plot_}'
+label_fontsize = {label_fontsize}
+title_fontsize = {title_fontsize}
+tick_labelsize = {tick_labelsize}
+
+line_width = {line_width}
+major_tick_length = {major_tick_length}
+minor_tick_length = {minor_tick_length}
+marker_size = {marker_size}
+scatter_size = {scatter_size}
+
+legend_fs = {legend_fs}
+fm_frame_lw = {fm_frame_lw}
+ceil_step = {ceil_step}
+
+""")
+
+
+        f.write(open(get_support('astrometry/astrometry.plot')).read())
+
+    # run and clean
+    os.system(f'ipython {temp_plot_script}')
+    os.system(f'mv {temp_plot_script} {saveplace_}/temp/{temp_plot_script}')
+    pass
+
+
+
+def plot_periodogram_old(my_data, options, tail_name=''):
     from scipy.signal import lombscargle
     if options is None:
         options = {}
@@ -1520,6 +1755,11 @@ def plot_periodogram(my_data, options, tail_name=''):
     pl.close(fig)
 
 
+def plot_periodogram(my_data, options, tail=''):
+    pass
+
+
+
 def make_block_plot(foo):
     if _PLATFORM_SYSTEM == 'Darwin':
         matplotlib.use('Agg')
@@ -1539,6 +1779,8 @@ def make_block_plot(foo):
         legend_kwargs = pltd['legend_kwargs']
         tick_params_kwargs = pltd['tick_params_kwargs']
         colorbar_kwargs = pltd['colorbar_kwargs']
+
+        vlines_alpha = 0.75
 
         if pltd['paper_mode']:
             #pltd['fs_supt'] = 48#24
@@ -2109,7 +2351,10 @@ def plot_beta_density(betas=[], options={}):
     pbar = tqdm(total=1)
 
     fig, axes = pl.subplots(figsize=(4, 3))
-    y = -1/np.diff(np.log(betas))
+    with np.errstate(divide='ignore'):
+        log_betas = np.log(betas)
+    
+    y = -1.0 / np.diff(log_betas)
     max_index = np.argmax(y)
     x_position = (betas[max_index] + betas[max_index + 1]) / 2
 

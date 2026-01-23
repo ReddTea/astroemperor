@@ -1,0 +1,183 @@
+# astrometry exclusive functions
+
+if True:
+    def calc_astro_new_t(theta, plx, tt=time_iad_all):
+        per, K, pha, ecc, omega, I, Omega = theta
+
+        # Precompute constants
+        sinI, cosI = np.sin(I), np.cos(I)
+        sqrt1_e2 = np.sqrt(1 - ecc**2)
+
+        # Mean anomaly
+        #freq = two_pi / per
+        freq = 2. * np.pi / per
+        M = freq * (tt) + pha
+
+        # Solve Kepler's equation
+        E = kepler.solve(M, np.repeat(ecc, len(tt)))
+        f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
+
+        # Thiele-Innes constants
+        A, B, F, G, C, H = thiele_innes(omega, Omega, sinI, cosI)
+
+        # Orbit in the orbital plane
+        X = np.cos(E) - ecc
+        Y = sqrt1_e2 * np.sin(E)
+
+        # Velocity components in the orbital plane
+        VX = -np.sin(f)
+        VY = np.cos(f) + ecc
+
+        # Auxiliary constants
+        alpha0 = K/sinI/PC_PER_KPC/AUYR2KMS  # au/yr
+        beta0 = per/DAY_PER_YEAR*(K/PC_PER_KPC/AUYR2KMS)*sqrt1_e2/(2*np.pi)/sinI  # au
+        alpha = -alpha0 * plx
+        beta = -beta0 * plx  # mas
+
+        # Sky plane coordinates
+        rasP = beta * (B*X + G*Y)
+        decP = beta * (A*X + F*Y)
+        plxP =-beta * (C*X + H*Y) * plx/206265e3  # parallax change
+
+        # Proper motions
+        pmrasP = alpha * (B*VX + G*VY)
+        pmdecP = alpha * (A*VX + F*VY)
+        rv = alpha0 * (C*VX + H*VY)  # km/s
+
+        # Photocentric motion correction (if eta != 0)
+        #sma, mp = cps(per, K, ecc)
+        #mp /= sinI
+        eta = 0  #calc_eta(mp)
+        if eta != 0:
+            xi = 1 / (eta + 1)
+            rasP *= xi
+            decP *= xi
+            plxP *= xi
+            pmrasP *= xi
+            pmdecP *= xi
+
+        # mas | mas/yr
+        return np.array([rasP, decP, plxP, pmrasP, pmdecP, rv*AUYR2KMS])
+                                    
+
+    def calc_astro_nodes(theta, plx):
+        per, K, pha, ecc, omega, I, Omega = theta
+        sinI, cosI = np.sin(I), np.cos(I)
+        sqrt1_e2 = np.sqrt(1 - ecc**2)
+        eccterm = np.sqrt((1 - ecc)/(1 + ecc))
+        E = np.array([-1e-3,
+                    0,
+                    2*np.arctan(eccterm*np.tan((np.pi - omega)/2.)),
+                    2*np.arctan(eccterm*np.tan(-omega/2.))])
+
+        # Precompute constants
+        f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
+
+        # Thiele-Innes constants
+        A, B, F, G, C, H = thiele_innes(omega, Omega, sinI, cosI)
+
+        # Orbit in the orbital plane
+        X = np.cos(E) - ecc
+        Y = sqrt1_e2 * np.sin(E)
+
+        # Velocity components in the orbital plane
+        VX = -np.sin(f)
+        VY = np.cos(f) + ecc
+
+        # Auxiliary constants
+        alpha0 = K/sinI/PC_PER_KPC/AUYR2KMS  # au/yr
+        beta0 = per/DAY_PER_YEAR*(K/PC_PER_KPC/AUYR2KMS)*sqrt1_e2/(2*np.pi)/sinI  # au
+        alpha = -alpha0 * plx
+        beta = -beta0 * plx  # mas
+
+        # Sky plane coordinates
+        rasP = beta * (B*X + G*Y)
+        decP = beta * (A*X + F*Y)
+        plxP =-beta * (C*X + H*Y) * plx/206265e3  # parallax change
+
+        # Proper motions
+        pmrasP = alpha * (B*VX + G*VY)
+        pmdecP = alpha * (A*VX + F*VY)
+        rv = alpha0 * (C*VX + H*VY)  # km/s
+
+        # Photocentric motion correction (if eta != 0)
+        #sma, mp = cps(per, K, ecc)
+        #mp /= sinI
+        eta = 0  #calc_eta(mp)
+        if eta != 0:
+            xi = 1 / (eta + 1)
+            rasP *= xi
+            decP *= xi
+            plxP *= xi
+            pmrasP *= xi
+            pmdecP *= xi
+
+        # mas | mas/yr
+        return np.array([rasP, decP, plxP, pmrasP, pmdecP, rv*AUYR2KMS])
+                            
+
+    def calc_astro_hipp_binned(theta, plx, df):
+        per, K, pha, ecc, omega, I, Omega = theta
+
+        # Precompute constants
+        sinI, cosI = np.sin(I), np.cos(I)
+        sqrt1_e2 = np.sqrt(1 - ecc**2)
+
+        # Mean anomaly
+        #freq = two_pi / per
+        freq = 2. * np.pi / per
+        M = freq * (df['BJD'] - common_t) + pha  # AM_abs_T
+        E = kepler.solve(M, np.repeat(ecc, len(M)))
+
+        f = (np.arctan(((1. + ecc) ** 0.5 / (1. - ecc) ** 0.5) * np.tan(E / 2.)) * 2.)
+
+        # Thiele-Innes constants
+        A, B, F, G, C, H = thiele_innes(omega, Omega, sinI, cosI)
+
+        # Orbit in the orbital plane
+        X = np.cos(E) - ecc
+        Y = sqrt1_e2 * np.sin(E)
+
+        # Velocity components in the orbital plane
+        VX = -np.sin(f)
+        VY = np.cos(f) + ecc
+
+        # Auxiliary constants
+        alpha0 = K/sinI/PC_PER_KPC/AUYR2KMS  # au/yr
+        beta0 = per/DAY_PER_YEAR*(K/PC_PER_KPC/AUYR2KMS)*sqrt1_e2/(2*np.pi)/sinI  # au
+        alpha = -alpha0 * plx
+        beta = -beta0 * plx  # mas
+
+        # Sky plane coordinates
+        rasP = beta * (B*X + G*Y)
+        decP = beta * (A*X + F*Y)
+        plxP =-beta * (C*X + H*Y) * plx/206265e3  # parallax change
+
+        # Proper motions
+        pmrasP = alpha * (B*VX + G*VY)
+        pmdecP = alpha * (A*VX + F*VY)
+        rv = alpha0 * (C*VX + H*VY)  # km/s
+
+        # Photocentric motion correction (if eta != 0)
+        #sma, mp = cps(per, K, ecc)
+        #mp /= sinI
+        eta = 0  #calc_eta(mp)
+        if eta != 0:
+            xi = 1 / (eta + 1)
+            rasP *= xi
+            decP *= xi
+            plxP *= xi
+            pmrasP *= xi
+            pmdecP *= xi
+
+        # mas | mas/yr
+        return np.array([rasP, decP, plxP, pmrasP, pmdecP, rv*AUYR2KMS])
+
+
+    def AstroDiff(obs1, obs2):
+        # obs1, obs2: ra[deg], dec[deg], parallax [mas], pmra [mas/yr], pmdec [mas/yr], rv [km/s]
+        dobs = obs2 - obs1
+        dobs[:2] = dobs[:2] * np.longdouble(3.6e6)  # deg2mas
+        dobs[0] = dobs[0] * np.cos(np.deg2rad((obs1[1] + obs2[1])*0.5))
+        return dobs
+

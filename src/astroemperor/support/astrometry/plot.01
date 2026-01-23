@@ -1,0 +1,67 @@
+
+coor = astrometry_iad_model(theta)
+bary = model_barycenter(theta_am_off)
+
+coor_h = coor[:, :N_HIPP]  # flag
+bary_h = bary[0, :]  # Flag
+
+coor_g         = coor[:3, -N_GOST:]
+barycenter_g   = bary[AM_iref_, :]
+bary_g         = obs_lin_prop_simple(barycenter_g).T[:3]
+
+dra_g = coor_g[0]
+dec_g = coor_g[1]
+                
+fdra, fdde = ca[0], ca[1]  # model      
+fdrag, fddeg = go[0], go[1]
+
+
+def _construct_cov(catalog_data):
+    keys = ['ra', 'dec', 'parallax', 'pmra', 'pmdec']
+    num_entries = len(catalog_data)
+    cov_matrices = np.zeros((num_entries, 5, 5), dtype=float)
+
+    for idx, row in catalog_data.iterrows():
+        cov_matrix = np.zeros((5, 5), dtype=float)
+        for i, key_i in enumerate(keys):
+            error_key = f'{key_i}_error'
+            cov_matrix[i, i] = row[error_key] ** 2
+            for j in range(i + 1, 5):
+                key_j = keys[j]
+                cov_key = f'{key_i}_{key_j}_cov'
+                cov_value = row[cov_key]
+                cov_matrix[i, j] = cov_matrix[j, i] = cov_value
+        cov_matrices[idx] = cov_matrix
+    return cov_matrices
+
+AM_gaia_cov_ = _construct_cov(data_hg123)
+
+def band_polygon(pos, mu, S_pp, S_pmu, S_mup, S_mumu,
+                smin=-1.0, smax=1.0, n=200, Nsigma=1.0):
+    # Unit normal to the line (rotate by +90°)
+    mu_norm = np.hypot(mu[0], mu[1])
+    if mu_norm == 0:
+        raise ValueError("Proper-motion offset vector is zero.")
+    nvec = np.array([-mu[1], mu[0]]) / mu_norm
+
+    ss = np.linspace(smin, smax, n)
+    left, right = [], []
+
+    for s in ss:
+        p = pos + s*mu
+        S = S_pp + s*(S_pmu + S_mup) + (s**2)*S_mumu
+        # project 2D covariance onto the normal direction
+        width = Nsigma * np.sqrt(nvec @ S @ nvec)
+        left.append(p + width*nvec)
+        right.append(p - width*nvec)
+
+    # build closed polygon: one edge forward, the other backward
+    poly = np.vstack([left, right[::-1]])
+    return poly
+
+data_iad_hipp0 = data_iad_hipp.copy()
+
+
+
+
+
