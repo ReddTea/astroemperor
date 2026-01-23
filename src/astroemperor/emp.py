@@ -20,7 +20,7 @@ from .math_utils import find_confidence_intervals, cps, delinearize, adelineariz
 
 from .block_repo import *
 from .emp_model  import ReddModel
-from .canvas import plot_GM_Estimator, plot_beta_density, plot_trace2, plot_KeplerianModel, super_plots, plot_histograms, plot_betas, plot_rates
+from .canvas import plot_GM_Estimator, plot_beta_density, plot_trace2, plot_KeplerianModel, super_plots, plot_histograms, plot_betas, plot_rates, plot_AstrometricModel
 from .globals import _CORES, _PLATFORM_SYSTEM
 
 from tabulate import tabulate
@@ -497,6 +497,7 @@ setattr(gaussian_mixture_objects[{p.gC_}], '{at}', {coso})''')
         if self.engine__.__name__ == 'reddemcee':
             f.write(f'''
 logging.getLogger('emcee').setLevel('{self.run_config['logger_level']}')
+logging.getLogger('reddemcee').setLevel('{self.run_config['logger_level']}')
 ''')
 
 
@@ -587,7 +588,7 @@ sampler = reddemcee.PTSampler(nwalkers,
                              smd_history={self.engine_config["smd_history"]},
                              adapt_tau={self.engine_config["adapt_tau"]},
                              adapt_nu={self.engine_config["adapt_nu"]},
-                             adapt_mode={self.engine_config["adapt_mode"]}
+                             adapt_mode="{self.engine_config["adapt_mode"]}"
                              )
 
 ''')
@@ -891,6 +892,27 @@ class emp_painter(object):
                                      'nice_name':'Plotting Keplerian Models',
                                     }
 
+        self.plot_astrometric_model = {'figsize':(10, 8),
+                                       'line_width':2,
+                                       'ceil_step':0.5,
+                                       'label_fontsize':22,
+                                       'title_fontsize':12,
+                                       'tick_labelsize':18,
+                                       'major_tick_length':8,
+                                       'minor_tick_length':4,
+                                       'marker_size':8,
+                                       'scatter_size':20,
+                                       'legend_fs':14,
+                                       'fm_frame_lw':3,
+                                       'celerite':False,
+                                       'fonts':fonts_kwargs,
+                                       'name':'plot_astrometric_model',
+                                       'function':plot_AstrometricModel,
+                                       'nice_name':'Plotting Astrometric Model',
+                                       }
+
+        
+
         self.plot_betas = {'title_fs':24,
                            'xaxis_fs':18,
                            'yaxis_fs':18,
@@ -992,6 +1014,9 @@ class emp_painter(object):
                                },
             'plot_keplerian_model':{'model_':self.model
                                    },
+            'plot_astrometric_model':{'model_':self.model,
+                                      'input_theta':repr(np.asarray(self.fit_max).tolist())
+                                      },
             'plot_betas':{'betas':plot_betas_betas_disc,
                           'logls':np.array([np.mean(self.likes[t]) for t in range(setup[0])]),
                           'Z':self.evidence,
@@ -1067,12 +1092,23 @@ class emp_painter(object):
 
 
     def _plot_routines_check(self):
-
         for pi in self.plot_all_list:
             if pi['name'] == 'plot_keplerian_model':
-                    pi['use_c'] = self.use_c
-                    pi['celerite'] = self.switch_celerite
-                    pi['common_t'] = self.my_data_common_t
+                pi['use_c'] = self.use_c
+                pi['celerite'] = self.switch_celerite
+                pi['common_t'] = self.my_data_common_t
+
+
+            if pi['name'] == 'plot_astrometric_model':
+                pi['tail'] = self.backend_name
+                if self.model.kplan__ == 0:
+                    pi['plot'] = False
+                else:
+                    for b in self.model:
+                        if b.type_ == 'Keplerian':
+                            if b.astrometry_bool == False:
+                                pi['plot'] = False
+
 
 
         if self.engine__.__name__ == 'reddemcee':
@@ -1094,7 +1130,6 @@ class emp_painter(object):
                         pi['thin'] = self.reddemcee_thin
 
                 
-
 
         if self.engine__.__name__ == 'dynesty':
             self.plot_posteriors['chain_alpha'] = 1.0
@@ -1149,7 +1184,7 @@ class emp_stats(object):
         new_d = np.round(new, 3)  # new
         old_d = np.round(old, 3)  # old
 
-        self.logger(f'\npast {self._crit_current} - present {self._crit_current} > 5', c='blue')
+        self.logger(f'\n(Past {self._crit_current}) - (Present {self._crit_current}) > 5', c='blue')
         self._crit_msg = f'{old_d} - {new_d} > {self._crit_tolerance}'
 
         return old - new > self._crit_tolerance
@@ -1432,18 +1467,29 @@ class emp_counsil(object):
         if self.switch_evidence:
             try:
                 zaux = getattr(self.sampler, f'get_evidence_{self.evidence_method}')(discard=self.reddemcee_discard)[:2]
-                if zaux[0] == -np.inf:
-                    print('Are you running a short chain?')
-                    print(f'Evidence with {self.evidence_method} failed! Trying fallback to TI')
-                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard)[:2]
-                if zaux[0] == -np.inf:
-                    print('Are you running a short chain?')
-                    print('Evidence with TI failed! Trying fallback to classic')
-                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)[:2]
-
             except Exception:
-                print('Thermodynamic Integration interpolation failed! Using classic method...')
-                zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)
+                print(f'Are you running a short chain? Evidence with {self.evidence_method} failed! Trying fallback to TI+.')
+                #print('Thermodynamic Integration interpolation failed! Using classic method...')
+                try:
+                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard)[:2]
+                except Exception:
+                    print('Are you running a short chain? Evidence with TI+ failed! Trying fallback to classic TI.')
+                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)
+
+                if zaux[0] == -np.inf:
+                    print('Are you running a short chain? Evidence with TI+ failed! Trying fallback to classic TI.')
+                    zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)
+
+
+
+            if zaux[0] == -np.inf:
+                print(f'Are you running a short chain? Evidence with {self.evidence_method} failed! Trying fallback to TI+.')
+                zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard)[:2]
+
+            if zaux[0] == -np.inf:
+                print('Are you running a short chain? Evidence with TI+ failed! Trying fallback to classic TI.')
+                zaux = self.sampler.get_evidence_ti(discard=self.reddemcee_discard, pchip=False)[:2]
+
             self.evidence = zaux[0], zaux[1]
 
         self.best_loc_post = np.argmax(self.posts[0])
@@ -1517,29 +1563,6 @@ class emp_counsil(object):
         self.fit_low2, self.fit_high2 = all_quants[:, 2], all_quants[:, 3]
         self.fit_low3, self.fit_high3 = all_quants[:, 4], all_quants[:, 5]
 
-
-        '''
-        r = sim.sampler
-        weights = np.exp(r.logwt - r.logz[-1])
-        weights /= np.sum(weights)
-
-        for i in range(8):
-            ...:     print(dynesty.utils.quantile(samples[:, i], [0.36, 0.5, 0.64], weights))
-        vals = [[4.2307702768102, 4.230783913236789, 4.230797624141973],
-        [55.5163041392088, 55.709485945761706, 55.9056472781712],
-        [7.180579681830706, 7.3553242075764675, 7.585150916162191],
-        [0.0072205583259223535, 0.010166281858242752, 0.013384756270929339],
-        [0.8254052515045534, 1.0848266869015135, 1.4278938384403816],
-        [-0.004576031733818643, -0.004389921887157595, -0.004205252616377426],
-        [5.1502626959312945, 5.3115763243581355, 5.474122164860442],
-        [0.7824368659647362, 1.0536187976773366, 1.326083745360509],
-        ]
-
-        for v in vals:
-            print(f'{v[1]:.9f}+{v[2]-v[1]:.9f}-{v[1]-v[0]:.9f}')
-        '''
-
-
         pass
 
 
@@ -1582,139 +1605,166 @@ class emp_counsil(object):
         # Get extra chains
 
         ch0 = self.chain[0]
+        n_samp = len(ch0)
+        ch0_T = ch0.T  # shape: (n_params, n_samp)
+
+        def _param_vector_for_block(block):
+            """Return the per-block sampled/fixed parameters in the legacy index layout."""
+            n_base = 5
+            n_ast = 2 if block.astrometry_bool else 0
+            vec = [None] * (n_base + n_ast)
+
+            # Sampled params (from chain)
+            for p in block[block.C_]:
+                vec[p.C_] = ch0_T[p.cpointer]
+
+            # Fixed/analytic params
+            for p in block[block.A_]:
+                vec[p.A_] = np.full(n_samp, p.value, dtype=float)
+
+            return vec
+
+        def _append_extra(chains):
+            """Append one or many chains to `extra_chains`."""
+            if chains is None:
+                return
+            if isinstance(chains, (list, tuple)):
+                extra_chains.extend(chains)
+            else:
+                extra_chains.append(chains)
+
+        # Retrieve Planet Signatures
         for b in self.model:
-            ## PLANET SIGNATURES
-            if b.type_ == 'Keplerian':
-                my_params = [None, None, None, None, None]
+            if b.type_ != 'Keplerian':
+                continue
+
+            vec = _param_vector_for_block(b)
+
+            # Convenience: inclination chain is always the penultimate element when astrometry is on
+            inc0 = inc_ = None
+            # These are the three things we ultimately need for cps:
+            per0 = A0 = ecc0 = None
+            per_ = A_ = ecc_ = None
+
+            if b.astrometry_bool:
+                # Convention in this codebase: inclination, Omega are the last two values
+                vals = b.get_attr("value")
+                inc0 = vals[-2]
+                inc_ = vec[-2]
+
+            # Handle parameterisation
+            par = b.parameterisation
+
+            if par == 0:
+                # Direct: (P, K, phase, e, ω [, i, Ω])
                 if b.astrometry_bool:
-                    my_params.extend([None, None])
+                    per0, A0, _, ecc0, _, _, _ = b.get_attr("value")
+                    per_, A_, _, ecc_, _, _, _ = vec
+                else:
+                    per0, A0, _, ecc0, _ = b.get_attr("value")
+                    per_, A_, _, ecc_, _ = vec
 
-                for p in b[b.C_]:
-                    my_params[p.C_] = ch0.T[p.cpointer]
+            elif par == 1:
+                # (P, K, phase, S, C) with S,C -> e,ω
+                per0, A0, _, S0, C0 = b.get_attr("value")[:5]
+                per_, A_, _, S_, C_ = vec[:5]
 
-                for p in b[b.A_]:
-                    my_params[p.A_] = p.value * np.ones(len(ch0))
+                ecc0, _ = delinearize(S0, C0)
+                ecc_, w_ = adelinearize(S_, C_)
 
-                if True:
-                    if b.parameterisation == 0:
-                        if b.astrometry_bool:
-                            per, A, phase, ecc, w, inc, Ome = b.get_attr('value')
-                            per_, A_, phase_, ecc_, w_, inc_, Ome_ = my_params
+                _append_extra([ecc_, w_])  # Eccentricity, Longitude_Periastron
 
+            elif par == 2:
+                # (logP, As, Ac, S, C) with:
+                #   P = exp(logP)
+                #   (As,Ac) -> (K, phase)
+                #   (S,C)   -> (e, ω)
+                P0, As0, Ac0, S0, C0 = b.get_attr("value")[:5]
+                P_, As_, Ac_, S_, C_ = vec[:5]
 
-                        else:
-                            per, A, phase, ecc, w = b.get_attr('value')
-                            per_, A_, phase_, ecc_, w_ = my_params
+                per0 = np.exp(P0)
+                per_ = np.exp(P_)
 
-                    elif b.parameterisation == 1:
-                        per, A, phase, S, C = b.get_attr('value')
-                        per_, A_, phase_, S_, C_ = my_params
+                A0, _ = delinearize(As0, Ac0)
+                ecc0, _ = delinearize(S0, C0)
 
-                        ecc, w = delinearize(S, C)
-                        ecc_, w_ = adelinearize(S_, C_)
+                A_, phase_ = adelinearize(As_, Ac_)
+                ecc_, w_ = adelinearize(S_, C_)
 
-                        for thingy in ['Eccentricity', 'Longitude_Periastron']:
-                            extra_names.append(thingy+'_{}'.format(b.number_))
+                _append_extra([per_, A_, phase_, ecc_, w_])  # Period, Amplitude, Phase, e, ω
 
-                        for thingy in [ecc_, w_]:
-                            extra_chains.append(thingy)
+            elif par == 3:
+                # (P, K, t0, e, ω)
+                per0, A0, _, ecc0, _ = b.get_attr("value")[:5]
+                per_, A_, _, ecc_, _ = vec[:5]
 
+            elif par == 4:
+                # (P, K, t0, S, C) with S,C -> e,ω
+                per0, A0, _, S0, C0 = b.get_attr("value")[:5]
+                per_, A_, _, S_, C_ = vec[:5]
 
-                    elif b.parameterisation == 2:
-                        P, As, Ac, S, C = b.get_attr('value')
-                        P_, As_, Ac_, S_, C_ = my_params
+                ecc0, _ = delinearize(S0, C0)
+                ecc_, w_ = adelinearize(S_, C_)
 
-                        per = np.exp(P)
-                        per_ = np.exp(P_)
+                _append_extra([ecc_, w_])  # e, ω
 
-                        A, phase = delinearize(As, Ac)
-                        ecc, w = delinearize(S, C)
+            elif par == 6:
+                # (logP, K, phase, e, ω) with P = exp(logP)
+                logP0, A0, _, ecc0, _ = b.get_attr("value")[:5]
+                logP_, A_, _, ecc_, _ = vec[:5]
 
-                        A_, phase_ = adelinearize(As_, Ac_)
-                        ecc_, w_ = adelinearize(S_, C_)
+                per0 = np.exp(logP0)
+                per_ = np.exp(logP_)
 
-                        for thingy in ['Period', 'Amplitude', 'Phase', 'Eccentricity', 'Longitude_Periastron']:
-                            extra_names.append(thingy+'_{}'.format(b.number_))
+                _append_extra([per_])  # Period
 
-                        for thingy in [per_, A_, phase_, ecc_, w_]:
-                            extra_chains.append(thingy)
+            elif par == 7:
+                # (logP, K, phase, S, C) with P=exp(logP) and S,C -> e,ω
+                P0, A0, _, S0, C0 = b.get_attr("value")[:5]
+                P_, A_, _, S_, C_ = vec[:5]
 
-                    elif b.parameterisation == 3:
-                        per, A, t0, ecc, w = b.get_attr('value')
-                        per_, A_, t0_, ecc_, w_ = my_params
+                per0 = np.exp(P0)
+                per_ = np.exp(P_)
 
-                    elif b.parameterisation == 4:
-                        per, A, t0, S, C = b.get_attr('value')
-                        per_, A_, t0_, S_, C_ = my_params
+                ecc0, _ = delinearize(S0, C0)
+                ecc_, w_ = adelinearize(S_, C_)
 
-                        ecc, w = delinearize(S, C)
-                        ecc_, w_ = adelinearize(S_, C_)
-
-                        for thingy in ['Eccentricity', 'Longitude_Periastron']:
-                            extra_names.append(thingy)
-                        for thingy in [ecc_, w_]:
-                            extra_chains.append(thingy)
-
-                    elif b.parameterisation == 6:
-                        per, A, phase, ecc, w = b.get_attr('value')
-                        per_, A_, phase_, ecc_, w_ = my_params
-
-                        per = np.exp(per)
-                        per_ = np.exp(per_)
-
-                        for thingy in ['Period']:
-                            extra_names.append(thingy+'_{}'.format(b.number_))
-
-                        for thingy in [per_]:
-                            extra_chains.append(thingy)
+                _append_extra([per_, ecc_, w_])  # Period, e, ω
 
 
-                    elif b.parameterisation == 7:
-                        P, A, phase, S, C = b.get_attr('value')
-                        P_, A_, phase_, S_, C_ = my_params
+            if self.starmass:
+                # Point estimate (no M* uncertainty)
+                sma0, mm0 = cps(per0, A0, ecc0, self.starmass)
 
-                        per = np.exp(P)
-                        per_ = np.exp(P_)
+                # Posterior with stellar-mass uncertainty (if provided)
+                sma_, mm_ = cps(per_, A_, ecc_, self.starmass, self.starmass_err)
 
-                        ecc, w = delinearize(S, C)
-                        ecc_, w_ = adelinearize(S_, C_)
+                # Convert m sin i -> m true if inclination is sampled (astrometry)
+                if b.astrometry_bool and inc0 is not None and inc_ is not None:
+                    mm0 = mm0 / np.sin(inc0)
+                    mm_ = mm_ / np.sin(inc_)
 
-                        for thingy in ['Period', 'Eccentricity', 'Longitude_Periastron']:
-                            extra_names.append(thingy+'_{}'.format(b.number_))
+                # Store summaries (now consistent with names)
+                self.sma.append(sma0)
+                self.mm.append(mm0)
+                self.sma_sig.append(float(np.std(sma_)))
+                self.mm_sig.append(float(np.std(mm_)))
 
-                        for thingy in [per_, ecc_, w_]:
-                            extra_chains.append(thingy)
+                # And expose full posteriors as additional-parameter chains
+                _append_extra([sma_, mm_])  # Semi-Major Axis, Minimum/True Mass
 
+        # Push derived chains into the model's declared additional parameters
+        post_params = []
+        for b in self.model:
+            for p in b.additional_parameters:
+                if p.has_posterior:
+                    post_params.append(p)
 
-                    if self.starmass:
-                        sma, mm = cps(per, A, ecc, self.starmass)  # No starmass error
-                        sma_, mm_ = cps(per_, A_, ecc_, self.starmass, self.starmass_err)
-
-                        if b.astrometry_bool:
-                            mm = mm/np.sin(inc)
-                            mm_ = mm_/np.sin(inc_)
-
-                        self.sma_sig.append(sma)
-                        self.mm_sig.append(mm)
-
-                        self.sma_sig.append(np.std(sma_))
-                        self.mm_sig.append(np.std(mm_))
-
-                        extra_names.append('Semi-Major Axis [AU]')
-                        extra_names.append('Minimum Mass [M_J]')
-                        extra_chains.append(sma_)
-                        extra_chains.append(mm_)
-
-        ## Set p.values and sigma for extra params
-        if True:
-            ## **RED w/ set_attr\
-            jj = 0
-            for b in self.model:
-                for p in b.additional_parameters:
-                    if p.has_posterior:
-                        ch = extra_chains[jj]
-                        self._update_p_extra(p, ch)
-                        jj += 1
+        # If these ever diverge, it means the ordering assumptions are broken.
+        # (Keeping it silent by default; add a log/warn if you want.)
+        n = min(len(post_params), len(extra_chains))
+        for p, ch in zip(post_params[:n], extra_chains[:n]):
+            self._update_p_extra(p, ch)
 
         self.extra_chains = extra_chains
 
@@ -1829,7 +1879,7 @@ class emp_counsil(object):
                         if p.GM_parameter.n_components == 1:
                             mu = np.round(p.GM_parameter.mixture_mean, 3)
                             sig = np.round(p.GM_parameter.mixture_sigma, 3)
-                            p.display_posterior = '~𝓝 ({}, {})'.format(mu, sig)
+                            p.display_posterior = f'~𝓝 ({mu}, {sig})'
                         elif p.GM_parameter.n_components > 1:
                             mu = np.round(p.GM_parameter.mixture_mean, 3)
                             sig = np.round(p.GM_parameter.mixture_sigma, 3)
@@ -1875,55 +1925,22 @@ class emp_counsil(object):
         self.debug(f'postprocess() : PRINT POSTERIORS | {time.time()-self.time_init}')
         self.logger._add_subtitle('Best Fit', postprocess=True)
 
-        switch_title = True
-
-        #param_length = max(len(n) for n in self.model.get_attr_param('name', flat=True))
-        #value_length = max(len(n) for n in self.model.get_attr_param('value_max', flat=True))
-        #range_length = max(len(str(ran)) for ran in self.model.get_attr_param('value_range', flat=True))
-
-        #prior_length = max(len(n) for n in self.model.get_attr_param('display_prior', flat=True))
-        #limits_length = max(len(str(lim)) for lim in self.model.get_attr_param('limits', flat=True))
-
-
-        to_get = ['name',
-                    'value_max',
-                    'value_range',
-                    'display_prior',
-                    'limits']
-        for b in self.model:
-            
-            to_tab0 = b.get_attr(to_get)
-
-            if len(b.additional_parameters):
-                mask = [x.has_posterior for x in b.additional_parameters]
-                for p in np.array(b.additional_parameters)[mask]:
-                    p.display_prior = ''
-                    for j in range(len(to_get)):
-                        to_tab0[j] += [getattr(p, to_get[j])]
-
-            to_tab0[2] = (np.array(to_tab0[2]).T - np.array(to_tab0[1])).T
-
-            to_tab0 = adjust_table_tex(to_tab0, rounder=self.rounder_display)
-
-            to_tab = list(zip(*to_tab0))
-
-            df0 = pd.DataFrame(to_tab, columns=to_get)
-
-
-            if switch_title:
-                headers1 = ['Parameter',
-                            'Value (max)',
-                            'Range (-+ sig)',
-                            'Prior',
-                            'Limits',
-                            ]
-                switch_title = False
-            else:
-                headers1 = [' ' * len(s) for s in headers1]
-
-            self.logger(tabulate(df0,
-                                    headers=headers1,
-                                    showindex=False))
+        self.logger.log_blocks_table(self.model,
+                                     attrs=('name',
+                                            'value_max',
+                                            'value_range',
+                                            'display_prior',
+                                            'limits'),
+                                     titles=('Parameter',
+                                             'Value(max)',
+                                             'Range(±σ)',
+                                             'Prior',
+                                             'Limits'),
+                                     formatters={'value_max': lambda col: np.round(col, self.rounder_display),
+                                                 'value_range': lambda col: np.round(col, self.rounder_display),
+                                                 'limits': lambda col: np.round(col, self.rounder_display),
+                                                 },
+                                     round_ndigits=self.rounder_display)
 
 
     def _print_postproc_log(self):
@@ -1991,24 +2008,25 @@ class emp_counsil(object):
             
 
     def _print_3_statistics(self):
-        tabh_2 = ['Statistic                  ', 'Value']
+        tabh_2 = ['Statistic                 ', 'Value']
 
-        tab_2 = [['The maximum posterior is    :    ', '{:.3f}'.format(self.post_max)],
-                    ['The maximum likelihood is   :    ', '{:.3f}'.format(self.like_max)],
-                    ['The BIC is                  :    ', '{:.3f}'.format(self.BIC)],
-                    ['The AIC is                  :    ', '{:.3f}'.format(self.AIC)],
-                    ['The DIC is                  :    ', '{:.3f}'.format(self.DIC)],
-                    ['The HQIC is                 :    ', '{:.3f}'.format(self.HQIC)],
-                    ['The Bayes Factor is         :    ', '{:.3f}'.format(self.BayesFactor)],
-                    ['The chi2 is                 :    ', '{:.3f}'.format(self.chi2)],
-                    ['The reduced chi2 is         :    ', '{:.3f}'.format(self.chi2_red)],
-                    ['The RMSE is                 :    ', '{:.3f}'.format(self.RMSE)],
-                    ['The RMSi is                 :    ', f'{np.round(self.RMSi, 3)}'],
-                    ['The Weights are             :    ', f'{np.round(self.Weights, 3)}'],
-                    ]
+        tab_2 = [['Posterior  ln(P) (max)  : ', '{:.3f}'.format(self.post_max)],
+                 ['Likelihood ln(L) (max)  : ', '{:.3f}'.format(self.like_max)],
+                 ['Bayes Factor            : ', '{:.3f}'.format(self.BayesFactor)],
+
+                 ['BIC                     : ', '{:.3f}'.format(self.BIC)],
+                 ['AIC                     : ', '{:.3f}'.format(self.AIC)],
+                 ['DIC                     : ', '{:.3f}'.format(self.DIC)],
+                 ['HQIC                    : ', '{:.3f}'.format(self.HQIC)],
+                 ['χ²                      : ', '{:.3f}'.format(self.chi2)],
+                 ['Reduced χ²              : ', '{:.3f}'.format(self.chi2_red)],
+                 ['RMSE                    : ', '{:.3f}'.format(self.RMSE)],
+                 ['RMSi                    : ', f'{np.round(self.RMSi, 3)}'],
+                 ['Weights (RMS)           : ', f'{np.round(self.Weights, 3)}'],
+                 ]
         
         if self.switch_evidence:
-            x = [['The evidence is             :    ', '%.3f +- %.3f' % self.evidence]]
+            x = [['Evidence   ln(Z)        : ', '%.3f +- %.3f' % self.evidence]]
             tab_2 = np.vstack([x, tab_2])
 
         self.logger._add_subtitle('Statistical Details', double=True, postprocess=True)
@@ -2375,7 +2393,7 @@ class Simulation(emp_retainer, model_manager,
                               'smd_history':True,
                               'adapt_tau':1000,
                               'adapt_nu':1,
-                              'adapt_mode':0,
+                              'adapt_mode':'SAR',
                               'progress':True,
                               }
         # TODO burnin in int is for sweeps, should be in niter
@@ -2383,7 +2401,7 @@ class Simulation(emp_retainer, model_manager,
                            'adaptation_batches':None,
                            'adaptation_nsweeps':None,
                            'thin':1,
-                           'discard':0.5,
+                           #'discard':0.5,
                            'logger_level':'CRITICAL',
                             }
         
@@ -2816,32 +2834,12 @@ class Simulation(emp_retainer, model_manager,
 
         self.logger._add_subtitle('Pre-Run Info', postprocess=True)
 
-        switch_title = True
-
-        param_length = max(len(n) for n in self.model.get_attr_param('name', flat=True))
-        prior_length = max(len(n) for n in self.model.get_attr_param('display_prior', flat=True))
-        limits_length = max(len(str(lim)) for lim in self.model.get_attr_param('limits', flat=True))
-
-        for b in self.model:
-            to_tab0 = b.get_attr(['name', 'display_prior', 'limits'])
-
-            to_tab0[2] = np.round(to_tab0[2], 3)
-            to_tab = list(zip(*to_tab0))
-
-            if switch_title:
-                headers0 = [f"{'Parameter':<{param_length}}",
-                            f"{'Prior':<{prior_length}}",
-                            f"{'Limits':<{limits_length}}",
-                            ]
-                switch_title = False
-
-            else:
-                headers0 = [f"{'':<{param_length}}",
-                            f"{'':<{prior_length}}",
-                            f"{'':<{limits_length}}",
-                            ]
-            self.logger(tabulate(to_tab,
-                                headers=headers0))
+        self.logger.log_blocks_table(self.model,
+                                     attrs=("name", "display_prior", "limits"),
+                                     titles=("Parameter", "Prior", "Limits"),
+                                     formatters={"limits": lambda col: np.round(col, 3),
+                                                 },
+                                     round_ndigits=self.rounder_display)
 
         # logger math models
         self.logger.dline()
@@ -2903,15 +2901,16 @@ class Simulation(emp_retainer, model_manager,
     @property
     def plot_all_list(self):
         return [
-            self.plot_posteriors,
-            self.plot_histograms,
-            self.plot_keplerian_model,
+            self.plot_posteriors,       # 0
+            self.plot_histograms,       # 1
+            self.plot_keplerian_model,  # 2
             self.plot_periodogram,
-            self.plot_betas,  # 4
+            self.plot_betas,            # 4
             self.plot_beta_density,
-            self.plot_rates,
+            self.plot_rates,            # 6
             self.plot_gaussian_mixtures,
-            self.plot_trace,
+            self.plot_trace,            # 8
+            self.plot_astrometric_model,
         ]
 
 

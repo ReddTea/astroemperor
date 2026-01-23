@@ -620,10 +620,6 @@ AM_astro_gost = pd.read_csv('{saveloc}temp_astro{tail}.csv', index_col=0)
 #data_relast = pd.read_csv('{saveloc}temp_relast{tail}.csv')
 
 # LOAD COV MATRIX
-#AM_GSV = pd.read_csv(f'{saveloc}temp_AM_GSV{tail}.csv', index_col=0)
-#AM_inv_COV = pd.read_csv(f'{saveloc}temp_AM_inv_COV{tail}.csv', index_col=0)
-#AM_log_det_COV = pd.read_csv(f'{saveloc}temp_AM_log_det_COV{tail}.csv', index_col=0)
-
 AM_GSV = dict([
     ('GDR2', np.loadtxt('{saveloc}temp_AM_GSV_GDR2.csv')),
     ('GDR3', np.loadtxt('{saveloc}temp_AM_GSV_GDR3.csv')),
@@ -633,15 +629,12 @@ AM_inv_COV = np.load('{saveloc}temp_AM_inv_COV{tail}.npy')
 AM_log_det_COV = np.loadtxt('{saveloc}temp_AM_log_det_COV{tail}.csv')
 
 
-#AM_inv_COV = np.loadtxt(f'{saveloc}temp_AM_inv_COV{tail}.csv')
-
-#AM_log_det_COV = np.load(f'{saveloc}temp_AM_log_det_COV{tail}')
 # Define catalogs and reference index
 AM_cats_ = {self.AM_cats}
 AM_iref_ = -1  # Reference index pointing to GDR3 data
 
 
-# TODO Do this in datawrapper
+# TODO: Do this in datawrapper
 # Extract necessary columns from data_hg123
 columns_to_extract = ['ref_epoch', 'ra', 'dec', 'parallax', 'pmra', 'pmdec', 'radial_velocity']
 AM_catalogs_ = data_hg123[columns_to_extract].values
@@ -784,6 +777,7 @@ def {model_func_name}(theta):
     def _write_model_RV_GP(self, f):
         # TODO: we don't need to return gp.predict in my_model func for the mcmc run
         # TODO: we just need it for plots and models. kw?
+        # TODO: temp_kernel name should have run number
         if not self.switch_RV_celerite:
             return
         f.write('''
@@ -1289,14 +1283,16 @@ def calc_eta(m1, mlow_m22=0, mup_m22=99, mrl_m22=None):
 
 def astrometry_iad_model(theta):
     model = np.zeros((6, N_IAD))
+                                
+    theta_am_off = theta[{b.slice}]
+    plx0 = AM_PLX_ref - theta_am_off[2]
+
 ''')
                         
 
                         for bsub in self:
                             if bsub.type_ == 'Keplerian':
                                 f.write(f'''
-    theta_am_off = theta[{b.slice}]
-    plx0 = AM_PLX_ref - theta_am_off[2]
     model += calc_astro_new(theta[{bsub.slice}], plx0)
 ''')
 
@@ -1339,6 +1335,8 @@ def calc_astro_new(theta, plx):
     # Auxiliary constants
     alpha0 = K/sinI/PC_PER_KPC/AUYR2KMS  # au/yr
     beta0 = per/DAY_PER_YEAR*(K/PC_PER_KPC/AUYR2KMS)*sqrt1_e2/(2*np.pi)/sinI  # au
+    # TODO: define alpha and beta as negative for \Omega = \Omega + \pi
+    # TODO: we want it positive!
     alpha = -alpha0 * plx
     beta = -beta0 * plx  # mas
 
@@ -1631,6 +1629,8 @@ def _prepare_gost_inputs(coord, barycenter):
                     if True:
                         f.write(f'''
 def loglike_AM(theta):
+    for a in A_:
+        theta = np.insert(theta, a, mod_fixed_[a])
     theta_am_off = theta[{b.slice}]''')
 
 

@@ -6,6 +6,7 @@ import tracemalloc
 from termcolor import colored
 from sklearn.mixture import GaussianMixture
 from contextlib import contextmanager
+from tabulate import tabulate
 from .globals import _OS_ROOT
 
 
@@ -548,6 +549,67 @@ class reddlog(object):
         self(f"{msg:<{width}}" + colored(val, attrs=['bold']), c='blue', save_extra_n=True)
 
 
+    def stringify(self, x, round_ndigits=3):
+        """Return a nice string for scalars / arrays / strings."""
+        if isinstance(x, np.ndarray):
+            x = np.round(x.astype(float), round_ndigits) if np.issubdtype(x.dtype, np.number) else x
+            return np.array2string(
+                x,
+                separator=", ",
+                formatter={"float_kind": lambda v: f"{v:.{round_ndigits}f}".rstrip("0").rstrip(".")}
+            )
+        if isinstance(x, (float, np.floating)):
+            s = f"{float(x):.{round_ndigits}f}".rstrip("0").rstrip(".")
+            return s if s else "0"
+        return str(x)
+    
+
+    def log_blocks_table(self, model,
+                         attrs=("name", "display_prior", "limits"),
+                         titles=None,
+                         formatters=None,
+                         round_ndigits=3):
+        attrs = list(attrs)
+        titles = list(titles) if titles is not None else [a.replace("_", " ").title() for a in attrs]
+        formatters = formatters or {}
+
+        # --- First pass: gather all rows for all blocks (as strings) ---
+        per_block_rows = []
+        for b in model:
+            cols = b.get_attr(attrs)  # e.g. [names, priors, limits]
+            # apply formatters per column, then stringify per cell
+            cols_str = []
+            for a, col in zip(attrs, cols):
+                f = formatters.get(a, None)
+                if f is not None:
+                    col = f(col)
+                cols_str.append([self.stringify(v, round_ndigits=round_ndigits) for v in col])
+            rows = list(zip(*cols_str))
+            per_block_rows.append(rows)
+
+        # Column widths across all blocks (and header titles)
+        ncol = len(attrs)
+        widths = [len(titles[j]) for j in range(ncol)]
+        for rows in per_block_rows:
+            for row in rows:
+                for j, cell in enumerate(row):
+                    widths[j] = max(widths[j], len(cell))
+
+        def pad_headers(hdrs):
+            return [f"{h:<{widths[j]}}" for j, h in enumerate(hdrs)]
+
+        blank_headers = [""] * ncol
+
+        # --- Print ---
+        first = True
+        for rows in per_block_rows:
+            hdrs = titles if first else blank_headers
+
+            self(tabulate(rows, headers=pad_headers(hdrs)))
+            first = False
+
+
+
     def line(self, *args):
         self('\n', *args)
 
@@ -770,7 +832,7 @@ def adjust_table_tex(to_tab0, rounder=3):
         if type(to_tab0[j][0]) == str:
             to_tab0[j] = adjust_str_length(to_tab0[j])
 
-        elif type(to_tab0[j][0]) in [np.float64, list, np.ndarray]:
+        if type(to_tab0[j][0]) in [np.float64, list, np.ndarray]:
             to_tab0[j] = np.round(to_tab0[j], rounder)
 
     return to_tab0
@@ -779,6 +841,8 @@ def adjust_table_tex(to_tab0, rounder=3):
 def adjust_str_length(my_list):
     max_length = max(len(item) for item in my_list)
     return [item.ljust(max_length) for item in my_list]
+
+
 
 
 def mk_table(headers, values):

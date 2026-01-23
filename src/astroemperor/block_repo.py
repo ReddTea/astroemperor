@@ -19,6 +19,12 @@ subscript_nums = ['', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '�
 supscript_nums = ['', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹']
 
 
+def Parameter_add_number(p, number):
+    p.name += f' {number}'
+    p.mininame += f'{subscript_nums[number]}'
+    p.texname += rf'_{number}'
+
+
 def KeplerianBlock(parameterisation, number, use_c):
     params_param = [['dPeriod', 'dAmplitude', 'dPhase', 'dEccentricity', 'dLongitude'],
                     ['dPeriod', 'dAmplitude', 'dPhase', 'dEcc_sin', 'dEcc_cos'],
@@ -42,8 +48,7 @@ def KeplerianBlock(parameterisation, number, use_c):
     my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
     if number:
         for p in my_params:
-            p.name += f' {number}'
-            p.mininame += f' {number}'
+            Parameter_add_number(p, number)
 
     Empty_Block = {'name_':f'KeplerianBlock {number}',
                    'type_':'Keplerian',
@@ -78,8 +83,7 @@ def SinusoidBlock(number):
 
     if number:
         for p in my_params:
-            p.name += f' {number}'
-            p.mininame += f' {number}'
+            Parameter_add_number(p, number)
 
     block_attributes = {'name_':'SinusoidBlock',
                         'type_':'Sinusoid',
@@ -106,10 +110,12 @@ def OffsetBlock(number, marginalize=False):
         model_to_use = 'offset01.model'
     else:
         for i in range(number):
-            offset_dict = pr.make_parameter(getattr(pr, 'dOffset'))
-            offset_dict['name'] += f' {i+1}'
-            offset_dict['mininame'] += f' {i+1}'
-            my_params.append(Parameter(offset_dict))
+            my_param = Parameter(pr.make_parameter(getattr(pr, 'dOffset')))
+
+            Parameter_add_number(my_param, i+1)
+
+            my_params.append(my_param)
+
         model_to_use = 'offset00.model'
     
 
@@ -137,29 +143,26 @@ def OffsetBlock(number, marginalize=False):
 def AccelerationBlock(accel):
     my_params = []
     for i in range(accel):
-        accel_dict = pr.make_parameter(getattr(pr, 'dAcceleration'))
-        if i == 0:
-            accel_dict['name'] = 'Acceleration'
-            accel_dict['unit'] = r'($\frac{m}{s day}$)'
-        else:
-            accel_dict['name'] = f'Acceleration Order {str(i + 1)}'
-            accel_dict['unit'] = r'($\frac{m}{s day^%s}$)' % str(i + 1)
-            accel_dict['mininame'] += f' {i+1}'
+        accel_param = Parameter(pr.make_parameter(getattr(pr, 'dAcceleration')))
+        if i > 0:
+            accel_param['name'] += ' Order'
+            accel_param['unit'] = r'($\frac{m}{s day^%s}$)' % str(i + 1)
+            Parameter_add_number(accel_param, i+1)
 
-        my_params.append(Parameter(accel_dict))
-    
+        my_params.append(accel_param)
+
     math_display = f'γ{subscript_nums[1]}'
     for j in range(accel-1):
         math_display += f' + γ{subscript_nums[2 + j]}'
 
-    block_attributes = {'name_':f'AccelerationBlock o{accel}',
+    block_attributes = {'name_':f'AccelerationBlock 𝓞{accel}',
                         'type_':'Acceleration',
                         'class_':'Data',
                         'is_iterative':False,
                         'display_on_data_':False,
                         'parameterisation':None,
                         'number_':accel,
-                        
+
                         'bnumber_':0,
                         'moav':0,
                         'slice':None,
@@ -176,11 +179,10 @@ def AccelerationBlock(accel):
 def JitterBlock(number):
     my_params = []
     for i in range(number):
-        jitter_dict = pr.make_parameter(getattr(pr, 'dJitter'))
-        jitter_dict['name'] += f' {i+1}'
-        jitter_dict['mininame'] += rf'_{i+1}'
+        jitter_param = Parameter(pr.make_parameter(getattr(pr, 'dJitter')))
+        Parameter_add_number(jitter_param, i+1)
 
-        my_params.append(Parameter(jitter_dict))
+        my_params.append(jitter_param)
     
     block_attributes = {'name_':'JitterBlock',
                         'type_':'Jitter',
@@ -214,6 +216,8 @@ def MOAVBlock(number, moav_args=None):
     for i, j in itertools.product(range(param_range), range(order)):
         MA_coef_dict = pr.make_parameter(getattr(pr, 'dMACoefficient'))
         MA_coef_dict['name'] += f' {i+1} Order {j+1}'
+        MA_coef_dict['mininame'] += f'{subscript_nums[i+1]} 𝓞{supscript_nums[j+1]}'
+        MA_coef_dict['texname'] += f'_{i+1}({j+1})'
 
         MA_time_dict = pr.make_parameter(getattr(pr, 'dMATimescale'))
         MA_time_dict['name'] += f' {i+1} Order {j+1}'
@@ -246,7 +250,8 @@ def SAIBlock(number, sa=False):
         for si in range(sa[i]):
             d0 = pr.make_parameter(getattr(pr, 'dStaract'))
             d0['name'] += f' {i+1} {si+1}'
-            d0['mininame'] += f'_{i+1} {si+1}'
+            d0['mininame'] += f'{subscript_nums[i+1]}{subscript_nums[si+1]}'
+            d0['texname'] += f'_{i+1}^{si+1}'
             my_params.append(Parameter(d0))
 
 
@@ -277,18 +282,23 @@ def MagneticCycleBlock(number):
     my_params = [Parameter(pr.make_parameter(getattr(pr, par))) for par in param_list]
 
     if True:
-        my_params[0].name += f' S{1}'
-        my_params[0].mininame += f' S{1}'
+        my_params[0].name += f' S1'
+        my_params[0].mininame += f' S₁'
+        my_params[0].texname += rf' S_1'
 
-        my_params[1].name += f' S{1}'
-        my_params[1].mininame += f' S{1}'
-        my_params[2].name += f' S{2}'
-        my_params[2].mininame += f' S{2}'
+        my_params[1].name += f' S1'
+        my_params[1].mininame += f' S₁'
+        my_params[1].texname += rf' S_1'
+        my_params[2].name += f' S2'
+        my_params[2].mininame += f' S₂'
+        my_params[2].texname += rf' S_2'
 
-        my_params[3].name += f' S{1}'
-        my_params[3].mininame += f' S{1}'
-        my_params[4].name += f' S{2}'
-        my_params[4].mininame += f' S{2}'
+        my_params[3].name += f' S2'
+        my_params[3].mininame += f' S₁'
+        my_params[3].texname += rf' S_1'
+        my_params[4].name += f' S2'
+        my_params[4].mininame += f' S₂'
+        my_params[4].texname += rf' S_2'
 
         if False:
             for p in my_params:
@@ -395,7 +405,7 @@ def CeleriteBlock(nins, my_kernel):
         params_counter = 0
         for t in range(nterms):
             for _ in my_kernel['params'][t]:
-                my_params[params_counter].name += str(nterms_counter)
+                Parameter_add_number(my_params[params_counter], nterms_counter)
                 params_counter += 1
             nterms_counter += 1
 
@@ -441,7 +451,7 @@ def AstrometryKeplerianBlock(parameterisation, number, use_c):
 
     if number:
         for p in my_params:
-            p.name += f' {number}'
+            Parameter_add_number(p, number)
     
     init_Block.list_ = np.append(init_Block.list_, my_params)
 
@@ -638,9 +648,10 @@ class SmartSetter(object):
             additional_parameter.has_posterior = False
             additional_parameter.limits = [0, np.pi]
             if b.number_:
-                additional_parameter.name += f' {b.number_}'
-                additional_parameter.mininame += f' {b.number_}'
-            additional_parameter.display_name = additional_parameter.name
+                Parameter_add_number(additional_parameter, b.number_)
+
+
+            additional_parameter.display_name = additional_parameter.mininame
             b.add_additional_parameters(additional_parameter)
 
 
@@ -654,9 +665,9 @@ class SmartSetter(object):
             additional_parameter.has_posterior = True
             additional_parameter.limits = [1e-5, 1000]
             if b.number_:
-                additional_parameter.name += f' {b.number_}'
-                additional_parameter.mininame += f' {b.number_}'
-            additional_parameter.display_name = additional_parameter.name
+                Parameter_add_number(additional_parameter, b.number_)
+
+            additional_parameter.display_name = additional_parameter.mininame
             b.add_additional_parameters(additional_parameter)
 
     def ecc_w_add_additional(self, b, prargs=None):
@@ -677,9 +688,8 @@ class SmartSetter(object):
         for additional_parameter in my_params:
             additional_parameter.has_posterior = True
             if b.number_:
-                additional_parameter.name += f' {b.number_}'
-                additional_parameter.mininame += f' {b.number_}'
-            additional_parameter.display_name = additional_parameter.name
+                Parameter_add_number(additional_parameter, b.number_)
+            additional_parameter.display_name = additional_parameter.mininame
             b.add_additional_parameters(additional_parameter)
 
     def per_add_additional(self, b, per_limiter=None):
@@ -688,9 +698,9 @@ class SmartSetter(object):
         my_params.limits = [0, per_limiter]
         my_params.has_posterior = True
         if b.number_:
-            my_params.name += f' {b.number_}'
-            my_params.mininame += f' {b.number_}'
-            my_params.display_name = my_params.name
+            Parameter_add_number(my_params, b.number_)
+
+            my_params.display_name = my_params.mininame
             b.add_additional_parameters(my_params)
 
 
