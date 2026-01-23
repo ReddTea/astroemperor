@@ -3,7 +3,7 @@
 # -*- coding: utf-8 -*-
 
 # Metadata about the package
-__version__ = '0.9.12'
+__version__ = '1.0'
 __name__ = 'astroemperor'
 __url__ = "https://astroemperor.readthedocs.io"
 
