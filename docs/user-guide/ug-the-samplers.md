@@ -28,7 +28,7 @@ More information on `reddemcee`'s options can be found on [reddemcee's documenta
 | moves         | (opt) list | moves used by the sampler                      |
 | tsw_history   | (opt) bool | Saves the temperature swap rate. |
 | smd_history   | (opt) bool | Saves the swap mean distance.    |
-| adapt_mode    | int        | Uses different adaptation schemes.             |
+| adapt_mode    | str        | Uses different adaptation schemes.             |
 | adapt_tau     | float      | Ladder adaptation decay timescale.             |
 | adapt_nu      | float      | Ladder adaptation decay rate.                  |
 | progress      | bool       | Wheter to display the progress bar.            |

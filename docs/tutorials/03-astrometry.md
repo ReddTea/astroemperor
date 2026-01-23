@@ -1,6 +1,6 @@
 # Astrometry
 
-This section is a hands-on tutorial on how to make a simple run with joint RVs with astrometry (RVAM).
+This section is a hands-on tutorial on how to make a simple run with joint RVs with astrometry (RV+AM).
 We use the HIP 21850 data available on [GitHub](https://github.com/ReddTea/astroemperor/tree/main/tests/datafiles/HIP21850).
 
 ## Data

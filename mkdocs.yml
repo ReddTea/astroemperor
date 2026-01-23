@@ -17,9 +17,9 @@ nav:
       - The Results: user-guide/ug-the-results.md
       - FAQ: user-guide/ug-FAQ.md
   - Tutorials:
-      - Peg 51: tutorials/01-51peg-basic.md
-      - Peg 51 advanced: tutorials/02-51peg-advanced.md
-      - Astrometry: tutorials/03-astrometry.md
+      - Peg 51: tutorials/RV_01_51peg_basic.ipynb
+      - Peg 51 advanced: tutorials/RV_02_51peg_advanced.ipynb
+      - Astrometry: tutorials/AM_01_astrometry.ipynb
       #- Quickstart: tutorials/quickstart/quickstart.md
       #- Fitting a model: tutorials/fitting_model/fitting_model.md
       #- Temperatures & Adaptation: tutorials/temperatures/temperatures.md
@@ -28,6 +28,10 @@ nav:
       #- Autocorrelation Analysis: tutorials/autocorrelation-analysis.md
       #- Moves: tutorials/moves.md
   - API Reference: reference/api.md
+
+exclude_docs: |
+  tutorials/datalogs/*
+
 
 theme:
   name: material  # material  # readthedocs # mkdocs #
@@ -88,9 +92,6 @@ extra_javascript:
   - https://unpkg.com/katex@0/dist/fonts/KaTeX_Size2-Regular.ttf
 
 
-
-
-
 extra_css:
   - https://unpkg.com/katex@0/dist/katex.min.css
 
@@ -99,6 +100,11 @@ plugins:
   - privacy
   - autorefs
   - mkdocstrings
+  - mkdocs-jupyter:
+      include_source: true
+  - redirects:
+      redirect_maps:
+        tutorials/astrometry.md: https://astroemperor.readthedocs.io/en/latest/tutorials/AM_01_astrometry/
 
 
 extra:
