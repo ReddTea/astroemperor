@@ -108,6 +108,33 @@ In depth utilities of `EMPEROR`.
 - [FAQ](user-guide/ug-FAQ.md)
 
 
-## Tutorials
-
 ## License and Attribution
+
+Copyright (c) 2024 Pablo Peña Rojas.
+
+`EMPEROR` is open software under the MIT License (see [License](https://github.com/ReddTea/astroemperor/blob/main/LICENSE)).
+
+If you use `EMPEROR`, please cite the paper ([arXiv](https://arxiv.org/abs/2511.05331), [ADS](https://ui.adsabs.harvard.edu/abs/2025A%26A...704A.323P/abstract), [SciX](https://scixplorer.org/abs/2025A%26A...704A.323P/abstract), [aanda](https://www.aanda.org/articles/aa/full_html/2025/12/aa54336-25/aa54336-25.html)).
+
+
+
+BibTeX:
+```
+@ARTICLE{2025A&A...704A.323P,
+       author = {{Pe{\~n}a R.}, Pablo A. and {Jenkins}, James S.},
+        title = "{EMPEROR: I. Exoplanet MCMC parallel tempering for RV orbit retrieval}",
+      journal = {A\&A},
+     keywords = {methods: data analysis, methods: numerical, techniques: radial velocities, planets and satellites: detection, planets and satellites: individual: HD 55693, planets and satellites: individual: Barnard's Star, Earth and Planetary Astrophysics, Instrumentation and Methods for Astrophysics},
+         year = 2025,
+        month = dec,
+       volume = {704},
+          eid = {A323},
+        pages = {A323},
+          doi = {10.1051/0004-6361/202554336},
+archivePrefix = {arXiv},
+       eprint = {2511.05331},
+ primaryClass = {astro-ph.EP},
+       adsurl = {https://ui.adsabs.harvard.edu/abs/2025A&A...704A.323P},
+      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+}
+```
