@@ -1599,7 +1599,7 @@ class emp_counsil(object):
         self.sma_sig = []
         self.mm_sig = []
 
-        extra_names = []
+        #extra_names = []
         extra_chains = []
 
         # Get extra chains
@@ -1753,6 +1753,7 @@ class emp_counsil(object):
                 # And expose full posteriors as additional-parameter chains
                 _append_extra([sma_, mm_])  # Semi-Major Axis, Minimum/True Mass
 
+        '''
         # Push derived chains into the model's declared additional parameters
         post_params = []
         for b in self.model:
@@ -1765,6 +1766,15 @@ class emp_counsil(object):
         n = min(len(post_params), len(extra_chains))
         for p, ch in zip(post_params[:n], extra_chains[:n]):
             self._update_p_extra(p, ch)
+        '''
+        if True:
+            jj = 0
+            for b in self.model:
+                for p in b.additional_parameters:
+                    if p.has_posterior:
+                        ch = extra_chains[jj]
+                        self._update_p_extra(p, ch)
+                        jj += 1
 
         self.extra_chains = extra_chains
 

@@ -576,9 +576,16 @@ class reddlog(object):
         # --- First pass: gather all rows for all blocks (as strings) ---
         per_block_rows = []
         for b in model:
-            cols = b.get_attr(attrs)  # e.g. [names, priors, limits]
+            cols = b.get_attr(attrs)  # [names, priors, limits]
             # apply formatters per column, then stringify per cell
             cols_str = []
+
+            if len(b.additional_parameters):
+                mask = [x.has_posterior for x in b.additional_parameters]
+                for p in np.array(b.additional_parameters)[mask]:
+                    for i in range(len(cols)):
+                        cols[i].append(getattr(p, attrs[i]))
+
             for a, col in zip(attrs, cols):
                 f = formatters.get(a, None)
                 if f is not None:
@@ -586,6 +593,13 @@ class reddlog(object):
                 cols_str.append([self.stringify(v, round_ndigits=round_ndigits) for v in col])
             rows = list(zip(*cols_str))
             per_block_rows.append(rows)
+
+
+        if len(b.additional_parameters):
+            mask = [x.has_posterior for x in b.additional_parameters]
+            for p in np.array(b.additional_parameters)[mask]:
+                p.get_attr
+
 
         # Column widths across all blocks (and header titles)
         ncol = len(attrs)

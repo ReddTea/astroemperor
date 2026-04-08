@@ -170,6 +170,16 @@ class Parameter_Block(object):
             print('Unidentified call type, try str, list or array')
 
 
+    def get_additional_attr(self, call):
+        try:
+            if type(call) == str:
+                return np.array([getattr(param, call) for param in self.additional_parameters])
+            else:
+                return [[getattr(param, c) for param in self.additional_parameters] for c in call]
+        except Exception:
+            print('Unidentified call type, try str, list or array')
+
+
     def set_attr(self, call, val, silent=False):
         x = ''
         for i in range(len(self)):
