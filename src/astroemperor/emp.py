@@ -1743,6 +1743,8 @@ class emp_counsil(object):
                 if b.astrometry_bool and inc0 is not None and inc_ is not None:
                     mm0 = mm0 / np.sin(inc0)
                     mm_ = mm_ / np.sin(inc_)
+                    newname = b.additional_parameters[1].name.replace('Minimum ', '')
+                    b.additional_parameters[1].name = newname
 
                 # Store summaries (now consistent with names)
                 self.sma.append(sma0)
@@ -1935,22 +1937,56 @@ class emp_counsil(object):
         self.debug(f'postprocess() : PRINT POSTERIORS | {time.time()-self.time_init}')
         self.logger._add_subtitle('Best Fit', postprocess=True)
 
-        self.logger.log_blocks_table(self.model,
-                                     attrs=('name',
-                                            'value_max',
-                                            'value_range',
-                                            'display_prior',
-                                            'limits'),
-                                     titles=('Parameter',
-                                             'Value(max)',
-                                             'Range(±σ)',
-                                             'Prior',
-                                             'Limits'),
-                                     formatters={'value_max': lambda col: np.round(col, self.rounder_display),
-                                                 'value_range': lambda col: np.round(col, self.rounder_display),
-                                                 'limits': lambda col: np.round(col, self.rounder_display),
-                                                 },
-                                     round_ndigits=self.rounder_display)
+        titles = ['Parameter', 'Value(max)', 'Range(±σ)', 'Prior', 'Limits']
+        formatters = {'value_max': lambda col: np.round(col, self.rounder_display),
+                      'value_range': lambda col: np.round(col, self.rounder_display),
+                      'limits': lambda col: np.round(col, self.rounder_display)}
+
+        attrs = ['name', 'value_max', 'value_range', 'display_prior', 'limits']
+        per_block_rows = []
+        for b in self.model:
+            to_tab0 = b.get_attr(attrs)
+            cols_str = []
+
+            if len(b.additional_parameters):
+                mask = [x.has_posterior for x in b.additional_parameters]
+                for p in np.array(b.additional_parameters)[mask]:
+                    p.display_prior = ''
+                    for j in range(len(attrs)):
+                        to_tab0[j] += [getattr(p, attrs[j])]
+
+            to_tab0[2] = (np.array(to_tab0[2]).T - np.array(to_tab0[1])).T
+
+            for a, col in zip(attrs, to_tab0):
+                f = formatters.get(a, None)
+                if f is not None:
+                    col = f(col)
+                cols_str.append([self.logger.stringify(v, round_ndigits=self.rounder_display) for v in col])
+            rows = list(zip(*cols_str))
+            per_block_rows.append(rows)
+
+        # Column widths across all blocks (and header titles)
+        ncol = len(attrs)
+        widths = [len(titles[j]) for j in range(ncol)]
+        for rows in per_block_rows:
+            for row in rows:
+                for j, cell in enumerate(row):
+                    widths[j] = max(widths[j], len(cell))
+
+
+        def pad_headers(hdrs):
+            return [f"{h:<{widths[j]}}" for j, h in enumerate(hdrs)]
+
+        blank_headers = [""] * ncol
+
+        # --- Print ---
+        first = True
+        for rows in per_block_rows:
+            hdrs = titles if first else blank_headers
+
+            self.logger(tabulate(rows, headers=pad_headers(hdrs)))
+            first = False
+
 
 
     def _print_postproc_log(self):
