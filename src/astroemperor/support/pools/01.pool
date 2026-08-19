@@ -6,7 +6,7 @@ if is_darwin:
         multiprocessing.set_start_method('fork')  # not spawn
     except:
         print('\n FAILED \n multiprocessing.set_start_method(fork, force=True)\n')
-
+        print(' Method set to:', multiprocessing.get_start_method())
 from multiprocessing import Pool as Pool1
 
 mypool = Pool1(ncores)

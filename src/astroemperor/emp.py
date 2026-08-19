@@ -1069,7 +1069,7 @@ class emp_painter(object):
 
         self.logger('\n', save=False)
         self.logger(self.plot_gaussian_mixtures['nice_name'], center=True, c='green', save=False)
-        pbar_tot = np.sum(b.ndim_ + len(b.additional_parameters) for b in self.model)
+        pbar_tot = np.sum([b.ndim_ + len(b.additional_parameters) for b in self.model])
 
         pbar = tqdm(total=pbar_tot)
         for b in self.model:
@@ -1908,7 +1908,7 @@ class emp_counsil(object):
         time_gm_init = time.time()
         self.logger('Calculating Gaussian Mixtures', center=True, c='green', save=False)
 
-        pbartot = np.sum(b.ndim_ + len(b.additional_parameters) for b in self.model)
+        pbartot = np.sum([b.ndim_ + len(b.additional_parameters) for b in self.model])
         pbar = tqdm(total=pbartot)
         
         for b in self.blocks__:
@@ -2719,10 +2719,10 @@ class Simulation(emp_retainer, model_manager,
         new_crit = getattr(self, f'{self._crit_current}')
         old_crit = getattr(self, f'stats_old_{self._crit_current}')
         if self.criteria_compare(new_crit, old_crit):
-            self.logger(f'\n {self._crit_current} condition met!!', c='blue', attrs=['bold'])
+            self.logger(f'\n {self._crit_current} condition met!!', c='green', attrs=['bold'])
             self.logger(self._crit_msg, c='blue')
         else:
-            self.logger('\nBIC condition not met', c='blue')
+            self.logger('\nBIC condition not met', c='red')
             self.logger(self._crit_msg, c='blue')
             return True
 

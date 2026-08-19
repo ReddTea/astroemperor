@@ -1488,6 +1488,7 @@ def plot_AstrometricModel(model_=None, input_theta=None, options={}):
             f.write('''
 # dependencies
 if True:
+    import matplotlib.pyplot as pl
     import matplotlib.gridspec as gridspec
     import matplotlib.colors as plc
     from matplotlib.ticker import MaxNLocator, FixedLocator
