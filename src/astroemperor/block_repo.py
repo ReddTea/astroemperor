@@ -144,9 +144,9 @@ def AccelerationBlock(accel):
     my_params = []
     for i in range(accel):
         accel_param = Parameter(pr.make_parameter(getattr(pr, 'dAcceleration')))
-        if i > 0:
-            accel_param['name'] += ' Order'
-            accel_param['unit'] = r'($\frac{m}{s day^%s}$)' % str(i + 1)
+        if accel > 0:
+            accel_param.name += ' Order'
+            accel_param.unit = r'($\frac{m}{s day^%s}$)' % str(i + 1)
             Parameter_add_number(accel_param, i+1)
 
         my_params.append(accel_param)
@@ -173,7 +173,7 @@ def AccelerationBlock(accel):
                         'math_display_':math_display,
                         }
 
-    return Parameter_Block(my_params, block_attributes)
+    return Parameter_Block(my_params[::-1], block_attributes)
 
 
 def JitterBlock(number):
